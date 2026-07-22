@@ -4,21 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="162ccae8-4853-472f-a0e2-42ed8ef4fe31" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/checkstyle-idea.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/jarRepositories.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-api/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-app/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-domain/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-infrastructure/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-queries/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-trigger/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/hex-doc-types/pom.xml" afterDir="false" />
+    <list default="true" id="162ccae8-4853-472f-a0e2-42ed8ef4fe31" name="更改" comment="init: 初始化项目结构">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-app/src/main/java/com/hector/hexdoc/HexDocApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/src/main/java/com/hector/hexdoc/HexDocApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-app/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-app/target/classes/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/target/classes/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-app/target/classes/com/hector/hexdoc/HexDocApplication.class" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/target/classes/com/hector/hexdoc/HexDocApplication.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-app/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-domain/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-domain/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hex-doc-infrastructure/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-infrastructure/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,11 +25,29 @@
     <persistenceIdMap>
       <entry key="_/Users/hector/Desktop/dev/HexDoc" value="3Go09bw8oc0S3E7lZQhOYd0JEzF" />
       <entry key="_/Users/hector/Desktop/dev/docAI" value="3GnyGKcJpWr3b8SeC8Bd3JIvvr8" />
+      <entry key="_/Users/hector/Desktop/dev/hex-doc" value="3GqQU06BHPDbNDIllDSwR7Fx62D" />
     </persistenceIdMap>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;HectorGetFree&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:HectorGetFree/hex-doc.git&quot;,
+    &quot;accountId&quot;: &quot;db137511-5b46-4505-92e9-cc6f284e41b1&quot;
+  }
+}</component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
       <MavenGeneralSettings>
@@ -72,26 +86,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;Spring Boot.HexDocApplication.executor&quot;: &quot;Run&quot;,
-    &quot;copilot.chat.legacySessionMetadata.migrated&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/hector/Desktop/dev/HexDoc&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "Spring Boot.HexDocApplication.executor": "Run",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "git-widget-placeholder": "260722-user-service",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/hector/Desktop/dev/hex-doc",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RunManager">
     <configuration default="true" type="JetRunConfigurationType">
       <module name="HexDoc" />
@@ -155,10 +170,36 @@
       <workItem from="1784622464645" duration="794000" />
       <workItem from="1784681008798" duration="1416000" />
       <workItem from="1784695612254" duration="946000" />
+      <workItem from="1784696632094" duration="1163000" />
+      <workItem from="1784700207301" duration="3646000" />
     </task>
+    <task id="LOCAL-00001" summary="init: 初始化项目结构">
+      <option name="closed" value="true" />
+      <created>1784696681903</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1784696681903</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="init: 初始化项目结构" />
+    <option name="LAST_COMMIT_MESSAGE" value="init: 初始化项目结构" />
   </component>
 </project>

@@ -1,0 +1,10 @@
+com/hector/hexdoc/domain/tenant/model/entity/Tenant.class
+com/hector/hexdoc/domain/user/model/valobj/UserStatusVO.class
+com/hector/hexdoc/domain/user/model/entity/User$UserBuilder.class
+com/hector/hexdoc/domain/membership/model/valobj/MembershipRoleVO.class
+com/hector/hexdoc/domain/membership/model/entity/Membership.class
+com/hector/hexdoc/domain/user/model/entity/User.class
+com/hector/hexdoc/domain/tenant/model/valobj/TenantStatusVO.class
+com/hector/hexdoc/domain/tenant/model/entity/Tenant$TenantBuilder.class
+com/hector/hexdoc/domain/membership/model/valobj/MembershipStatusVO.class
+com/hector/hexdoc/domain/membership/model/entity/Membership$MembershipBuilder.class

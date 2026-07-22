@@ -1,0 +1,7 @@
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/user/model/entity/User.java
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/membership/model/valobj/MembershipStatusVO.java
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/membership/model/valobj/MembershipRoleVO.java
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/membership/model/entity/Membership.java
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/tenant/model/valobj/TenantStatusVO.java
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/user/model/valobj/UserStatusVO.java
+/Users/hector/Desktop/dev/hex-doc/hex-doc-domain/src/main/java/com/hector/hexdoc/domain/tenant/model/entity/Tenant.java
