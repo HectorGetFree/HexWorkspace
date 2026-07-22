@@ -4,17 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="162ccae8-4853-472f-a0e2-42ed8ef4fe31" name="更改" comment="init: 初始化项目结构">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-app/src/main/java/com/hector/hexdoc/HexDocApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/src/main/java/com/hector/hexdoc/HexDocApplication.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-app/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/src/main/resources/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-app/target/classes/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/target/classes/application.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-app/target/classes/com/hector/hexdoc/HexDocApplication.class" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/target/classes/com/hector/hexdoc/HexDocApplication.class" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-app/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-app/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-domain/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-domain/pom.xml" afterDir="false" />
+    <list default="true" id="162ccae8-4853-472f-a0e2-42ed8ef4fe31" name="更改" comment="feat: 拆分 user、tenant、membership 领域，并做好基本的数据模型">
+      <change beforePath="$PROJECT_DIR$/hex-doc-api/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-api/pom.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-domain/target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hex-doc-infrastructure/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/hex-doc-infrastructure/pom.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -171,7 +164,7 @@
       <workItem from="1784681008798" duration="1416000" />
       <workItem from="1784695612254" duration="946000" />
       <workItem from="1784696632094" duration="1163000" />
-      <workItem from="1784700207301" duration="3646000" />
+      <workItem from="1784700207301" duration="4669000" />
     </task>
     <task id="LOCAL-00001" summary="init: 初始化项目结构">
       <option name="closed" value="true" />
@@ -181,7 +174,23 @@
       <option name="project" value="LOCAL" />
       <updated>1784696681903</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="feat: 拆分 user、tenant、membership 领域，并做基本数据模型构建">
+      <option name="closed" value="true" />
+      <created>1784705625187</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1784705625187</updated>
+    </task>
+    <task id="LOCAL-00003" summary="feat: 拆分 user、tenant、membership 领域，并做好基本的数据模型">
+      <option name="closed" value="true" />
+      <created>1784705856098</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1784705856098</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -200,6 +209,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="init: 初始化项目结构" />
-    <option name="LAST_COMMIT_MESSAGE" value="init: 初始化项目结构" />
+    <MESSAGE value="feat: 拆分 user、tenant、membership 领域，并做基本数据模型构建" />
+    <MESSAGE value="feat: 拆分 user、tenant、membership 领域，并做好基本的数据模型" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: 拆分 user、tenant、membership 领域，并做好基本的数据模型" />
   </component>
 </project>

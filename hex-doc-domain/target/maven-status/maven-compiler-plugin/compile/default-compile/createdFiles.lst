@@ -1,3 +1,4 @@
+com/hector/hexdoc/domain/user/service/IUserService.class
 com/hector/hexdoc/domain/tenant/model/entity/Tenant.class
 com/hector/hexdoc/domain/user/model/valobj/UserStatusVO.class
 com/hector/hexdoc/domain/user/model/entity/User$UserBuilder.class
