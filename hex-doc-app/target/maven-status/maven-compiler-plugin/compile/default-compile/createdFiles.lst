@@ -1,1 +1,7 @@
-com/hector/hexdoc/HexDocApplication.class
+META-INF/spring-configuration-metadata.json
+com/hector/config/RedisClientConfig$RedisCodec.class
+com/hector/config/DataSourceConfig$MysqlMyBatisConfig.class
+com/hector/config/RedisClientConfig.class
+com/hector/config/DataSourceConfig.class
+com/hector/config/RedisClientConfigProperties.class
+com/hector/HexDocApplication.class

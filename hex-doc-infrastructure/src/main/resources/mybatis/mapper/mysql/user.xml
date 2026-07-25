@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IUserDao">
+
+    <resultMap id="userResultMap" type="com.hector.infrastructure.dao.po.UserPO">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.UserPO" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO `user` (
+            username,
+            password_hash,
+            status,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{username},
+            #{passwordHash},
+            #{status},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <select id="queryUserByUsername" parameterType="java.lang.String" resultMap="userResultMap">
+        SELECT
+            id,
+            username,
+            password_hash,
+            status,
+            created_at,
+            updated_at
+        FROM `user`
+        WHERE username = #{username}
+        LIMIT 1
+    </select>
+
+    <select id="queryUserById" parameterType="java.lang.Long" resultMap="userResultMap">
+        SELECT
+            id,
+            username,
+            password_hash,
+            status,
+            created_at,
+            updated_at
+        FROM `user`
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+</mapper>

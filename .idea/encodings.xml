@@ -2,12 +2,19 @@
 <project version="4">
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/hex-doc-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-api/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/hex-doc-app/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-app/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/hex-doc-domain/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-domain/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/hex-doc-infrastructure/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-infrastructure/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/hex-doc-queries/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-queries/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/hex-doc-trigger/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-trigger/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/hex-doc-types/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/hex-doc-types/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
   </component>
