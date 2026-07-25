@@ -1,8 +1,0 @@
-com/hector/infrastructure/dao/po/UserPO$UserPOBuilder.class
-com/hector/infrastructure/redis/RedissonService.class
-com/hector/infrastructure/user/repository/UserRepository.class
-com/hector/infrastructure/redis/IRedisService.class
-com/hector/infrastructure/auth/service/impl/PasswordServiceImpl.class
-com/hector/infrastructure/dao/IUserDao.class
-com/hector/infrastructure/dao/po/UserPO.class
-com/hector/infrastructure/auth/service/impl/TokenServiceImpl.class

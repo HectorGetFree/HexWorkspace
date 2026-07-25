@@ -1,0 +1,17 @@
+.DS_Store
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Maven / Java build outputs
+target/
+*/target/
+
+# Logs
+logs/
+*.log
+
+# OS / temp files
+tmp/
+temp/
