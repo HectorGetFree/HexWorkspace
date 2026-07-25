@@ -8,13 +8,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 用户持久化对象。
+ * 用户表映射对象。
  */
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserPO {
+public class User {
 
     private Long id;
 

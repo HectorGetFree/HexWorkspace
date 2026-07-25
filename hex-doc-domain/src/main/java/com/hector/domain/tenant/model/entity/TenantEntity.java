@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Tenant {
+public class TenantEntity {
 
     /** 租户主键ID。 */
     private Long id;

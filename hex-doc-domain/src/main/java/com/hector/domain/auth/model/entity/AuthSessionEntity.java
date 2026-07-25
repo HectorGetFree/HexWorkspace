@@ -1,6 +1,6 @@
 package com.hector.domain.auth.model.entity;
 
-import com.hector.domain.user.model.entity.User;
+import com.hector.domain.user.model.entity.UserEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,12 +14,12 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AuthSession {
+public class AuthSessionEntity {
 
     /**
      * 当前登录用户。
      */
-    private User user;
+    private UserEntity user;
 
     /**
      * 本次签发的访问令牌。

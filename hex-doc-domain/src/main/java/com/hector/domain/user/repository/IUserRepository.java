@@ -1,6 +1,6 @@
 package com.hector.domain.user.repository;
 
-import com.hector.domain.user.model.entity.User;
+import com.hector.domain.user.model.entity.UserEntity;
 
 import java.util.Optional;
 
@@ -12,15 +12,15 @@ public interface IUserRepository {
     /**
      * 保存用户。
      */
-    User save(User user);
+    UserEntity save(UserEntity userEntity);
 
     /**
      * 按用户名查询用户。
      */
-    Optional<User> findByUsername(String username);
+    Optional<UserEntity> findByUsername(String username);
 
     /**
      * 按主键ID查询用户。
      */
-    Optional<User> findById(Long userId);
+    Optional<UserEntity> findById(Long userId);
 }

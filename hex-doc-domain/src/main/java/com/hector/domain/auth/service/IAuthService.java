@@ -1,7 +1,7 @@
 package com.hector.domain.auth.service;
 
-import com.hector.domain.auth.model.entity.AuthSession;
-import com.hector.domain.user.model.entity.User;
+import com.hector.domain.auth.model.entity.AuthSessionEntity;
+import com.hector.domain.user.model.entity.UserEntity;
 
 /**
  * 认证领域服务接口。
@@ -12,7 +12,7 @@ public interface IAuthService {
     /**
      * 用户登录。
      */
-    AuthSession login(String username, String rawPassword);
+    AuthSessionEntity login(String username, String rawPassword);
 
     /**
      * 用户登出。
@@ -22,5 +22,5 @@ public interface IAuthService {
     /**
      * 根据令牌获取当前用户。
      */
-    User getCurrentUser(String token);
+    UserEntity getCurrentUser(String token);
 }

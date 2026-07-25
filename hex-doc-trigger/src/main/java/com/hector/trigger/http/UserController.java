@@ -1,8 +1,8 @@
 package com.hector.trigger.http;
 
-import com.hector.domain.auth.model.entity.AuthSession;
+import com.hector.domain.auth.model.entity.AuthSessionEntity;
 import com.hector.domain.auth.service.IAuthService;
-import com.hector.domain.user.model.entity.User;
+import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.service.IUserService;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
@@ -61,12 +61,12 @@ public class UserController extends BaseController {
         try {
             UserRegisterRequestDTO data = requireData(request);
             log.info("用户注册开始 username:{}", data.getUsername());
-            User user = userService.registerUser(data.getUsername(), data.getPassword());
-            log.info("用户注册完成 userId:{} username:{}", user.getId(), user.getUsername());
+            UserEntity userEntity = userService.registerUser(data.getUsername(), data.getPassword());
+            log.info("用户注册完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
             return success(UserRegisterResponseDTO.builder()
-                    .userId(user.getId())
-                    .username(user.getUsername())
-                    .status(user.getStatus().name())
+                    .userId(userEntity.getId())
+                    .username(userEntity.getUsername())
+                    .status(userEntity.getStatus().name())
                     .build());
         } catch (BusinessException exception) {
             log.error("用户注册业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
@@ -96,15 +96,15 @@ public class UserController extends BaseController {
         try {
             UserLoginRequestDTO data = requireData(request);
             log.info("用户登录开始 username:{}", data.getUsername());
-            AuthSession authSession = authService.login(data.getUsername(), data.getPassword());
-            User user = authSession.getUser();
-            log.info("用户登录完成 userId:{} username:{}", user.getId(), user.getUsername());
+            AuthSessionEntity authSessionEntity = authService.login(data.getUsername(), data.getPassword());
+            UserEntity userEntity = authSessionEntity.getUser();
+            log.info("用户登录完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
             return success(UserLoginResponseDTO.builder()
-                    .token(authSession.getToken())
+                    .token(authSessionEntity.getToken())
                     .tokenType(TOKEN_TYPE)
-                    .userId(user.getId())
-                    .username(user.getUsername())
-                    .status(user.getStatus().name())
+                    .userId(userEntity.getId())
+                    .username(userEntity.getUsername())
+                    .status(userEntity.getStatus().name())
                     .build());
         } catch (BusinessException exception) {
             log.error("用户登录业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
@@ -165,12 +165,12 @@ public class UserController extends BaseController {
         try {
             CurrentUserRequestDTO data = requireData(request);
             log.info("查询当前用户开始 token:{}", data.getToken());
-            User user = authService.getCurrentUser(data.getToken());
-            log.info("查询当前用户完成 userId:{} username:{}", user.getId(), user.getUsername());
+            UserEntity userEntity = authService.getCurrentUser(data.getToken());
+            log.info("查询当前用户完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
             return success(CurrentUserResponseDTO.builder()
-                    .userId(user.getId())
-                    .username(user.getUsername())
-                    .status(user.getStatus().name())
+                    .userId(userEntity.getId())
+                    .username(userEntity.getUsername())
+                    .status(userEntity.getStatus().name())
                     .build());
         } catch (BusinessException exception) {
             log.error("查询当前用户业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);

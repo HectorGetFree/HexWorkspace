@@ -4,7 +4,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hector.infrastructure.dao.IUserDao">
 
-    <resultMap id="userResultMap" type="com.hector.infrastructure.dao.po.UserPO">
+    <resultMap id="userResultMap" type="com.hector.infrastructure.dao.po.User">
         <id property="id" column="id"/>
         <result property="username" column="username"/>
         <result property="passwordHash" column="password_hash"/>
@@ -13,7 +13,7 @@
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.UserPO" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.User" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `user` (
             username,
             password_hash,

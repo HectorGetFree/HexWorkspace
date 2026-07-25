@@ -1,6 +1,6 @@
 package com.hector.domain.user.service;
 
-import com.hector.domain.user.model.entity.User;
+import com.hector.domain.user.model.entity.UserEntity;
 
 /**
  * 用户领域服务接口。
@@ -11,10 +11,10 @@ public interface IUserService {
     /**
      * 注册用户。
      */
-    User registerUser(String username, String rawPassword);
+    UserEntity registerUser(String username, String rawPassword);
 
     /**
      * 查询当前用户。
      */
-    User getCurrentUser(Long userId);
+    UserEntity getCurrentUser(Long userId);
 }

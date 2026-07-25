@@ -1,10 +1,10 @@
 package com.hector.domain.auth.service.impl;
 
-import com.hector.domain.auth.model.entity.AuthSession;
+import com.hector.domain.auth.model.entity.AuthSessionEntity;
 import com.hector.domain.auth.service.IAuthService;
 import com.hector.domain.auth.service.IPasswordService;
 import com.hector.domain.auth.service.ITokenService;
-import com.hector.domain.user.model.entity.User;
+import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
@@ -33,27 +33,27 @@ public class AuthServiceImpl implements IAuthService {
     private ITokenService tokenService;
 
     @Override
-    public AuthSession login(String username, String rawPassword) {
+    public AuthSessionEntity login(String username, String rawPassword) {
         log.info("认证领域服务-用户登录开始 username:{}", username);
         String normalizedUsername = normalizeUsername(username);
         String normalizedPassword = normalizePassword(rawPassword);
 
-        User user = userRepository.findByUsername(normalizedUsername)
+        UserEntity userEntity = userRepository.findByUsername(normalizedUsername)
                 .orElseThrow(() -> new BusinessException(ResponseCode.USERNAME_OR_PASSWORD_ERROR));
 
-        if (!user.isActive()) {
+        if (!userEntity.isActive()) {
             throw new BusinessException(ResponseCode.USER_STATUS_LOGIN_ERROR);
         }
-        if (!passwordService.matches(normalizedPassword, user.getPasswordHash())) {
+        if (!passwordService.matches(normalizedPassword, userEntity.getPasswordHash())) {
             throw new BusinessException(ResponseCode.USERNAME_OR_PASSWORD_ERROR);
         }
 
-        AuthSession authSession = AuthSession.builder()
-                .user(user)
-                .token(tokenService.createToken(user.getId(), user.getUsername()))
+        AuthSessionEntity authSessionEntity = AuthSessionEntity.builder()
+                .user(userEntity)
+                .token(tokenService.createToken(userEntity.getId(), userEntity.getUsername()))
                 .build();
-        log.info("认证领域服务-用户登录完成 userId:{} username:{}", user.getId(), user.getUsername());
-        return authSession;
+        log.info("认证领域服务-用户登录完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
+        return authSessionEntity;
     }
 
     @Override
@@ -66,16 +66,16 @@ public class AuthServiceImpl implements IAuthService {
     }
 
     @Override
-    public User getCurrentUser(String token) {
+    public UserEntity getCurrentUser(String token) {
         log.info("认证领域服务-查询当前用户开始 token:{}", token);
         Long userId = tokenService.parseUserId(extractToken(token));
-        User user = userRepository.findById(userId)
+        UserEntity userEntity = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
-        if (!user.isActive()) {
+        if (!userEntity.isActive()) {
             throw new BusinessException(ResponseCode.USER_STATUS_UNAVAILABLE);
         }
-        log.info("认证领域服务-查询当前用户完成 userId:{} username:{}", user.getId(), user.getUsername());
-        return user;
+        log.info("认证领域服务-查询当前用户完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
+        return userEntity;
     }
 
     private String normalizeUsername(String username) {

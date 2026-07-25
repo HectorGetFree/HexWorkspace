@@ -1,4 +1,4 @@
-package com.hector.infrastructure.auth.service.impl;
+package com.hector.domain.auth.service.impl;
 
 import com.hector.domain.auth.service.IPasswordService;
 import org.apache.commons.codec.digest.DigestUtils;

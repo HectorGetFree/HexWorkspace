@@ -1,6 +1,6 @@
 package com.hector.infrastructure.dao;
 
-import com.hector.infrastructure.dao.po.UserPO;
+import com.hector.infrastructure.dao.po.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -13,15 +13,15 @@ public interface IUserDao {
     /**
      * 新增用户。
      */
-    int insert(UserPO userPO);
+    int insert(User user);
 
     /**
      * 按用户名查询用户。
      */
-    UserPO queryUserByUsername(@Param("username") String username);
+    User queryUserByUsername(@Param("username") String username);
 
     /**
      * 按主键查询用户。
      */
-    UserPO queryUserById(@Param("id") Long id);
+    User queryUserById(@Param("id") Long id);
 }

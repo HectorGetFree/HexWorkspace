@@ -1,4 +1,4 @@
-package com.hector.infrastructure.auth.service.impl;
+package com.hector.domain.auth.service.impl;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -7,9 +7,9 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.hector.domain.auth.service.ITokenService;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
-import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
