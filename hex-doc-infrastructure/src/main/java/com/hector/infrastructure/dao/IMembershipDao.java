@@ -23,11 +23,6 @@ public interface IMembershipDao {
     int update(Membership membership);
 
     /**
-     * 按主键查询成员关系。
-     */
-    Membership queryMembershipById(@Param("id") Long id);
-
-    /**
      * 按用户ID和租户ID查询成员关系。
      */
     Membership queryMembershipByUserIdAndTenantId(@Param("userId") Long userId, @Param("tenantId") Long tenantId);

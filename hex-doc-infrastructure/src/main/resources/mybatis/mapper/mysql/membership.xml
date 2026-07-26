@@ -49,13 +49,6 @@
         WHERE id = #{id}
     </update>
 
-    <select id="queryMembershipById" resultMap="membershipResultMap">
-        SELECT id, user_id, tenant_id, role, status, joined_at, invited_at, created_at, updated_at
-        FROM `membership`
-        WHERE id = #{id}
-        LIMIT 1
-    </select>
-
     <select id="queryMembershipByUserIdAndTenantId" resultMap="membershipResultMap">
         SELECT id, user_id, tenant_id, role, status, joined_at, invited_at, created_at, updated_at
         FROM `membership`

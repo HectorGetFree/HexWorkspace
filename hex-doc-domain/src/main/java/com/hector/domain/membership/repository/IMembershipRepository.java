@@ -21,11 +21,6 @@ public interface IMembershipRepository {
     void update(MembershipEntity membershipEntity);
 
     /**
-     * 按主键查询成员关系。
-     */
-    Optional<MembershipEntity> findById(Long membershipId);
-
-    /**
      * 按用户ID和租户ID查询成员关系。
      */
     Optional<MembershipEntity> findByUserIdAndTenantId(Long userId, Long tenantId);

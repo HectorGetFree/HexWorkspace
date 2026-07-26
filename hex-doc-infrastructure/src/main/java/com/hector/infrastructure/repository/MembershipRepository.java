@@ -12,8 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 /**
  * 成员关系仓储实现。
@@ -45,19 +45,6 @@ public class MembershipRepository implements IMembershipRepository {
                 membershipEntity.getRole(), membershipEntity.getStatus());
         membershipDao.update(toPo(membershipEntity));
         log.info("成员关系仓储-更新成员关系完成 membershipId:{}", membershipEntity.getId());
-    }
-
-    @Override
-    public Optional<MembershipEntity> findById(Long membershipId) {
-        log.info("成员关系仓储-按ID查询开始 membershipId:{}", membershipId);
-        Membership membership = membershipDao.queryMembershipById(membershipId);
-        if (membership == null) {
-            return Optional.empty();
-        }
-        MembershipEntity membershipEntity = toEntity(membership);
-        log.info("成员关系仓储-按ID查询完成 membershipId:{} userId:{} tenantId:{}",
-                membershipEntity.getId(), membershipEntity.getUserId(), membershipEntity.getTenantId());
-        return Optional.of(membershipEntity);
     }
 
     @Override
