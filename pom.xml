@@ -135,6 +135,11 @@
                 <artifactId>adapter-rxjava2</artifactId>
                 <version>2.9.0</version>
             </dependency>
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>8.5.11</version>
+            </dependency>
 
             <!-- 工程依赖 -->
             <dependency>

@@ -64,6 +64,15 @@ redis:
       ping-interval: 60000
       keep-alive: true
 
+# MinIO
+minio:
+  sdk:
+    config:
+      endpoint: http://127.0.0.1:19000
+      access-key: admin
+      secret-key: admin123456
+      bucket: hex-doc
+
 # 日志
 logging:
   level:
