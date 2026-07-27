@@ -2,11 +2,9 @@ package com.hector.trigger.api;
 
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
-import com.hector.trigger.api.dto.CurrentUserRequestDTO;
 import com.hector.trigger.api.dto.CurrentUserResponseDTO;
 import com.hector.trigger.api.dto.UserLoginRequestDTO;
 import com.hector.trigger.api.dto.UserLoginResponseDTO;
-import com.hector.trigger.api.dto.UserLogoutRequestDTO;
 import com.hector.trigger.api.dto.UserLogoutResponseDTO;
 import com.hector.trigger.api.dto.UserRegisterRequestDTO;
 import com.hector.trigger.api.dto.UserRegisterResponseDTO;
@@ -30,10 +28,10 @@ public interface IUserService {
     /**
      * 用户登出接口。
      */
-    Response<UserLogoutResponseDTO> logout(Request<UserLogoutRequestDTO> request);
+    Response<UserLogoutResponseDTO> logout();
 
     /**
      * 查询当前登录用户接口。
      */
-    Response<CurrentUserResponseDTO> getCurrentUser(Request<CurrentUserRequestDTO> request);
+    Response<CurrentUserResponseDTO> getCurrentUser();
 }

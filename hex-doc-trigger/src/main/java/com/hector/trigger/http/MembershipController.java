@@ -1,6 +1,5 @@
 package com.hector.trigger.http;
 
-import com.hector.domain.auth.service.IAuthService;
 import com.hector.domain.membership.model.entity.MembershipEntity;
 import com.hector.domain.membership.service.IMembershipService;
 import com.hector.domain.tenant.model.entity.TenantEntity;
@@ -13,14 +12,15 @@ import com.hector.trigger.api.dto.MembershipAddRequestDTO;
 import com.hector.trigger.api.dto.MembershipInitOwnerRequestDTO;
 import com.hector.trigger.api.dto.MembershipListByTenantRequestDTO;
 import com.hector.trigger.api.dto.MembershipListResponseDTO;
-import com.hector.trigger.api.dto.MembershipMyListRequestDTO;
 import com.hector.trigger.api.dto.MembershipRemoveRequestDTO;
 import com.hector.trigger.api.dto.MembershipResponseDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
+import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,9 +43,6 @@ public class MembershipController extends BaseController {
     private IMembershipService membershipService;
 
     @Resource
-    private IAuthService authService;
-
-    @Resource
     private IUserService userService;
 
     @Resource
@@ -57,9 +54,9 @@ public class MembershipController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/members/init-owner" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantId": 1
      *     }
      *   }'
@@ -68,9 +65,9 @@ public class MembershipController extends BaseController {
     public Response<MembershipResponseDTO> initOwnerMember(@RequestBody Request<MembershipInitOwnerRequestDTO> request) {
         try {
             MembershipInitOwnerRequestDTO data = requireData(request);
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
-            log.info("初始化租户拥有者成员关系开始 operatorUserId:{} tenantId:{}", currentUser.getId(), data.getTenantId());
-            MembershipEntity membershipEntity = membershipService.initOwnerMember(currentUser.getId(), data.getTenantId());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            log.info("初始化租户拥有者成员关系开始 operatorUserId:{} tenantId:{}", currentUserId, data.getTenantId());
+            MembershipEntity membershipEntity = membershipService.initOwnerMember(currentUserId, data.getTenantId());
             log.info("初始化租户拥有者成员关系完成 membershipId:{} tenantId:{} userId:{}",
                     membershipEntity.getId(), membershipEntity.getTenantId(), membershipEntity.getUserId());
             return success(toResponse(membershipEntity));
@@ -89,9 +86,9 @@ public class MembershipController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/members/add" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantId": 1,
      *       "userId": 2
      *     }
@@ -101,10 +98,10 @@ public class MembershipController extends BaseController {
     public Response<MembershipResponseDTO> addMember(@RequestBody Request<MembershipAddRequestDTO> request) {
         try {
             MembershipAddRequestDTO data = requireData(request);
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
             log.info("添加成员开始 operatorUserId:{} tenantId:{} targetUserId:{}",
-                    currentUser.getId(), data.getTenantId(), data.getUserId());
-            MembershipEntity membershipEntity = membershipService.addMember(currentUser.getId(), data.getTenantId(), data.getUserId());
+                    currentUserId, data.getTenantId(), data.getUserId());
+            MembershipEntity membershipEntity = membershipService.addMember(currentUserId, data.getTenantId(), data.getUserId());
             log.info("添加成员完成 membershipId:{} tenantId:{} targetUserId:{}",
                     membershipEntity.getId(), membershipEntity.getTenantId(), membershipEntity.getUserId());
             return success(toResponse(membershipEntity));
@@ -123,9 +120,9 @@ public class MembershipController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/members/list-by-tenant" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantId": 1
      *     }
      *   }'
@@ -134,9 +131,9 @@ public class MembershipController extends BaseController {
     public Response<MembershipListResponseDTO> listByTenant(@RequestBody Request<MembershipListByTenantRequestDTO> request) {
         try {
             MembershipListByTenantRequestDTO data = requireData(request);
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
-            log.info("查询租户成员列表开始 operatorUserId:{} tenantId:{}", currentUser.getId(), data.getTenantId());
-            List<MembershipEntity> membershipEntities = membershipService.listMembersByTenantId(currentUser.getId(), data.getTenantId());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            log.info("查询租户成员列表开始 operatorUserId:{} tenantId:{}", currentUserId, data.getTenantId());
+            List<MembershipEntity> membershipEntities = membershipService.listMembersByTenantId(currentUserId, data.getTenantId());
             log.info("查询租户成员列表完成 tenantId:{} membershipCount:{}", data.getTenantId(), membershipEntities.size());
             return success(MembershipListResponseDTO.builder()
                     .memberships(membershipEntities.stream().map(this::toResponse).collect(Collectors.toList()))
@@ -152,24 +149,20 @@ public class MembershipController extends BaseController {
 
     /**
      * 查询当前用户所在租户中成员关系列表接口。
+     * 基于当前登录用户，查询其在不同租户下的成员身份信息。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/members/my-list" \
-     *   -H "Content-Type: application/json" \
-     *   -d '{
-     *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌"
-     *     }
-     *   }'
+     * curl -X GET "http://127.0.0.1:8098/api/v1/members/my-list" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
-    @PostMapping("/my-list")
-    public Response<MembershipListResponseDTO> listMyMemberships(@RequestBody Request<MembershipMyListRequestDTO> request) {
+    @GetMapping("/my-list")
+    public Response<MembershipListResponseDTO> listMyMemberships() {
         try {
-            MembershipMyListRequestDTO data = requireData(request);
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
-            log.info("查询当前用户成员关系列表开始 userId:{} username:{}", currentUser.getId(), currentUser.getUsername());
-            List<MembershipEntity> membershipEntities = membershipService.listMembershipsByUserId(currentUser.getId());
-            log.info("查询当前用户成员关系列表完成 userId:{} membershipCount:{}", currentUser.getId(), membershipEntities.size());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            String currentUsername = SecurityUserUtil.getCurrentUsername();
+            log.info("查询当前用户成员关系列表开始 userId:{} username:{}", currentUserId, currentUsername);
+            List<MembershipEntity> membershipEntities = membershipService.listMembershipsByUserId(currentUserId);
+            log.info("查询当前用户成员关系列表完成 userId:{} membershipCount:{}", currentUserId, membershipEntities.size());
             return success(MembershipListResponseDTO.builder()
                     .memberships(membershipEntities.stream().map(this::toResponse).collect(Collectors.toList()))
                     .build());
@@ -188,9 +181,9 @@ public class MembershipController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/members/remove" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantId": 1,
      *       "targetUserId": 2
      *     }
@@ -200,11 +193,11 @@ public class MembershipController extends BaseController {
     public Response<MembershipResponseDTO> removeMember(@RequestBody Request<MembershipRemoveRequestDTO> request) {
         try {
             MembershipRemoveRequestDTO data = requireData(request);
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
             log.info("移除成员开始 operatorUserId:{} tenantId:{} targetUserId:{}",
-                    currentUser.getId(), data.getTenantId(), data.getTargetUserId());
+                    currentUserId, data.getTenantId(), data.getTargetUserId());
             MembershipEntity membershipEntity = membershipService.removeMember(
-                    currentUser.getId(),
+                    currentUserId,
                     data.getTenantId(),
                     data.getTargetUserId());
             log.info("移除成员完成 membershipId:{} targetUserId:{}",

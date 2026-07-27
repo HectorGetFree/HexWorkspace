@@ -1,22 +1,21 @@
 package com.hector.trigger.http;
 
-import com.hector.domain.auth.service.IAuthService;
 import com.hector.domain.tenant.model.entity.TenantEntity;
 import com.hector.domain.tenant.service.ITenantService;
-import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
 import com.hector.trigger.api.dto.TenantCreateRequestDTO;
-import com.hector.trigger.api.dto.TenantListRequestDTO;
 import com.hector.trigger.api.dto.TenantListResponseDTO;
 import com.hector.trigger.api.dto.TenantQueryByCodeRequestDTO;
 import com.hector.trigger.api.dto.TenantQueryByIdRequestDTO;
 import com.hector.trigger.api.dto.TenantResponseDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
+import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,9 +37,6 @@ public class TenantController extends BaseController {
     @Resource
     private ITenantService tenantService;
 
-    @Resource
-    private IAuthService authService;
-
     /**
      * 创建租户接口。
      * 当前登录用户直接作为新租户 owner。
@@ -48,9 +44,9 @@ public class TenantController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/create" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantName": "演示租户",
      *       "description": "示例租户"
      *     }
@@ -61,10 +57,10 @@ public class TenantController extends BaseController {
         try {
             TenantCreateRequestDTO data = requireData(request);
             log.info("创建租户开始 tenantName:{}", data.getTenantName());
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
             TenantEntity tenantEntity = tenantService.createTenant(
                     data.getTenantName(),
-                    currentUser.getId(),
+                    currentUserId,
                     data.getDescription());
             log.info("创建租户完成 tenantId:{} tenantCode:{} ownerUserId:{}",
                     tenantEntity.getId(), tenantEntity.getTenantCode(), tenantEntity.getOwnerUserId());
@@ -84,9 +80,9 @@ public class TenantController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/query-by-id" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantId": 1
      *     }
      *   }'
@@ -96,7 +92,6 @@ public class TenantController extends BaseController {
         try {
             TenantQueryByIdRequestDTO data = requireData(request);
             log.info("按ID查询租户开始 tenantId:{}", data.getTenantId());
-            authService.getCurrentUser(data.getToken());
             TenantEntity tenantEntity = tenantService.getTenantById(data.getTenantId());
             log.info("按ID查询租户完成 tenantId:{} tenantCode:{}", tenantEntity.getId(), tenantEntity.getTenantCode());
             return success(toResponse(tenantEntity));
@@ -115,9 +110,9 @@ public class TenantController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/query-by-code" \
      *   -H "Content-Type: application/json" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
      *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌",
      *       "tenantCode": "tenant-001"
      *     }
      *   }'
@@ -127,7 +122,6 @@ public class TenantController extends BaseController {
         try {
             TenantQueryByCodeRequestDTO data = requireData(request);
             log.info("按编码查询租户开始 tenantCode:{}", data.getTenantCode());
-            authService.getCurrentUser(data.getToken());
             TenantEntity tenantEntity = tenantService.getTenantByCode(data.getTenantCode());
             log.info("按编码查询租户完成 tenantId:{} tenantCode:{}", tenantEntity.getId(), tenantEntity.getTenantCode());
             return success(toResponse(tenantEntity));
@@ -142,24 +136,20 @@ public class TenantController extends BaseController {
 
     /**
      * 查询当前用户名下租户列表接口。
+     * 基于当前登录用户，查询其创建的租户列表。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/my-list" \
-     *   -H "Content-Type: application/json" \
-     *   -d '{
-     *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌"
-     *     }
-     *   }'
+     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/my-list" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
-    @PostMapping("/my-list")
-    public Response<TenantListResponseDTO> listMyTenants(@RequestBody Request<TenantListRequestDTO> request) {
+    @GetMapping("/my-list")
+    public Response<TenantListResponseDTO> listMyTenants() {
         try {
-            TenantListRequestDTO data = requireData(request);
-            UserEntity currentUser = authService.getCurrentUser(data.getToken());
-            log.info("查询当前用户租户列表开始 userId:{} username:{}", currentUser.getId(), currentUser.getUsername());
-            List<TenantEntity> tenantEntities = tenantService.listTenantsByOwnerUserId(currentUser.getId());
-            log.info("查询当前用户租户列表完成 userId:{} tenantCount:{}", currentUser.getId(), tenantEntities.size());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            String currentUsername = SecurityUserUtil.getCurrentUsername();
+            log.info("查询当前用户租户列表开始 userId:{} username:{}", currentUserId, currentUsername);
+            List<TenantEntity> tenantEntities = tenantService.listTenantsByOwnerUserId(currentUserId);
+            log.info("查询当前用户租户列表完成 userId:{} tenantCount:{}", currentUserId, tenantEntities.size());
             return success(TenantListResponseDTO.builder()
                     .tenants(tenantEntities.stream().map(this::toResponse).collect(Collectors.toList()))
                     .build());

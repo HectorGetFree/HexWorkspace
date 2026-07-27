@@ -6,19 +6,19 @@ import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.service.IUserService;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
-import com.hector.trigger.api.request.Request;
-import com.hector.trigger.api.response.Response;
-import com.hector.trigger.api.dto.CurrentUserRequestDTO;
 import com.hector.trigger.api.dto.CurrentUserResponseDTO;
 import com.hector.trigger.api.dto.UserLoginRequestDTO;
 import com.hector.trigger.api.dto.UserLoginResponseDTO;
-import com.hector.trigger.api.dto.UserLogoutRequestDTO;
 import com.hector.trigger.api.dto.UserLogoutResponseDTO;
 import com.hector.trigger.api.dto.UserRegisterRequestDTO;
 import com.hector.trigger.api.dto.UserRegisterResponseDTO;
+import com.hector.trigger.api.request.Request;
+import com.hector.trigger.api.response.Response;
+import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -121,20 +121,15 @@ public class UserController extends BaseController {
      *
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/users/logout" \
-     *   -H "Content-Type: application/json" \
-     *   -d '{
-     *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌"
-     *     }
-     *   }'
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
     @PostMapping("/logout")
-    public Response<UserLogoutResponseDTO> logout(@RequestBody Request<UserLogoutRequestDTO> request) {
+    public Response<UserLogoutResponseDTO> logout() {
         try {
-            UserLogoutRequestDTO data = requireData(request);
-            log.info("用户登出开始 token:{}", data.getToken());
-            authService.logout(data.getToken());
-            log.info("用户登出完成 token:{}", data.getToken());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            String currentUsername = SecurityUserUtil.getCurrentUsername();
+            log.info("用户登出开始 userId:{} username:{}", currentUserId, currentUsername);
+            log.info("用户登出完成 userId:{} username:{}", currentUserId, currentUsername);
             return success(UserLogoutResponseDTO.builder()
                     .success(Boolean.TRUE)
                     .build());
@@ -149,23 +144,18 @@ public class UserController extends BaseController {
 
     /**
      * 查询当前用户接口。
-     * 用于根据访问令牌解析当前登录用户身份。
+     * 用于基于当前认证上下文返回登录用户身份信息。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/users/me" \
-     *   -H "Content-Type: application/json" \
-     *   -d '{
-     *     "data": {
-     *       "token": "Bearer 替换为实际登录令牌"
-     *     }
-     *   }'
+     * curl -X GET "http://127.0.0.1:8098/api/v1/users/me" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
-    @PostMapping("/me")
-    public Response<CurrentUserResponseDTO> getCurrentUser(@RequestBody Request<CurrentUserRequestDTO> request) {
+    @GetMapping("/me")
+    public Response<CurrentUserResponseDTO> getCurrentUser() {
         try {
-            CurrentUserRequestDTO data = requireData(request);
-            log.info("查询当前用户开始 token:{}", data.getToken());
-            UserEntity userEntity = authService.getCurrentUser(data.getToken());
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            log.info("查询当前用户开始 userId:{}", currentUserId);
+            UserEntity userEntity = userService.getCurrentUser(currentUserId);
             log.info("查询当前用户完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
             return success(CurrentUserResponseDTO.builder()
                     .userId(userEntity.getId())

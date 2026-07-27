@@ -17,9 +17,6 @@ import java.io.Serializable;
 @AllArgsConstructor
 public class TenantCreateRequestDTO implements Serializable {
 
-    /** 当前访问令牌。 */
-    private String token;
-
     /** 租户名称。 */
     private String tenantName;
 
