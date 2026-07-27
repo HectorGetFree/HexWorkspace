@@ -16,9 +16,6 @@ import java.io.Serializable;
 @AllArgsConstructor
 public class MembershipAddRequestDTO implements Serializable {
 
-    /** 租户主键ID。 */
-    private Long tenantId;
-
     /** 待加入的用户ID。 */
     private Long userId;
 }

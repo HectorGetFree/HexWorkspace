@@ -2,6 +2,7 @@ package com.hector.domain.auth.service;
 
 /**
  * 令牌服务接口。
+ * 负责访问令牌的创建与解析，供登录流程与 Spring Security 过滤器复用。
  */
 public interface ITokenService {
 

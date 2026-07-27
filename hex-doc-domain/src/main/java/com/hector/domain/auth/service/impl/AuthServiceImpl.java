@@ -15,13 +15,12 @@ import org.springframework.stereotype.Service;
 
 /**
  * 认证领域服务实现。
+ * 当前仅负责登录校验与访问令牌签发。
  */
 @Service
 public class AuthServiceImpl implements IAuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
-
-    private static final String TOKEN_PREFIX = "Bearer ";
 
     @Resource
     private IUserRepository userRepository;
@@ -56,28 +55,6 @@ public class AuthServiceImpl implements IAuthService {
         return authSessionEntity;
     }
 
-    @Override
-    public void logout(String token) {
-        log.info("认证领域服务-用户登出开始 token:{}", token);
-        Long userId = tokenService.parseUserId(extractToken(token));
-        userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
-        log.info("认证领域服务-用户登出完成 userId:{}", userId);
-    }
-
-    @Override
-    public UserEntity getCurrentUser(String token) {
-        log.info("认证领域服务-查询当前用户开始 token:{}", token);
-        Long userId = tokenService.parseUserId(extractToken(token));
-        UserEntity userEntity = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
-        if (!userEntity.isActive()) {
-            throw new BusinessException(ResponseCode.USER_STATUS_UNAVAILABLE);
-        }
-        log.info("认证领域服务-查询当前用户完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
-        return userEntity;
-    }
-
     private String normalizeUsername(String username) {
         if (username == null || username.trim().isEmpty()) {
             throw new BusinessException(ResponseCode.EMPTY_USERNAME);
@@ -90,15 +67,5 @@ public class AuthServiceImpl implements IAuthService {
             throw new BusinessException(ResponseCode.EMPTY_PASSWORD);
         }
         return rawPassword;
-    }
-
-    private String extractToken(String token) {
-        if (token == null || token.isBlank()) {
-            throw new BusinessException(ResponseCode.EMPTY_TOKEN);
-        }
-        if (token.startsWith(TOKEN_PREFIX)) {
-            return token.substring(TOKEN_PREFIX.length());
-        }
-        return token;
     }
 }

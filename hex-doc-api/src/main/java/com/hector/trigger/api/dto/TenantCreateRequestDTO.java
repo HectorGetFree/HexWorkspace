@@ -9,7 +9,7 @@ import java.io.Serializable;
 
 /**
  * 创建租户请求对象。
- * 通过当前登录用户发起租户创建，owner 由服务端根据 token 解析后自动绑定。
+ * 通过当前登录用户发起租户创建，owner 由服务端根据认证上下文自动绑定。
  */
 @Data
 @Builder

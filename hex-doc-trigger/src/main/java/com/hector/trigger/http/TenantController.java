@@ -6,8 +6,6 @@ import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
 import com.hector.trigger.api.dto.TenantCreateRequestDTO;
 import com.hector.trigger.api.dto.TenantListResponseDTO;
-import com.hector.trigger.api.dto.TenantQueryByCodeRequestDTO;
-import com.hector.trigger.api.dto.TenantQueryByIdRequestDTO;
 import com.hector.trigger.api.dto.TenantResponseDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
@@ -17,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,7 +41,7 @@ public class TenantController extends BaseController {
      * 当前登录用户直接作为新租户 owner。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/create" \
+     * curl -X POST "http://127.0.0.1:8098/api/v1/tenants" \
      *   -H "Content-Type: application/json" \
      *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -d '{
@@ -52,7 +51,7 @@ public class TenantController extends BaseController {
      *     }
      *   }'
      */
-    @PostMapping("/create")
+    @PostMapping
     public Response<TenantResponseDTO> createTenant(@RequestBody Request<TenantCreateRequestDTO> request) {
         try {
             TenantCreateRequestDTO data = requireData(request);
@@ -78,21 +77,14 @@ public class TenantController extends BaseController {
      * 按租户ID查询接口。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/query-by-id" \
-     *   -H "Content-Type: application/json" \
-     *   -H "Authorization: Bearer 替换为实际登录令牌" \
-     *   -d '{
-     *     "data": {
-     *       "tenantId": 1
-     *     }
-     *   }'
+     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/1" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
-    @PostMapping("/query-by-id")
-    public Response<TenantResponseDTO> queryById(@RequestBody Request<TenantQueryByIdRequestDTO> request) {
+    @GetMapping("/{tenantId}")
+    public Response<TenantResponseDTO> queryById(@PathVariable("tenantId") Long tenantId) {
         try {
-            TenantQueryByIdRequestDTO data = requireData(request);
-            log.info("按ID查询租户开始 tenantId:{}", data.getTenantId());
-            TenantEntity tenantEntity = tenantService.getTenantById(data.getTenantId());
+            log.info("按ID查询租户开始 tenantId:{}", tenantId);
+            TenantEntity tenantEntity = tenantService.getTenantById(tenantId);
             log.info("按ID查询租户完成 tenantId:{} tenantCode:{}", tenantEntity.getId(), tenantEntity.getTenantCode());
             return success(toResponse(tenantEntity));
         } catch (BusinessException exception) {
@@ -108,21 +100,14 @@ public class TenantController extends BaseController {
      * 按租户编码查询接口。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/query-by-code" \
-     *   -H "Content-Type: application/json" \
-     *   -H "Authorization: Bearer 替换为实际登录令牌" \
-     *   -d '{
-     *     "data": {
-     *       "tenantCode": "tenant-001"
-     *     }
-     *   }'
+     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/code/tenant_abc123" \
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
-    @PostMapping("/query-by-code")
-    public Response<TenantResponseDTO> queryByCode(@RequestBody Request<TenantQueryByCodeRequestDTO> request) {
+    @GetMapping("/code/{tenantCode}")
+    public Response<TenantResponseDTO> queryByCode(@PathVariable("tenantCode") String tenantCode) {
         try {
-            TenantQueryByCodeRequestDTO data = requireData(request);
-            log.info("按编码查询租户开始 tenantCode:{}", data.getTenantCode());
-            TenantEntity tenantEntity = tenantService.getTenantByCode(data.getTenantCode());
+            log.info("按编码查询租户开始 tenantCode:{}", tenantCode);
+            TenantEntity tenantEntity = tenantService.getTenantByCode(tenantCode);
             log.info("按编码查询租户完成 tenantId:{} tenantCode:{}", tenantEntity.getId(), tenantEntity.getTenantCode());
             return success(toResponse(tenantEntity));
         } catch (BusinessException exception) {
@@ -139,10 +124,10 @@ public class TenantController extends BaseController {
      * 基于当前登录用户，查询其创建的租户列表。
      *
      * curl 示例：
-     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/my-list" \
+     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/my" \
      *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
-    @GetMapping("/my-list")
+    @GetMapping("/my")
     public Response<TenantListResponseDTO> listMyTenants() {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();

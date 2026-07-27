@@ -18,7 +18,7 @@ public interface IUserService {
     /**
      * 用户注册接口。
      */
-    Response<UserRegisterResponseDTO> registerUser(Request<UserRegisterRequestDTO> request);
+    Response<UserRegisterResponseDTO> register(Request<UserRegisterRequestDTO> request);
 
     /**
      * 用户登录接口。
