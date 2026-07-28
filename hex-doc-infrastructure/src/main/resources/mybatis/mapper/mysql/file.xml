@@ -7,9 +7,6 @@
     <resultMap id="fileResultMap" type="com.hector.infrastructure.dao.po.File">
         <id property="id" column="id"/>
         <result property="fileCode" column="file_code"/>
-        <result property="tenantId" column="tenant_id"/>
-        <result property="bucketName" column="bucket_name"/>
-        <result property="scope" column="scope"/>
         <result property="creatorUserId" column="creator_user_id"/>
         <result property="fileName" column="file_name"/>
         <result property="originName" column="origin_name"/>
@@ -17,6 +14,7 @@
         <result property="contentType" column="content_type"/>
         <result property="fileSize" column="file_size"/>
         <result property="storageType" column="storage_type"/>
+        <result property="bucketName" column="bucket_name"/>
         <result property="storagePath" column="storage_path"/>
         <result property="fileHash" column="file_hash"/>
         <result property="status" column="status"/>
@@ -27,9 +25,6 @@
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.File" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `file` (
             file_code,
-            tenant_id,
-            bucket_name,
-            scope,
             creator_user_id,
             file_name,
             origin_name,
@@ -37,6 +32,7 @@
             content_type,
             file_size,
             storage_type,
+            bucket_name,
             storage_path,
             file_hash,
             status,
@@ -44,9 +40,6 @@
             updated_at
         ) VALUES (
             #{fileCode},
-            #{tenantId},
-            #{bucketName},
-            #{scope},
             #{creatorUserId},
             #{fileName},
             #{originName},
@@ -54,6 +47,7 @@
             #{contentType},
             #{fileSize},
             #{storageType},
+            #{bucketName},
             #{storagePath},
             #{fileHash},
             #{status},
@@ -66,9 +60,6 @@
         UPDATE `file`
         SET
             file_code = #{fileCode},
-            tenant_id = #{tenantId},
-            bucket_name = #{bucketName},
-            scope = #{scope},
             creator_user_id = #{creatorUserId},
             file_name = #{fileName},
             origin_name = #{originName},
@@ -76,6 +67,7 @@
             content_type = #{contentType},
             file_size = #{fileSize},
             storage_type = #{storageType},
+            bucket_name = #{bucketName},
             storage_path = #{storagePath},
             file_hash = #{fileHash},
             status = #{status},
@@ -85,8 +77,8 @@
     </update>
 
     <select id="queryFileById" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, bucket_name, creator_user_id, file_name, origin_name, file_suffix,
-               scope, content_type, file_size, storage_type, storage_path, file_hash, status,
+        SELECT id, file_code, creator_user_id, file_name, origin_name, file_suffix,
+               content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
         WHERE id = #{id}
@@ -94,20 +86,20 @@
     </select>
 
     <select id="queryFileByFileCode" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, bucket_name, creator_user_id, file_name, origin_name, file_suffix,
-               scope, content_type, file_size, storage_type, storage_path, file_hash, status,
+        SELECT id, file_code, creator_user_id, file_name, origin_name, file_suffix,
+               content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
         WHERE file_code = #{fileCode}
         LIMIT 1
     </select>
 
-    <select id="queryFilesByTenantId" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, bucket_name, creator_user_id, file_name, origin_name, file_suffix,
-               scope, content_type, file_size, storage_type, storage_path, file_hash, status,
+    <select id="queryFilesByCreatorUserId" resultMap="fileResultMap">
+        SELECT id, file_code, creator_user_id, file_name, origin_name, file_suffix,
+               content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
-        WHERE tenant_id = #{tenantId}
+        WHERE creator_user_id = #{creatorUserId}
         ORDER BY id DESC
     </select>
 

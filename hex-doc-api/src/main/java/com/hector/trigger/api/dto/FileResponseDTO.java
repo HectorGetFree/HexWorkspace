@@ -21,10 +21,6 @@ public class FileResponseDTO implements Serializable {
 
     private String fileCode;
 
-    private Long tenantId;
-
-    private String scope;
-
     private Long creatorUserId;
 
     private String fileName;

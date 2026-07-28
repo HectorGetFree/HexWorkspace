@@ -1,7 +1,6 @@
 package com.hector.infrastructure.repository;
 
 import com.hector.domain.file.model.entity.FileEntity;
-import com.hector.domain.file.model.valobj.FileScopeVO;
 import com.hector.domain.file.model.valobj.FileStatusVO;
 import com.hector.domain.file.repository.IFileRepository;
 import com.hector.infrastructure.dao.IFileDao;
@@ -28,7 +27,8 @@ public class FileRepository implements IFileRepository {
 
     @Override
     public FileEntity save(FileEntity fileEntity) {
-        log.info("文件仓储-保存文件开始 fileCode:{} tenantId:{} fileName:{}", fileEntity.getFileCode(), fileEntity.getTenantId(), fileEntity.getFileName());
+        log.info("文件仓储-保存文件开始 fileCode:{} creatorUserId:{} fileName:{}",
+                fileEntity.getFileCode(), fileEntity.getCreatorUserId(), fileEntity.getFileName());
         File file = toPo(fileEntity);
         fileDao.insert(file);
         FileEntity savedFileEntity = toEntity(file);
@@ -64,12 +64,12 @@ public class FileRepository implements IFileRepository {
     }
 
     @Override
-    public List<FileEntity> listByTenantId(Long tenantId) {
-        log.info("文件仓储-按租户查询列表开始 tenantId:{}", tenantId);
-        List<FileEntity> fileEntities = fileDao.queryFilesByTenantId(tenantId).stream()
+    public List<FileEntity> listByCreatorUserId(Long creatorUserId) {
+        log.info("文件仓储-按创建者查询列表开始 creatorUserId:{}", creatorUserId);
+        List<FileEntity> fileEntities = fileDao.queryFilesByCreatorUserId(creatorUserId).stream()
                 .map(this::toEntity)
                 .collect(Collectors.toList());
-        log.info("文件仓储-按租户查询列表完成 tenantId:{} fileCount:{}", tenantId, fileEntities.size());
+        log.info("文件仓储-按创建者查询列表完成 creatorUserId:{} fileCount:{}", creatorUserId, fileEntities.size());
         return fileEntities;
     }
 
@@ -77,9 +77,6 @@ public class FileRepository implements IFileRepository {
         return File.builder()
                 .id(fileEntity.getId())
                 .fileCode(fileEntity.getFileCode())
-                .tenantId(fileEntity.getTenantId())
-                .bucketName(fileEntity.getBucketName())
-                .scope(fileEntity.getScope().name())
                 .creatorUserId(fileEntity.getCreatorUserId())
                 .fileName(fileEntity.getFileName())
                 .originName(fileEntity.getOriginName())
@@ -87,6 +84,7 @@ public class FileRepository implements IFileRepository {
                 .contentType(fileEntity.getContentType())
                 .fileSize(fileEntity.getFileSize())
                 .storageType(fileEntity.getStorageType())
+                .bucketName(fileEntity.getBucketName())
                 .storagePath(fileEntity.getStoragePath())
                 .fileHash(fileEntity.getFileHash())
                 .status(fileEntity.getStatus().name())
@@ -99,9 +97,6 @@ public class FileRepository implements IFileRepository {
         return FileEntity.builder()
                 .id(file.getId())
                 .fileCode(file.getFileCode())
-                .tenantId(file.getTenantId())
-                .bucketName(file.getBucketName())
-                .scope(FileScopeVO.valueOf(file.getScope()))
                 .creatorUserId(file.getCreatorUserId())
                 .fileName(file.getFileName())
                 .originName(file.getOriginName())
@@ -109,6 +104,7 @@ public class FileRepository implements IFileRepository {
                 .contentType(file.getContentType())
                 .fileSize(file.getFileSize())
                 .storageType(file.getStorageType())
+                .bucketName(file.getBucketName())
                 .storagePath(file.getStoragePath())
                 .fileHash(file.getFileHash())
                 .status(FileStatusVO.valueOf(file.getStatus()))

@@ -20,12 +20,6 @@ public class File {
 
     private String fileCode;
 
-    private Long tenantId;
-
-    private String bucketName;
-
-    private String scope;
-
     private Long creatorUserId;
 
     private String fileName;
@@ -39,6 +33,8 @@ public class File {
     private Long fileSize;
 
     private String storageType;
+
+    private String bucketName;
 
     private String storagePath;
 

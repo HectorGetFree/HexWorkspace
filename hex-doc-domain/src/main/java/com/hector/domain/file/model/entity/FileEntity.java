@@ -1,7 +1,6 @@
 package com.hector.domain.file.model.entity;
 
 import com.hector.domain.file.model.valobj.FileStatusVO;
-import com.hector.domain.file.model.valobj.FileScopeVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,15 +24,6 @@ public class FileEntity {
     /** 文件唯一编码。 */
     private String fileCode;
 
-    /** 所属租户ID。 */
-    private Long tenantId;
-
-    /** 文件桶名称。 */
-    private String bucketName;
-
-    /** 文件可见范围。 */
-    private FileScopeVO scope;
-
     /** 创建者用户ID。 */
     private Long creatorUserId;
 
@@ -54,6 +44,9 @@ public class FileEntity {
 
     /** 存储类型，例如 LOCAL。 */
     private String storageType;
+
+    /** 文件桶名称。 */
+    private String bucketName;
 
     /** 文件存储路径。 */
     private String storagePath;

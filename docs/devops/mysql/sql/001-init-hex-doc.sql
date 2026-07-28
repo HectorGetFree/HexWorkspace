@@ -49,9 +49,6 @@ CREATE TABLE IF NOT EXISTS `membership` (
 CREATE TABLE IF NOT EXISTS `file` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `file_code` VARCHAR(64) NOT NULL COMMENT '文件编码',
-    `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
-    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
-    `scope` VARCHAR(16) NOT NULL DEFAULT 'PRIVATE' COMMENT 'PRIVATE / TENANT_PUBLIC',
     `creator_user_id` BIGINT NOT NULL COMMENT '创建者用户ID',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件展示名称',
     `origin_name` VARCHAR(255) NOT NULL COMMENT '原始文件名',
@@ -59,6 +56,7 @@ CREATE TABLE IF NOT EXISTS `file` (
     `content_type` VARCHAR(128) DEFAULT NULL COMMENT '文件内容类型',
     `file_size` BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小，单位字节',
     `storage_type` VARCHAR(32) NOT NULL COMMENT '存储类型，例如 LOCAL',
+    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
     `storage_path` VARCHAR(512) NOT NULL COMMENT '文件存储路径',
     `file_hash` VARCHAR(128) DEFAULT NULL COMMENT '文件摘要值',
     `status` VARCHAR(16) NOT NULL DEFAULT 'UPLOADED' COMMENT 'UPLOADED / SUCCESS / FAILED / DELETED',
@@ -66,7 +64,6 @@ CREATE TABLE IF NOT EXISTS `file` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_file_code` (`file_code`),
-    KEY `idx_file_tenant_id` (`tenant_id`),
     KEY `idx_file_bucket_name` (`bucket_name`),
     KEY `idx_file_creator_user_id` (`creator_user_id`),
     KEY `idx_file_status` (`status`)
