@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS `file` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `file_code` VARCHAR(64) NOT NULL COMMENT '文件编码',
     `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
+    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
     `scope` VARCHAR(16) NOT NULL DEFAULT 'PRIVATE' COMMENT 'PRIVATE / TENANT_PUBLIC',
     `creator_user_id` BIGINT NOT NULL COMMENT '创建者用户ID',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件展示名称',
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS `file` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_file_code` (`file_code`),
     KEY `idx_file_tenant_id` (`tenant_id`),
+    KEY `idx_file_bucket_name` (`bucket_name`),
     KEY `idx_file_creator_user_id` (`creator_user_id`),
     KEY `idx_file_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件表';

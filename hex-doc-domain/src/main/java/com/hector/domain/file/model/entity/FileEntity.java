@@ -28,6 +28,9 @@ public class FileEntity {
     /** 所属租户ID。 */
     private Long tenantId;
 
+    /** 文件桶名称。 */
+    private String bucketName;
+
     /** 文件可见范围。 */
     private FileScopeVO scope;
 

@@ -22,6 +22,8 @@ public class File {
 
     private Long tenantId;
 
+    private String bucketName;
+
     private String scope;
 
     private Long creatorUserId;
