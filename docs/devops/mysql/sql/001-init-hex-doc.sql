@@ -73,6 +73,42 @@ CREATE TABLE IF NOT EXISTS `file` (
     KEY `idx_file_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件表';
 
+CREATE TABLE IF NOT EXISTS `document` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `document_code` VARCHAR(64) NOT NULL COMMENT '文档唯一编码',
+    `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
+    `owner_user_id` BIGINT NOT NULL COMMENT '文档拥有者用户ID',
+    `source_file_id` BIGINT NOT NULL COMMENT '初始上传文件ID',
+    `title` VARCHAR(255) NOT NULL COMMENT '文档标题',
+    `document_type` VARCHAR(32) NOT NULL COMMENT 'UPLOADED / RICH_TEXT',
+    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / ARCHIVED / DELETED',
+    `current_version` INT NOT NULL DEFAULT 1 COMMENT '当前版本号',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_document_code` (`document_code`),
+    KEY `idx_document_tenant_status_updated_at` (`tenant_id`, `status`, `updated_at`),
+    KEY `idx_document_owner_user_id` (`owner_user_id`),
+    KEY `idx_document_source_file_id` (`source_file_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档聚合当前状态表';
+
+CREATE TABLE IF NOT EXISTS `document_version` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `document_id` BIGINT NOT NULL COMMENT '所属文档ID',
+    `version_number` INT NOT NULL COMMENT '版本号',
+    `file_id` BIGINT NOT NULL COMMENT '版本文件快照ID',
+    `content_hash` VARCHAR(128) DEFAULT NULL COMMENT '版本内容摘要，用于幂等与索引去重',
+    `extracted_text` MEDIUMTEXT DEFAULT NULL COMMENT '从版本文件解析出的纯文本',
+    `parse_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / PROCESSING / SUCCESS / FAILED',
+    `change_summary` VARCHAR(500) DEFAULT NULL COMMENT '变更说明',
+    `created_by_user_id` BIGINT NOT NULL COMMENT '创建版本的用户ID',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_document_version` (`document_id`, `version_number`),
+    KEY `idx_document_version_file_id` (`file_id`),
+    KEY `idx_document_version_parse_status` (`parse_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档不可变版本快照表';
+
 -- 业务约束：
 -- 1. 不使用数据库外键，交由应用层保证 user_id / tenant_id / owner_user_id 的引用一致性。
 -- 2. 每个租户必须至少保留一个 ACTIVE 状态的 ADMIN，该约束需在成员退出、移除、冻结或降权时由应用服务校验。

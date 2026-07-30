@@ -1,0 +1,40 @@
+package com.hector.domain.document.model.entity;
+
+import com.hector.domain.document.model.valobj.DocumentParseStatusVO;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * 文档版本实体。
+ * 每条记录代表一个不可变内容快照；解析结果只写入与该快照对应的版本。
+ */
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class DocumentVersionEntity {
+
+    private Long id;
+
+    private Long documentId;
+
+    private Integer versionNumber;
+
+    private Long fileId;
+
+    private String contentHash;
+
+    private String extractedText;
+
+    private DocumentParseStatusVO parseStatus;
+
+    private String changeSummary;
+
+    private Long createdByUserId;
+
+    private LocalDateTime createdAt;
+}
