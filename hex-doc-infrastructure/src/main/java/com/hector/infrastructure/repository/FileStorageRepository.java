@@ -4,6 +4,7 @@ import com.hector.domain.file.repository.IFileStorageRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
+import io.minio.GetObjectArgs;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import jakarta.annotation.Resource;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 
 /**
  * MinIO 文件存储仓储实现。
@@ -64,6 +66,27 @@ public class FileStorageRepository implements IFileStorageRepository {
             log.info("文件存储仓储-MinIO删除完成 bucketName:{} objectKey:{}", bucketName, objectKey);
         } catch (Exception exception) {
             log.error("文件存储仓储-MinIO删除失败 bucketName:{} objectKey:{} error:{}",
+                    bucketName, objectKey, exception.getMessage(), exception);
+            throw new RuntimeException(exception);
+        }
+    }
+
+    @Override
+    public byte[] download(String objectKey) {
+        try {
+            ensureBucketExists();
+            log.info("文件存储仓储-MinIO读取开始 bucketName:{} objectKey:{}", bucketName, objectKey);
+            try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(objectKey)
+                    .build())) {
+                byte[] content = inputStream.readAllBytes();
+                log.info("文件存储仓储-MinIO读取完成 bucketName:{} objectKey:{} fileSize:{}",
+                        bucketName, objectKey, content.length);
+                return content;
+            }
+        } catch (Exception exception) {
+            log.error("文件存储仓储-MinIO读取失败 bucketName:{} objectKey:{} error:{}",
                     bucketName, objectKey, exception.getMessage(), exception);
             throw new RuntimeException(exception);
         }

@@ -125,6 +125,17 @@ public class FileServiceImpl implements IFileService {
     }
 
     @Override
+    public byte[] readFileContent(Long tenantId, Long fileId) {
+        TenantEntity tenantEntity = getActiveTenant(tenantId);
+        log.info("文件领域服务-读取文件内容开始 tenantId:{} fileId:{}", tenantEntity.getId(), fileId);
+        FileEntity fileEntity = getTenantAvailableFile(tenantEntity.getId(), fileId);
+        byte[] fileContent = fileStorageRepository.download(fileEntity.getStoragePath());
+        log.info("文件领域服务-读取文件内容完成 tenantId:{} fileId:{} fileSize:{}",
+                tenantEntity.getId(), fileEntity.getId(), fileContent.length);
+        return fileContent;
+    }
+
+    @Override
     @Transactional
     public FileEntity deleteFile(Long tenantId, Long fileId) {
         TenantEntity tenantEntity = getActiveTenant(tenantId);

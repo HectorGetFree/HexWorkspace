@@ -16,6 +16,11 @@ public interface IFileStorageRepository {
     void upload(String objectKey, byte[] content, String contentType);
 
     /**
+     * 读取对象内容。
+     */
+    byte[] download(String objectKey);
+
+    /**
      * 删除文件对象。
      */
     void delete(String objectKey);

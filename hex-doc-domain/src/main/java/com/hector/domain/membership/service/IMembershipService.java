@@ -33,4 +33,10 @@ public interface IMembershipService {
      * 移除成员。
      */
     MembershipEntity removeMember(Long operatorUserId, Long tenantId, Long targetUserId);
+
+    /**
+     * 校验用户是否为租户内的有效成员。
+     * 文档等租户资源的读取和创建均以此作为基础访问边界。
+     */
+    void assertActiveMember(Long userId, Long tenantId);
 }

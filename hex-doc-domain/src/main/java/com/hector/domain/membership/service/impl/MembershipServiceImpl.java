@@ -149,6 +149,24 @@ public class MembershipServiceImpl implements IMembershipService {
         return updatedMembership;
     }
 
+    @Override
+    public void assertActiveMember(Long userId, Long tenantId) {
+        Long normalizedUserId = normalizeUserId(userId);
+        TenantEntity tenantEntity = getActiveTenant(tenantId);
+        log.info("成员关系领域服务-校验有效成员开始 userId:{} tenantId:{}", normalizedUserId, tenantEntity.getId());
+        if (tenantEntity.getOwnerUserId().equals(normalizedUserId)) {
+            log.info("成员关系领域服务-校验有效成员完成 userId:{} tenantId:{} role:OWNER", normalizedUserId, tenantEntity.getId());
+            return;
+        }
+        MembershipEntity membershipEntity = membershipRepository.findByUserIdAndTenantId(normalizedUserId, tenantEntity.getId())
+                .orElseThrow(() -> new BusinessException(ResponseCode.MEMBERSHIP_OPERATOR_NOT_MEMBER));
+        if (!membershipEntity.isActive()) {
+            throw new BusinessException(ResponseCode.MEMBERSHIP_OPERATOR_NOT_MEMBER);
+        }
+        log.info("成员关系领域服务-校验有效成员完成 userId:{} tenantId:{} role:{}",
+                normalizedUserId, tenantEntity.getId(), membershipEntity.getRole());
+    }
+
     private MembershipEntity reviveOrRejectExistingMembership(MembershipEntity existingMembership) {
         if (MembershipStatusVO.LEFT != existingMembership.getStatus()
                 && MembershipStatusVO.REMOVED != existingMembership.getStatus()) {

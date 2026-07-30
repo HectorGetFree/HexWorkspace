@@ -49,6 +49,16 @@ services:
     networks:
       - hex-doc-network
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - hex-doc-network
+
 networks:
   hex-doc-network:
     driver: bridge

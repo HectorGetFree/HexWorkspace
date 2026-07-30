@@ -25,6 +25,12 @@ public interface IFileService {
     FileEntity getAvailableFile(Long tenantId, Long fileId);
 
     /**
+     * 读取租户内可用文件的二进制内容。
+     * 调用方负责完成所属业务资源的访问授权。
+     */
+    byte[] readFileContent(Long tenantId, Long fileId);
+
+    /**
      * 删除指定租户下的文件。
      * 调用方必须先确认文件未被任何业务资源引用。
      */
