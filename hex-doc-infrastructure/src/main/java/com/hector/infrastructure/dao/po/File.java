@@ -20,6 +20,8 @@ public class File {
 
     private String fileCode;
 
+    private Long tenantId;
+
     private Long creatorUserId;
 
     private String fileName;

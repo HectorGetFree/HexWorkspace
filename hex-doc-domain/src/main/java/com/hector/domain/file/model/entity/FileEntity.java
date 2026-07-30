@@ -24,6 +24,9 @@ public class FileEntity {
     /** 文件唯一编码。 */
     private String fileCode;
 
+    /** 文件所属租户ID，用于平台级数据隔离。 */
+    private Long tenantId;
+
     /** 创建者用户ID。 */
     private Long creatorUserId;
 

@@ -7,6 +7,7 @@
     <resultMap id="fileResultMap" type="com.hector.infrastructure.dao.po.File">
         <id property="id" column="id"/>
         <result property="fileCode" column="file_code"/>
+        <result property="tenantId" column="tenant_id"/>
         <result property="creatorUserId" column="creator_user_id"/>
         <result property="fileName" column="file_name"/>
         <result property="originName" column="origin_name"/>
@@ -25,6 +26,7 @@
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.File" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `file` (
             file_code,
+            tenant_id,
             creator_user_id,
             file_name,
             origin_name,
@@ -40,6 +42,7 @@
             updated_at
         ) VALUES (
             #{fileCode},
+            #{tenantId},
             #{creatorUserId},
             #{fileName},
             #{originName},
@@ -60,6 +63,7 @@
         UPDATE `file`
         SET
             file_code = #{fileCode},
+            tenant_id = #{tenantId},
             creator_user_id = #{creatorUserId},
             file_name = #{fileName},
             origin_name = #{originName},
@@ -77,7 +81,7 @@
     </update>
 
     <select id="queryFileById" resultMap="fileResultMap">
-        SELECT id, file_code, creator_user_id, file_name, origin_name, file_suffix,
+        SELECT id, file_code, tenant_id, creator_user_id, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
@@ -86,7 +90,7 @@
     </select>
 
     <select id="queryFileByFileCode" resultMap="fileResultMap">
-        SELECT id, file_code, creator_user_id, file_name, origin_name, file_suffix,
+        SELECT id, file_code, tenant_id, creator_user_id, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
@@ -94,12 +98,12 @@
         LIMIT 1
     </select>
 
-    <select id="queryFilesByCreatorUserId" resultMap="fileResultMap">
-        SELECT id, file_code, creator_user_id, file_name, origin_name, file_suffix,
+    <select id="queryFilesByTenantId" resultMap="fileResultMap">
+        SELECT id, file_code, tenant_id, creator_user_id, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
-        WHERE creator_user_id = #{creatorUserId}
+        WHERE tenant_id = #{tenantId}
         ORDER BY id DESC
     </select>
 

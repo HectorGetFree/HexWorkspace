@@ -31,7 +31,7 @@ public interface IFileRepository {
     Optional<FileEntity> findByFileCode(String fileCode);
 
     /**
-     * 按创建者用户ID查询文件列表。
+     * 按租户ID查询文件列表。
      */
-    List<FileEntity> listByCreatorUserId(Long creatorUserId);
+    List<FileEntity> listByTenantId(Long tenantId);
 }

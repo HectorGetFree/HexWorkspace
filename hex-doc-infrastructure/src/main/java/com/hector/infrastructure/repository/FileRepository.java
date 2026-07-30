@@ -27,8 +27,8 @@ public class FileRepository implements IFileRepository {
 
     @Override
     public FileEntity save(FileEntity fileEntity) {
-        log.info("文件仓储-保存文件开始 fileCode:{} creatorUserId:{} fileName:{}",
-                fileEntity.getFileCode(), fileEntity.getCreatorUserId(), fileEntity.getFileName());
+        log.info("文件仓储-保存文件开始 fileCode:{} tenantId:{} creatorUserId:{} fileName:{}",
+                fileEntity.getFileCode(), fileEntity.getTenantId(), fileEntity.getCreatorUserId(), fileEntity.getFileName());
         File file = toPo(fileEntity);
         fileDao.insert(file);
         FileEntity savedFileEntity = toEntity(file);
@@ -64,12 +64,12 @@ public class FileRepository implements IFileRepository {
     }
 
     @Override
-    public List<FileEntity> listByCreatorUserId(Long creatorUserId) {
-        log.info("文件仓储-按创建者查询列表开始 creatorUserId:{}", creatorUserId);
-        List<FileEntity> fileEntities = fileDao.queryFilesByCreatorUserId(creatorUserId).stream()
+    public List<FileEntity> listByTenantId(Long tenantId) {
+        log.info("文件仓储-按租户查询列表开始 tenantId:{}", tenantId);
+        List<FileEntity> fileEntities = fileDao.queryFilesByTenantId(tenantId).stream()
                 .map(this::toEntity)
                 .collect(Collectors.toList());
-        log.info("文件仓储-按创建者查询列表完成 creatorUserId:{} fileCount:{}", creatorUserId, fileEntities.size());
+        log.info("文件仓储-按租户查询列表完成 tenantId:{} fileCount:{}", tenantId, fileEntities.size());
         return fileEntities;
     }
 
@@ -77,6 +77,7 @@ public class FileRepository implements IFileRepository {
         return File.builder()
                 .id(fileEntity.getId())
                 .fileCode(fileEntity.getFileCode())
+                .tenantId(fileEntity.getTenantId())
                 .creatorUserId(fileEntity.getCreatorUserId())
                 .fileName(fileEntity.getFileName())
                 .originName(fileEntity.getOriginName())
@@ -97,6 +98,7 @@ public class FileRepository implements IFileRepository {
         return FileEntity.builder()
                 .id(file.getId())
                 .fileCode(file.getFileCode())
+                .tenantId(file.getTenantId())
                 .creatorUserId(file.getCreatorUserId())
                 .fileName(file.getFileName())
                 .originName(file.getOriginName())

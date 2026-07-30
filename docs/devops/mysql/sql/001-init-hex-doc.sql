@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `membership` (
 CREATE TABLE IF NOT EXISTS `file` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `file_code` VARCHAR(64) NOT NULL COMMENT '文件编码',
+    `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
     `creator_user_id` BIGINT NOT NULL COMMENT '创建者用户ID',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件展示名称',
     `origin_name` VARCHAR(255) NOT NULL COMMENT '原始文件名',
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS `file` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_file_code` (`file_code`),
+    KEY `idx_file_tenant_id` (`tenant_id`),
     KEY `idx_file_bucket_name` (`bucket_name`),
     KEY `idx_file_creator_user_id` (`creator_user_id`),
     KEY `idx_file_status` (`status`)
