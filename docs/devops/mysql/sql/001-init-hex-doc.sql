@@ -98,14 +98,17 @@ CREATE TABLE IF NOT EXISTS `document_version` (
     `version_number` INT NOT NULL COMMENT '版本号',
     `file_id` BIGINT NOT NULL COMMENT '版本文件快照ID',
     `content_hash` VARCHAR(128) DEFAULT NULL COMMENT '版本内容摘要，用于幂等与索引去重',
-    `extracted_text` MEDIUMTEXT DEFAULT NULL COMMENT '从版本文件解析出的纯文本',
+    `extracted_file_id` BIGINT DEFAULT NULL COMMENT '解析文本产物文件ID',
     `parse_status` VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / PROCESSING / SUCCESS / FAILED',
+    `parser_version` VARCHAR(64) DEFAULT NULL COMMENT '解析器版本',
+    `parsed_at` DATETIME DEFAULT NULL COMMENT '解析完成时间',
     `change_summary` VARCHAR(500) DEFAULT NULL COMMENT '变更说明',
     `created_by_user_id` BIGINT NOT NULL COMMENT '创建版本的用户ID',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_document_version` (`document_id`, `version_number`),
     KEY `idx_document_version_file_id` (`file_id`),
+    KEY `idx_document_version_extracted_file_id` (`extracted_file_id`),
     KEY `idx_document_version_parse_status` (`parse_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档不可变版本快照表';
 

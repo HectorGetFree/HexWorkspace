@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文档版本实体。
- * 每条记录代表一个不可变内容快照；解析结果只写入与该快照对应的版本。
+ * 每条记录代表一个不可变内容快照；解析文本以派生文件形式与该版本关联。
  */
 @Getter
 @Builder
@@ -28,9 +28,13 @@ public class DocumentVersionEntity {
 
     private String contentHash;
 
-    private String extractedText;
+    private Long extractedFileId;
 
     private DocumentParseStatusVO parseStatus;
+
+    private String parserVersion;
+
+    private LocalDateTime parsedAt;
 
     private String changeSummary;
 
