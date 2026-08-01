@@ -1,6 +1,7 @@
 package com.hector.domain.file.model.entity;
 
 import com.hector.domain.file.model.valobj.FileStatusVO;
+import com.hector.domain.file.model.valobj.FilePurposeVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,6 +30,9 @@ public class FileEntity {
 
     /** 创建者用户ID。 */
     private Long creatorUserId;
+
+    /** 文件用途，区分用户上传的原始文件与系统生成的派生产物。 */
+    private FilePurposeVO purpose;
 
     /** 文件展示名称。 */
     private String fileName;

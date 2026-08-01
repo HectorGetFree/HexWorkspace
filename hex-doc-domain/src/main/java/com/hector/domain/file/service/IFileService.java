@@ -8,10 +8,16 @@ import com.hector.domain.file.model.entity.FileEntity;
 public interface IFileService {
 
     /**
-     * 在指定租户中存储文件。
+     * 保存用户上传的原始文件。
      * 调用方负责完成所属业务资源（例如文档）的成员与权限校验。
      */
     FileEntity uploadFile(Long tenantId, Long operatorUserId, String originalFilename, String contentType, byte[] fileBytes);
+
+    /**
+     * 保存系统生成的派生文件。
+     * operatorUserId 表示触发该业务动作的用户，用于审计；它不表示用户直接上传了这个对象。
+     */
+    FileEntity storeDerivedFile(Long tenantId, Long operatorUserId, String filename, String contentType, byte[] fileBytes);
 
     /**
      * 查询指定租户下可用的文件元数据。

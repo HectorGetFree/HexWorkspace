@@ -2,6 +2,7 @@ package com.hector.infrastructure.repository;
 
 import com.hector.domain.file.model.entity.FileEntity;
 import com.hector.domain.file.model.valobj.FileStatusVO;
+import com.hector.domain.file.model.valobj.FilePurposeVO;
 import com.hector.domain.file.repository.IFileRepository;
 import com.hector.infrastructure.dao.IFileDao;
 import com.hector.infrastructure.dao.po.File;
@@ -79,6 +80,7 @@ public class FileRepository implements IFileRepository {
                 .fileCode(fileEntity.getFileCode())
                 .tenantId(fileEntity.getTenantId())
                 .creatorUserId(fileEntity.getCreatorUserId())
+                .purpose(fileEntity.getPurpose().name())
                 .fileName(fileEntity.getFileName())
                 .originName(fileEntity.getOriginName())
                 .fileSuffix(fileEntity.getFileSuffix())
@@ -100,6 +102,7 @@ public class FileRepository implements IFileRepository {
                 .fileCode(file.getFileCode())
                 .tenantId(file.getTenantId())
                 .creatorUserId(file.getCreatorUserId())
+                .purpose(FilePurposeVO.valueOf(file.getPurpose()))
                 .fileName(file.getFileName())
                 .originName(file.getOriginName())
                 .fileSuffix(file.getFileSuffix())

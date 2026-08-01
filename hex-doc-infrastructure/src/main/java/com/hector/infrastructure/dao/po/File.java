@@ -24,6 +24,8 @@ public class File {
 
     private Long creatorUserId;
 
+    private String purpose;
+
     private String fileName;
 
     private String originName;

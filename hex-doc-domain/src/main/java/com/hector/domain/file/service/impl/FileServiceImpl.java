@@ -2,6 +2,7 @@ package com.hector.domain.file.service.impl;
 
 import com.hector.domain.file.model.entity.FileEntity;
 import com.hector.domain.file.model.valobj.FileStatusVO;
+import com.hector.domain.file.model.valobj.FilePurposeVO;
 import com.hector.domain.file.repository.IFileRepository;
 import com.hector.domain.file.repository.IFileStorageRepository;
 import com.hector.domain.file.service.IFileService;
@@ -47,8 +48,22 @@ public class FileServiceImpl implements IFileService {
     @Override
     @Transactional
     public FileEntity uploadFile(Long tenantId, Long operatorUserId, String originalFilename, String contentType, byte[] fileBytes) {
-        log.info("文件领域服务-上传文件开始 tenantId:{} operatorUserId:{} originalFilename:{}",
-                tenantId, operatorUserId, originalFilename);
+        return storeFile(tenantId, operatorUserId, originalFilename, contentType, fileBytes, FilePurposeVO.ORIGINAL);
+    }
+
+    @Override
+    @Transactional
+    public FileEntity storeDerivedFile(Long tenantId, Long operatorUserId, String filename, String contentType, byte[] fileBytes) {
+        return storeFile(tenantId, operatorUserId, filename, contentType, fileBytes, FilePurposeVO.DERIVED);
+    }
+
+    /**
+     * 统一管理对象写入与元数据落库；入口方法保留原始/派生语义，避免调用方用“上传”描述系统生成内容。
+     */
+    private FileEntity storeFile(Long tenantId, Long operatorUserId, String originalFilename, String contentType,
+                                 byte[] fileBytes, FilePurposeVO purpose) {
+        log.info("文件领域服务-保存文件开始 tenantId:{} operatorUserId:{} purpose:{} filename:{}",
+                tenantId, operatorUserId, purpose, originalFilename);
         TenantEntity tenantEntity = getActiveTenant(tenantId);
         UserEntity userEntity = getAvailableUser(operatorUserId);
         validateFile(fileBytes, originalFilename);
@@ -57,7 +72,7 @@ public class FileServiceImpl implements IFileService {
         String fileCode = generateUniqueFileCode();
         String bucketName = fileStorageRepository.getBucketName();
         String safeOriginalFilename = normalizeFilename(originalFilename);
-        String objectKey = buildObjectKey(tenantEntity.getId(), fileCode, safeOriginalFilename);
+        String objectKey = buildObjectKey(tenantEntity.getId(), purpose, fileCode, safeOriginalFilename);
         String fileSuffix = extractFileSuffix(originalFilename);
         LocalDateTime now = LocalDateTime.now();
         String fileHash = DigestUtils.md5Hex(fileBytes);
@@ -68,6 +83,7 @@ public class FileServiceImpl implements IFileService {
                     .fileCode(fileCode)
                     .tenantId(tenantEntity.getId())
                     .creatorUserId(userEntity.getId())
+                    .purpose(purpose)
                     .fileName(originalFilename)
                     .originName(originalFilename)
                     .fileSuffix(fileSuffix)
@@ -82,8 +98,8 @@ public class FileServiceImpl implements IFileService {
                     .updatedAt(now)
                     .build();
             FileEntity savedFileEntity = fileRepository.save(fileEntity);
-            log.info("文件领域服务-上传文件完成 fileId:{} fileCode:{} tenantId:{} creatorUserId:{}",
-                    savedFileEntity.getId(), savedFileEntity.getFileCode(), savedFileEntity.getTenantId(), savedFileEntity.getCreatorUserId());
+            log.info("文件领域服务-保存文件完成 fileId:{} fileCode:{} tenantId:{} creatorUserId:{} purpose:{}",
+                    savedFileEntity.getId(), savedFileEntity.getFileCode(), savedFileEntity.getTenantId(), savedFileEntity.getCreatorUserId(), savedFileEntity.getPurpose());
             return savedFileEntity;
         } catch (Exception exception) {
             try {
@@ -92,8 +108,8 @@ public class FileServiceImpl implements IFileService {
                 log.warn("文件领域服务-上传失败后清理对象失败 fileCode:{} objectKey:{} error:{}",
                         fileCode, objectKey, cleanupException.getMessage(), cleanupException);
             }
-            log.error("文件领域服务-上传文件失败 fileCode:{} tenantId:{} creatorUserId:{} error:{}",
-                    fileCode, tenantEntity.getId(), userEntity.getId(), exception.getMessage(), exception);
+            log.error("文件领域服务-保存文件失败 fileCode:{} tenantId:{} creatorUserId:{} purpose:{} error:{}",
+                    fileCode, tenantEntity.getId(), userEntity.getId(), purpose, exception.getMessage(), exception);
             throw new BusinessException(ResponseCode.FILE_UPLOAD_FAILED);
         }
     }
@@ -187,9 +203,9 @@ public class FileServiceImpl implements IFileService {
         throw new BusinessException(ResponseCode.FILE_UPLOAD_FAILED);
     }
 
-    // tenant/{tenantId}/file/{fileCode}_{originalFilename}
-    private String buildObjectKey(Long tenantId, String fileCode, String originalFilename) {
-        return "tenant/" + tenantId + "/file/" + fileCode + "_" + originalFilename;
+    // 按用途分目录，方便人工排查对象且不改变 file 表作为统一资源索引的职责。
+    private String buildObjectKey(Long tenantId, FilePurposeVO purpose, String fileCode, String originalFilename) {
+        return "tenant/" + tenantId + "/file/" + purpose.name().toLowerCase(Locale.ROOT) + "/" + fileCode + "_" + originalFilename;
     }
 
     private String normalizeFilename(String filename) {
@@ -225,6 +241,7 @@ public class FileServiceImpl implements IFileService {
                 .fileCode(source.getFileCode())
                 .tenantId(source.getTenantId())
                 .creatorUserId(source.getCreatorUserId())
+                .purpose(source.getPurpose())
                 .fileName(source.getFileName())
                 .originName(source.getOriginName())
                 .fileSuffix(source.getFileSuffix())

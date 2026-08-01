@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS `file` (
     `file_code` VARCHAR(64) NOT NULL COMMENT '文件编码',
     `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
     `creator_user_id` BIGINT NOT NULL COMMENT '创建者用户ID',
+    `file_purpose` VARCHAR(16) NOT NULL DEFAULT 'ORIGINAL' COMMENT 'ORIGINAL 用户上传原始文件 / DERIVED 系统派生文件',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件展示名称',
     `origin_name` VARCHAR(255) NOT NULL COMMENT '原始文件名',
     `file_suffix` VARCHAR(32) DEFAULT NULL COMMENT '文件后缀',
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS `file` (
     KEY `idx_file_tenant_id` (`tenant_id`),
     KEY `idx_file_bucket_name` (`bucket_name`),
     KEY `idx_file_creator_user_id` (`creator_user_id`),
+    KEY `idx_file_tenant_purpose` (`tenant_id`, `file_purpose`),
     KEY `idx_file_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件表';
 

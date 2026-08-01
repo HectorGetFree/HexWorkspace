@@ -9,6 +9,7 @@
         <result property="fileCode" column="file_code"/>
         <result property="tenantId" column="tenant_id"/>
         <result property="creatorUserId" column="creator_user_id"/>
+        <result property="purpose" column="file_purpose"/>
         <result property="fileName" column="file_name"/>
         <result property="originName" column="origin_name"/>
         <result property="fileSuffix" column="file_suffix"/>
@@ -28,6 +29,7 @@
             file_code,
             tenant_id,
             creator_user_id,
+            file_purpose,
             file_name,
             origin_name,
             file_suffix,
@@ -44,6 +46,7 @@
             #{fileCode},
             #{tenantId},
             #{creatorUserId},
+            #{purpose},
             #{fileName},
             #{originName},
             #{fileSuffix},
@@ -65,6 +68,7 @@
             file_code = #{fileCode},
             tenant_id = #{tenantId},
             creator_user_id = #{creatorUserId},
+            file_purpose = #{purpose},
             file_name = #{fileName},
             origin_name = #{originName},
             file_suffix = #{fileSuffix},
@@ -81,7 +85,7 @@
     </update>
 
     <select id="queryFileById" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, creator_user_id, file_name, origin_name, file_suffix,
+        SELECT id, file_code, tenant_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
@@ -90,7 +94,7 @@
     </select>
 
     <select id="queryFileByFileCode" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, creator_user_id, file_name, origin_name, file_suffix,
+        SELECT id, file_code, tenant_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
@@ -99,7 +103,7 @@
     </select>
 
     <select id="queryFilesByTenantId" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, creator_user_id, file_name, origin_name, file_suffix,
+        SELECT id, file_code, tenant_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
