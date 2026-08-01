@@ -12,6 +12,7 @@ import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
 import com.hector.trigger.api.dto.DocumentCreateResponseDTO;
 import com.hector.trigger.api.dto.DocumentListResponseDTO;
+import com.hector.trigger.api.dto.DocumentProcessingStatusResponseDTO;
 import com.hector.trigger.api.dto.DocumentResponseDTO;
 import com.hector.trigger.api.response.Response;
 import com.hector.trigger.http.security.SecurityUserUtil;
@@ -166,6 +167,44 @@ public class DocumentController extends BaseController {
             return failure(exception.getCode(), exception.getInfo());
         } catch (Exception exception) {
             log.error("查询文档详情系统异常 tenantId:{} documentCode:{}", tenantId, documentCode, exception);
+            return failure(ResponseCode.SYSTEM_ERROR);
+        }
+    }
+
+    /**
+     * 查询当前版本的异步解析状态，供上传客户端和评测执行器轮询。
+     *
+     * curl 示例：
+     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/1/documents/doc_xxx/processing-status" \\
+     *   -H "Authorization: Bearer 替换为实际登录令牌"
+     */
+    @GetMapping("/{documentCode}/processing-status")
+    public Response<DocumentProcessingStatusResponseDTO> getProcessingStatus(
+            @PathVariable("tenantId") Long tenantId,
+            @PathVariable("documentCode") String documentCode) {
+        try {
+            Long currentUserId = SecurityUserUtil.getCurrentUserId();
+            log.info("查询文档处理状态开始 tenantId:{} userId:{} documentCode:{}", tenantId, currentUserId, documentCode);
+            membershipService.assertActiveMember(currentUserId, tenantId);
+            DocumentEntity documentEntity = documentService.getActiveDocument(tenantId, documentCode);
+            DocumentVersionEntity version = documentService.getCurrentVersion(documentEntity);
+            DocumentProcessingStatusResponseDTO response = DocumentProcessingStatusResponseDTO.builder()
+                    .documentCode(documentEntity.getDocumentCode())
+                    .versionNumber(version.getVersionNumber())
+                    .documentStatus(documentEntity.getStatus().name())
+                    .parseStatus(version.getParseStatus().name())
+                    .extractedFileId(version.getExtractedFileId())
+                    .parserVersion(version.getParserVersion())
+                    .parsedAt(version.getParsedAt())
+                    .build();
+            log.info("查询文档处理状态完成 tenantId:{} userId:{} documentCode:{} parseStatus:{}",
+                    tenantId, currentUserId, documentCode, response.getParseStatus());
+            return success(response);
+        } catch (BusinessException exception) {
+            log.error("查询文档处理状态业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
+            return failure(exception.getCode(), exception.getInfo());
+        } catch (Exception exception) {
+            log.error("查询文档处理状态系统异常 tenantId:{} documentCode:{}", tenantId, documentCode, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
