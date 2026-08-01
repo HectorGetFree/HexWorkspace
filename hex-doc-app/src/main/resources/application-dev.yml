@@ -87,6 +87,18 @@ minio:
       secret-key: admin123456
       bucket: hex-doc
 
+# RAG MVP：模型密钥只从本机环境或私有配置注入，禁止提交真实密钥。
+ai:
+  embedding:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:}
+      model: text-embedding-v4
+      dimensions: 1024
+  vector-store:
+    qdrant:
+      endpoint: http://127.0.0.1:6333
+      collection: hex_doc_segments
+
 # 日志
 logging:
   level:

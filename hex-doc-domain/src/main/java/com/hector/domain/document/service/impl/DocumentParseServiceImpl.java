@@ -10,6 +10,7 @@ import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentParseService;
 import com.hector.domain.file.model.entity.FileEntity;
 import com.hector.domain.file.service.IFileService;
+import com.hector.domain.knowledge.service.IKnowledgeIndexService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,9 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
 
     @Resource
     private IDocumentContentParser documentContentParser;
+
+    @Resource
+    private IKnowledgeIndexService knowledgeIndexService;
 
     @Override
     public void parse(DocumentParseRequestedEvent event) {
@@ -75,6 +79,14 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
                     parsedFilename, "text/plain; charset=utf-8", parseResult.text().getBytes(StandardCharsets.UTF_8));
             documentVersionEntity.markParseSucceeded(extractedFileEntity.getId(), parseResult.parserVersion(), LocalDateTime.now());
             documentVersionRepository.updateParseResult(documentVersionEntity);
+
+            // 4. 解析与索引复用同一条消费链路，索引失败不回滚已成功保存的解析产物；后续可基于该产物安全重建。
+            try {
+                knowledgeIndexService.indexParsedDocument(event, extractedFileEntity.getId());
+            } catch (Exception exception) {
+                log.error("文档解析领域服务-知识索引异常 tenantId:{} documentId:{} versionNumber:{} extractedFileId:{} error:{}",
+                        event.getTenantId(), documentEntity.getId(), documentVersionEntity.getVersionNumber(), extractedFileEntity.getId(), exception.getMessage(), exception);
+            }
             log.info("文档解析领域服务-解析文档版本完成 tenantId:{} documentId:{} versionNumber:{} extractedFileId:{}",
                     event.getTenantId(), documentEntity.getId(), documentVersionEntity.getVersionNumber(), extractedFileEntity.getId());
         } catch (Exception exception) {
