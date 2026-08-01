@@ -5,6 +5,7 @@ import com.hector.domain.knowledge.service.IKnowledgeIndexService;
 import com.hector.domain.membership.service.IMembershipService;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
+import com.hector.trigger.api.dto.KnowledgeSearchHitResponseDTO;
 import com.hector.trigger.api.dto.KnowledgeSearchResponseDTO;
 import com.hector.trigger.api.response.Response;
 import com.hector.trigger.http.security.SecurityUserUtil;
@@ -24,8 +25,11 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/tenants/{tenantId}/knowledge")
 public class KnowledgeController extends BaseController {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeController.class);
-    @Resource private IMembershipService membershipService;
-    @Resource private IKnowledgeIndexService knowledgeIndexService;
+    @Resource
+    private IMembershipService membershipService;
+
+    @Resource
+    private IKnowledgeIndexService knowledgeIndexService;
 
     /**
      * 根据问题查询当前租户的知识片段。
@@ -41,17 +45,20 @@ public class KnowledgeController extends BaseController {
                     .map(this::toHit).collect(Collectors.toList())).build();
             log.info("知识检索完成 tenantId:{} userId:{} hitCount:{}", tenantId, userId, response.getHits().size());
             return success(response);
-        } catch (BusinessException | IllegalArgumentException exception) {
+        } catch (BusinessException exception) {
             log.error("知识检索业务异常 tenantId:{} error:{}", tenantId, exception.getMessage(), exception);
-            return failure(ResponseCode.SYSTEM_ERROR.getCode(), exception.getMessage());
+            return failure(exception.getCode(), exception.getInfo());
+        } catch (IllegalArgumentException exception) {
+            log.error("知识检索参数异常 tenantId:{} error:{}", tenantId, exception.getMessage(), exception);
+            return failure(ResponseCode.ILLEGAL_PARAMETER.getCode(), exception.getMessage());
         } catch (Exception exception) {
             log.error("知识检索系统异常 tenantId:{}", tenantId, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
 
-    private KnowledgeSearchResponseDTO.Hit toHit(KnowledgeSearchHitVO hit) {
-        return KnowledgeSearchResponseDTO.Hit.builder().documentId(hit.documentId()).versionNumber(hit.versionNumber())
+    private KnowledgeSearchHitResponseDTO toHit(KnowledgeSearchHitVO hit) {
+        return KnowledgeSearchHitResponseDTO.builder().documentId(hit.documentId()).versionNumber(hit.versionNumber())
                 .chunkNo(hit.chunkNo()).heading(hit.heading()).content(hit.content()).score(hit.score()).build();
     }
 }

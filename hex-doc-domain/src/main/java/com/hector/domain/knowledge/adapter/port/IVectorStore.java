@@ -1,6 +1,7 @@
 package com.hector.domain.knowledge.adapter.port;
 
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
+import com.hector.domain.knowledge.model.valobj.KnowledgeVectorPointVO;
 
 import java.util.List;
 
@@ -10,8 +11,7 @@ import java.util.List;
 public interface IVectorStore {
 
     void replaceDocumentVersion(Long tenantId, Long documentId, Integer versionNumber,
-                                List<String> pointIds, List<List<Float>> vectors,
-                                List<String> headings, List<String> contents);
+                                List<KnowledgeVectorPointVO> points);
 
     List<KnowledgeSearchHitVO> search(Long tenantId, List<Float> queryVector, int topK);
 }

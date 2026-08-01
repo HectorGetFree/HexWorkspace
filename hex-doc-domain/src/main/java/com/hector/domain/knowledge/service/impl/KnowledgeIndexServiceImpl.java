@@ -7,6 +7,7 @@ import com.hector.domain.knowledge.adapter.port.IEmbeddingModel;
 import com.hector.domain.knowledge.adapter.port.IVectorStore;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSegmentVO;
+import com.hector.domain.knowledge.model.valobj.KnowledgeVectorPointVO;
 import com.hector.domain.knowledge.service.IKnowledgeIndexService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,15 +48,21 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
             throw new IllegalArgumentException("解析文本为空，无法建立知识索引");
         }
 
-        // 2. 以批量模型调用生成向量，再原子替换当前版本在向量库中的全部点位。
+        // 2. 以批量模型调用生成向量，再替换当前版本在向量库中的全部点位。
         List<String> contents = segments.stream().map(KnowledgeSegmentVO::content).collect(Collectors.toList());
         List<List<Float>> vectors = embeddingModel.embed(contents);
         if (vectors.size() != segments.size()) {
             throw new IllegalStateException("向量模型返回数量与分段数量不一致");
         }
-        List<String> pointIds = segments.stream().map(segment -> event.getDocumentId() + "-" + event.getVersionNumber() + "-" + segment.chunkNo()).collect(Collectors.toList());
-        vectorStore.replaceDocumentVersion(event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), pointIds, vectors,
-                segments.stream().map(KnowledgeSegmentVO::heading).collect(Collectors.toList()), contents);
+        List<KnowledgeVectorPointVO> points = new ArrayList<>();
+        for (int index = 0; index < segments.size(); index++) {
+            KnowledgeSegmentVO segment = segments.get(index);
+            points.add(new KnowledgeVectorPointVO(
+                    event.getDocumentId() + "-" + event.getVersionNumber() + "-" + segment.chunkNo(),
+                    segment.chunkNo(), segment.heading(), segment.content(), vectors.get(index)
+            ));
+        }
+        vectorStore.replaceDocumentVersion(event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), points);
         log.info("知识索引领域服务-建立索引完成 tenantId:{} documentId:{} versionNumber:{} segmentCount:{} strategy:{} model:{}",
                 event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), segments.size(), documentSegmenter.strategyVersion(), embeddingModel.modelName());
     }

@@ -5,10 +5,12 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.hector.domain.knowledge.adapter.port.IVectorStore;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
+import com.hector.domain.knowledge.model.valobj.KnowledgeVectorPointVO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Qdrant REST 适配器。
@@ -31,24 +34,35 @@ public class QdrantVectorStore implements IVectorStore {
     private String collection;
 
     @Override
-    public void replaceDocumentVersion(Long tenantId, Long documentId, Integer versionNumber, List<String> pointIds,
-                                       List<List<Float>> vectors, List<String> headings, List<String> contents) {
-        if (vectors.isEmpty()) return;
-        ensureCollection(vectors.get(0).size());
-        JSONObject must = new JSONObject();
-        must.put("key", "document_id"); must.put("match", JSON.parseObject("{\"value\":" + documentId + "}"));
-        JSONObject filter = new JSONObject(); filter.put("must", List.of(must));
-        request("POST", "/collections/" + collection + "/points/delete?wait=true", JSON.toJSONString(new JSONObject() {{ put("filter", filter); }}));
+    public void replaceDocumentVersion(Long tenantId, Long documentId, Integer versionNumber,
+                                       List<KnowledgeVectorPointVO> points) {
+        if (points.isEmpty()) return;
+        ensureCollection(points.get(0).vector().size());
 
-        JSONArray points = new JSONArray();
-        for (int index = 0; index < pointIds.size(); index++) {
+        // 1. 仅替换指定租户、文档、版本的索引点，保留该文档其他版本以支持版本追溯。
+        JSONObject filter = new JSONObject();
+        filter.put("must", List.of(
+                buildMatchCondition("tenant_id", tenantId),
+                buildMatchCondition("document_id", documentId),
+                buildMatchCondition("version_number", versionNumber)
+        ));
+        JSONObject deleteBody = new JSONObject();
+        deleteBody.put("filter", filter);
+        request("POST", "/collections/" + collection + "/points/delete?wait=true", deleteBody.toJSONString());
+
+        // 2. Qdrant 只接受无符号整数或 UUID 作为 point ID；业务复合键经 name-based UUID 转换后可稳定幂等写入。
+        JSONArray qdrantPoints = new JSONArray();
+        for (KnowledgeVectorPointVO pointValue : points) {
             JSONObject payload = new JSONObject();
             payload.put("tenant_id", tenantId); payload.put("document_id", documentId); payload.put("version_number", versionNumber);
-            payload.put("chunk_no", index + 1); payload.put("heading", headings.get(index)); payload.put("content", contents.get(index));
-            JSONObject point = new JSONObject(); point.put("id", pointIds.get(index)); point.put("vector", vectors.get(index)); point.put("payload", payload);
-            points.add(point);
+            payload.put("chunk_no", pointValue.chunkNo()); payload.put("heading", pointValue.heading()); payload.put("content", pointValue.content());
+            JSONObject point = new JSONObject();
+            point.put("id", toQdrantPointId(pointValue.businessPointId()));
+            point.put("vector", pointValue.vector());
+            point.put("payload", payload);
+            qdrantPoints.add(point);
         }
-        JSONObject body = new JSONObject(); body.put("points", points);
+        JSONObject body = new JSONObject(); body.put("points", qdrantPoints);
         request("PUT", "/collections/" + collection + "/points?wait=true", body.toJSONString());
     }
 
@@ -82,6 +96,19 @@ public class QdrantVectorStore implements IVectorStore {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Qdrant 连接异常", exception);
         }
+    }
+
+    private JSONObject buildMatchCondition(String key, Object value) {
+        JSONObject match = new JSONObject();
+        match.put("value", value);
+        JSONObject condition = new JSONObject();
+        condition.put("key", key);
+        condition.put("match", match);
+        return condition;
+    }
+
+    private String toQdrantPointId(String businessPointId) {
+        return UUID.nameUUIDFromBytes(businessPointId.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private String request(String method, String path, String body) {
