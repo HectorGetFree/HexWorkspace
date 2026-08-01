@@ -1,6 +1,8 @@
 package com.hector.domain.knowledge.service.impl;
 
 import com.hector.domain.document.event.DocumentParseRequestedEvent;
+import com.hector.domain.document.model.entity.DocumentEntity;
+import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.file.service.IFileService;
 import com.hector.domain.knowledge.adapter.port.IDocumentSegmenter;
 import com.hector.domain.knowledge.adapter.port.IEmbeddingModel;
@@ -31,6 +33,9 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
 
     @Resource
     private IFileService fileService;
+
+    @Resource
+    private IDocumentRepository documentRepository;
     @Resource
     private IDocumentSegmenter documentSegmenter;
     @Resource
@@ -42,6 +47,11 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
     public void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedFileId) {
         log.info("知识索引领域服务-建立索引开始 tenantId:{} documentId:{} versionNumber:{}", event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
         // 1. 解析产物是唯一文本输入；重新索引时也可从 MinIO 重放，不依赖向量库保留正文。
+        DocumentEntity documentEntity = documentRepository.findById(event.getDocumentId())
+                .orElseThrow(() -> new IllegalStateException("待索引文档不存在"));
+        if (!event.getTenantId().equals(documentEntity.getTenantId())) {
+            throw new IllegalStateException("待索引文档租户不匹配");
+        }
         String content = new String(fileService.readFileContent(event.getTenantId(), extractedFileId), StandardCharsets.UTF_8);
         List<KnowledgeSegmentVO> segments = documentSegmenter.segment(content);
         if (segments.isEmpty()) {
@@ -59,7 +69,7 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
             KnowledgeSegmentVO segment = segments.get(index);
             points.add(new KnowledgeVectorPointVO(
                     event.getDocumentId() + "-" + event.getVersionNumber() + "-" + segment.chunkNo(),
-                    segment.chunkNo(), segment.heading(), segment.content(), vectors.get(index)
+                    documentEntity.getDocumentCode(), segment.chunkNo(), segment.heading(), segment.content(), vectors.get(index)
             ));
         }
         vectorStore.replaceDocumentVersion(event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), points);

@@ -19,6 +19,8 @@ public class KnowledgeSearchHitResponseDTO implements Serializable {
 
     private Long documentId;
 
+    private String documentCode;
+
     private Integer versionNumber;
 
     private Integer chunkNo;

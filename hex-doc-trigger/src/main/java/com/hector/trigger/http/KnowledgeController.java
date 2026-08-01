@@ -1,11 +1,15 @@
 package com.hector.trigger.http;
 
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
+import com.hector.domain.knowledge.model.valobj.KnowledgeAnswerVO;
+import com.hector.domain.knowledge.service.IKnowledgeAnswerService;
 import com.hector.domain.knowledge.service.IKnowledgeIndexService;
 import com.hector.domain.membership.service.IMembershipService;
 import com.hector.hexdoc.types.enums.ResponseCode;
 import com.hector.hexdoc.types.exception.BusinessException;
 import com.hector.trigger.api.dto.KnowledgeSearchHitResponseDTO;
+import com.hector.trigger.api.dto.KnowledgeAskRequestDTO;
+import com.hector.trigger.api.dto.KnowledgeAskResponseDTO;
 import com.hector.trigger.api.dto.KnowledgeSearchResponseDTO;
 import com.hector.trigger.api.response.Response;
 import com.hector.trigger.http.security.SecurityUserUtil;
@@ -15,7 +19,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.stream.Collectors;
@@ -30,6 +36,9 @@ public class KnowledgeController extends BaseController {
 
     @Resource
     private IKnowledgeIndexService knowledgeIndexService;
+
+    @Resource
+    private IKnowledgeAnswerService knowledgeAnswerService;
 
     /**
      * 根据问题查询当前租户的知识片段。
@@ -57,8 +66,36 @@ public class KnowledgeController extends BaseController {
         }
     }
 
+    /**
+     * 基于当前租户已索引文档进行单轮问答。
+     * curl 示例：curl -X POST "http://127.0.0.1:8098/api/v1/tenants/1/knowledge/ask" -H "Authorization: Bearer 替换为实际登录令牌" -H "Content-Type: application/json" -d '{"question":"文档讲了什么？"}'
+     */
+    @PostMapping("/ask")
+    public Response<KnowledgeAskResponseDTO> ask(@PathVariable Long tenantId, @RequestBody KnowledgeAskRequestDTO request) {
+        try {
+            Long userId = SecurityUserUtil.getCurrentUserId();
+            String question = request == null ? null : request.getQuestion();
+            log.info("知识问答开始 tenantId:{} userId:{} questionLength:{}", tenantId, userId, question == null ? 0 : question.length());
+            membershipService.assertActiveMember(userId, tenantId);
+            KnowledgeAnswerVO answer = knowledgeAnswerService.answer(tenantId, question);
+            KnowledgeAskResponseDTO response = KnowledgeAskResponseDTO.builder().answer(answer.answer())
+                    .sources(answer.sources().stream().map(this::toHit).collect(Collectors.toList())).build();
+            log.info("知识问答完成 tenantId:{} userId:{} sourceCount:{}", tenantId, userId, response.getSources().size());
+            return success(response);
+        } catch (BusinessException exception) {
+            log.error("知识问答业务异常 tenantId:{} error:{}", tenantId, exception.getMessage(), exception);
+            return failure(exception.getCode(), exception.getInfo());
+        } catch (IllegalArgumentException exception) {
+            log.error("知识问答参数异常 tenantId:{} error:{}", tenantId, exception.getMessage(), exception);
+            return failure(ResponseCode.ILLEGAL_PARAMETER.getCode(), exception.getMessage());
+        } catch (Exception exception) {
+            log.error("知识问答系统异常 tenantId:{}", tenantId, exception);
+            return failure(ResponseCode.SYSTEM_ERROR);
+        }
+    }
+
     private KnowledgeSearchHitResponseDTO toHit(KnowledgeSearchHitVO hit) {
-        return KnowledgeSearchHitResponseDTO.builder().documentId(hit.documentId()).versionNumber(hit.versionNumber())
+        return KnowledgeSearchHitResponseDTO.builder().documentId(hit.documentId()).documentCode(hit.documentCode()).versionNumber(hit.versionNumber())
                 .chunkNo(hit.chunkNo()).heading(hit.heading()).content(hit.content()).score(hit.score()).build();
     }
 }

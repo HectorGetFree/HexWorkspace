@@ -55,7 +55,8 @@ public class QdrantVectorStore implements IVectorStore {
         for (KnowledgeVectorPointVO pointValue : points) {
             JSONObject payload = new JSONObject();
             payload.put("tenant_id", tenantId); payload.put("document_id", documentId); payload.put("version_number", versionNumber);
-            payload.put("chunk_no", pointValue.chunkNo()); payload.put("heading", pointValue.heading()); payload.put("content", pointValue.content());
+            payload.put("document_code", pointValue.documentCode()); payload.put("chunk_no", pointValue.chunkNo());
+            payload.put("heading", pointValue.heading()); payload.put("content", pointValue.content());
             JSONObject point = new JSONObject();
             point.put("id", toQdrantPointId(pointValue.businessPointId()));
             point.put("vector", pointValue.vector());
@@ -78,7 +79,7 @@ public class QdrantVectorStore implements IVectorStore {
         for (Object item : points) {
             JSONObject point = (JSONObject) item;
             JSONObject payload = point.getJSONObject("payload");
-            hits.add(new KnowledgeSearchHitVO(payload.getLong("document_id"), payload.getInteger("version_number"),
+            hits.add(new KnowledgeSearchHitVO(payload.getLong("document_id"), payload.getString("document_code"), payload.getInteger("version_number"),
                     payload.getInteger("chunk_no"), payload.getString("heading"), payload.getString("content"), point.getDouble("score")));
         }
         return hits;

@@ -98,6 +98,11 @@ ai:
     qdrant:
       endpoint: http://127.0.0.1:6333
       collection: hex_doc_segments
+  chat:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      endpoint: https://api.openai.com/v1/chat/completions
+      model: gpt-4.1-mini
 
 # 日志
 logging:
