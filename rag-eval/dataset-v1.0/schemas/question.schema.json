@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hex-doc.local/rag-eval/dataset-v1.0/question.schema.json",
+  "title": "RAG evaluation question",
+  "type": "object",
+  "required": ["id", "question", "answerable", "evidences", "category", "difficulty"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "question": { "type": "string", "minLength": 1 },
+    "answerable": { "type": "boolean" },
+    "referenceAnswer": { "type": ["string", "null"] },
+    "evidences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["documentKey", "quote"],
+        "properties": {
+          "documentKey": { "type": "string", "minLength": 1 },
+          "heading": { "type": ["string", "null"] },
+          "quote": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "expectedBehavior": { "enum": ["ANSWER", "REFUSE"] },
+    "category": { "type": "string", "minLength": 1 },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "mustContain": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}
