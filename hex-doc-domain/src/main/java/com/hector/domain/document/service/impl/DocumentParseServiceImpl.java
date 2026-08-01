@@ -71,7 +71,7 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
             // 3. 解析文本作为派生文件保存，供后续 RAG、摘要和 Agent 能力复用。
             String parsedFilename = documentEntity.getDocumentCode() + "_v"
                     + documentVersionEntity.getVersionNumber() + "_parsed.txt";
-            FileEntity extractedFileEntity = fileService.uploadFile(event.getTenantId(), event.getOperatorUserId(),
+            FileEntity extractedFileEntity = fileService.storeDerivedFile(event.getTenantId(), event.getOperatorUserId(),
                     parsedFilename, "text/plain; charset=utf-8", parseResult.text().getBytes(StandardCharsets.UTF_8));
             documentVersionEntity.markParseSucceeded(extractedFileEntity.getId(), parseResult.parserVersion(), LocalDateTime.now());
             documentVersionRepository.updateParseResult(documentVersionEntity);
