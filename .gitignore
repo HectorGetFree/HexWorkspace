@@ -15,3 +15,7 @@ logs/
 # OS / temp files
 tmp/
 temp/
+
+# RAG evaluation runtime outputs
+rag-eval/runs/*
+!rag-eval/runs/.gitkeep
