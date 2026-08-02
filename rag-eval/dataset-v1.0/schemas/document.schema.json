@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hex-doc.local/rag-eval/dataset-v1.0/document.schema.json",
+  "title": "RAG evaluation document manifest",
+  "type": "object",
+  "required": ["documentKey", "title", "format", "rawFile", "canonicalTextFile", "rawSha256"],
+  "properties": {
+    "documentKey": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "format": { "enum": ["txt", "md", "pdf", "docx"] },
+    "rawFile": { "type": "string", "minLength": 1 },
+    "canonicalTextFile": { "type": "string", "minLength": 1 },
+    "rawSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "domain": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "language": { "type": "string" }
+  },
+  "additionalProperties": false
+}

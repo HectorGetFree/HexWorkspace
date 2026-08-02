@@ -1,6 +1,5 @@
 spring:
-  application:
-    name: hex-doc
-
-server:
-  port: 8080
+  config:
+    name: big-market-app
+  profiles:
+    active: dev

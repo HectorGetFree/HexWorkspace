@@ -1,0 +1,26 @@
+dataset:
+  version: dataset-v1.0
+  split: test
+
+ingestion:
+  parserVersion: mvp-parser-v1
+  segmentStrategy: auto-chapter-fixed-v1(1000/100)
+
+embedding:
+  provider: dashscope
+  model: text-embedding-v4
+  dimensions: 1024
+
+retrieval:
+  vectorStore: qdrant
+  distance: cosine
+  initialTopK: 8
+  maxHitsPerDocumentVersion: 2
+  finalTopK: 6
+
+generation:
+  provider: openai
+  model: gpt-4.1-mini
+  temperature: 0.2
+  maxContextCharacters: 6000
+  streaming: false

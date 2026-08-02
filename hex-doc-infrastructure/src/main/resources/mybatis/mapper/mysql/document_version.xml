@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IDocumentVersionDao">
+
+    <resultMap id="documentVersionResultMap" type="com.hector.infrastructure.dao.po.DocumentVersion">
+        <id property="id" column="id"/>
+        <result property="documentId" column="document_id"/>
+        <result property="versionNumber" column="version_number"/>
+        <result property="fileId" column="file_id"/>
+        <result property="contentHash" column="content_hash"/>
+        <result property="extractedFileId" column="extracted_file_id"/>
+        <result property="parseStatus" column="parse_status"/>
+        <result property="parserVersion" column="parser_version"/>
+        <result property="parsedAt" column="parsed_at"/>
+        <result property="changeSummary" column="change_summary"/>
+        <result property="createdByUserId" column="created_by_user_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.DocumentVersion" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO `document_version` (
+            document_id, version_number, file_id, content_hash, extracted_file_id,
+            parse_status, parser_version, parsed_at, change_summary, created_by_user_id, created_at
+        ) VALUES (
+            #{documentId}, #{versionNumber}, #{fileId}, #{contentHash}, #{extractedFileId},
+            #{parseStatus}, #{parserVersion}, #{parsedAt}, #{changeSummary}, #{createdByUserId}, #{createdAt}
+        )
+    </insert>
+
+    <update id="updateParseResult" parameterType="com.hector.infrastructure.dao.po.DocumentVersion">
+        UPDATE `document_version`
+        SET
+            extracted_file_id = #{extractedFileId},
+            parse_status = #{parseStatus},
+            parser_version = #{parserVersion},
+            parsed_at = #{parsedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="queryByDocumentIdAndVersionNumber" resultMap="documentVersionResultMap">
+        SELECT id, document_id, version_number, file_id, content_hash, extracted_file_id,
+               parse_status, parser_version, parsed_at, change_summary, created_by_user_id, created_at
+        FROM `document_version`
+        WHERE document_id = #{documentId}
+          AND version_number = #{versionNumber}
+        LIMIT 1
+    </select>
+
+    <select id="queryByDocumentId" resultMap="documentVersionResultMap">
+        SELECT id, document_id, version_number, file_id, content_hash, extracted_file_id,
+               parse_status, parser_version, parsed_at, change_summary, created_by_user_id, created_at
+        FROM `document_version`
+        WHERE document_id = #{documentId}
+        ORDER BY version_number DESC
+    </select>
+
+</mapper>
