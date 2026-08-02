@@ -23,10 +23,10 @@ public class OpenAiChatModel implements IChatModel {
     @Value("${ai.chat.openai.api-key:}")
     private String apiKey;
 
-    @Value("${ai.chat.openai.endpoint:https://api.openai.com/v1/chat/completions}")
-    private String endpoint;
+    @Value("${ai.chat.openai.base-url:}")
+    private String baseUrl;
 
-    @Value("${ai.chat.openai.model:gpt-4.1-mini}")
+    @Value("${ai.chat.openai.model:gpt-5.4}")
     private String model;
 
     @Override
@@ -39,7 +39,7 @@ public class OpenAiChatModel implements IChatModel {
             body.put("model", model);
             body.put("temperature", 0.2);
             body.put("messages", buildMessages(systemPrompt, userPrompt));
-            HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(60))
+            HttpRequest request = HttpRequest.newBuilder(URI.create(chatCompletionsEndpoint())).timeout(Duration.ofSeconds(60))
                     .header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body.toJSONString())).build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -58,6 +58,13 @@ public class OpenAiChatModel implements IChatModel {
     @Override
     public String modelName() {
         return model;
+    }
+
+    private String chatCompletionsEndpoint() {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalStateException("未配置 ai.chat.openai.base-url，无法生成知识库回答");
+        }
+        return baseUrl.replaceAll("/+$", "") + "/chat/completions";
     }
 
     private JSONArray buildMessages(String systemPrompt, String userPrompt) {

@@ -45,7 +45,8 @@ public class KnowledgeController extends BaseController {
      * curl 示例：curl -G "http://127.0.0.1:8098/api/v1/tenants/1/knowledge/search" -H "Authorization: Bearer 替换为实际登录令牌" --data-urlencode "question=文档讲了什么"
      */
     @GetMapping("/search")
-    public Response<KnowledgeSearchResponseDTO> search(@PathVariable Long tenantId, @RequestParam String question) {
+    public Response<KnowledgeSearchResponseDTO> search(@PathVariable("tenantId") Long tenantId,
+                                                        @RequestParam("question") String question) {
         try {
             Long userId = SecurityUserUtil.getCurrentUserId();
             log.info("知识检索开始 tenantId:{} userId:{} questionLength:{}", tenantId, userId, question == null ? 0 : question.length());
@@ -71,7 +72,8 @@ public class KnowledgeController extends BaseController {
      * curl 示例：curl -X POST "http://127.0.0.1:8098/api/v1/tenants/1/knowledge/ask" -H "Authorization: Bearer 替换为实际登录令牌" -H "Content-Type: application/json" -d '{"question":"文档讲了什么？"}'
      */
     @PostMapping("/ask")
-    public Response<KnowledgeAskResponseDTO> ask(@PathVariable Long tenantId, @RequestBody KnowledgeAskRequestDTO request) {
+    public Response<KnowledgeAskResponseDTO> ask(@PathVariable("tenantId") Long tenantId,
+                                                  @RequestBody KnowledgeAskRequestDTO request) {
         try {
             Long userId = SecurityUserUtil.getCurrentUserId();
             String question = request == null ? null : request.getQuestion();
