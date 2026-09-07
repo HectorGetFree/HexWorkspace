@@ -28,7 +28,7 @@ def text_for(domain, title, number):
 
 ## 文档目的
 
-本文档定义 HexDoc 企业协作平台中“{title}”的统一规则。规则编号为 {code}，适用于生产、预发布和演示租户。任何自动化任务都必须记录规则编号、操作人和执行时间。
+本文档定义 HexWorkspace 企业协作平台中“{title}”的统一规则。规则编号为 {code}，适用于生产、预发布和演示租户。任何自动化任务都必须记录规则编号、操作人和执行时间。
 
 ## 核心规则
 
@@ -84,7 +84,7 @@ def main():
             if fmt in ('md','txt'): raw.write_text(text, encoding='utf-8')
             elif fmt == 'pdf': write_pdf(raw, title, text)
             else: write_docx(raw, title, text)
-            records.append({"documentKey":key,"title":title,"format":fmt,"rawFile":f"corpus/raw/{raw.name}","canonicalTextFile":f"corpus/canonical-text/{canonical.name}","rawSha256":hashlib.sha256(raw.read_bytes()).hexdigest(),"domain":domain,"tags":[domain,"hexdoc","baseline-v1"],"language":"zh-CN"})
+            records.append({"documentKey":key,"title":title,"format":fmt,"rawFile":f"corpus/raw/{raw.name}","canonicalTextFile":f"corpus/canonical-text/{canonical.name}","rawSha256":hashlib.sha256(raw.read_bytes()).hexdigest(),"domain":domain,"tags":[domain,"hexworkspace","baseline-v1"],"language":"zh-CN"})
     MANIFEST.write_text('\n'.join(json.dumps(x,ensure_ascii=False) for x in records)+'\n',encoding='utf-8')
 
 if __name__ == '__main__': main()

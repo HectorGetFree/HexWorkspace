@@ -1,6 +1,6 @@
-# hex-doc
+# hex-workspace
 
-hex-doc 是一个面向企业文档与知识库场景的后端项目。当前版本已经完成第一版 MVP：以 DDD 分层组织用户、租户、成员、文件、文档和知识库能力，打通文档上传、异步解析、分段、向量化、租户级检索与 RAG 问答链路，并提供可复现的 RAG 评测基线。
+hex-workspace 是一个面向企业文档与知识库场景的后端项目。当前版本已经完成第一版 MVP：以 DDD 分层组织用户、租户、成员、文件、文档和知识库能力，打通文档上传、异步解析、分段、向量化、租户级检索与 RAG 问答链路，并提供可复现的 RAG 评测基线。
 
 项目后续将在现有 MVP 上继续完成 DocAI 的 DDD 重构与缺陷补足，并逐步演进为包含 AI Gateway、AI Orchestrator、Tool Runtime、RAG Runtime 和可观测体系的 AI 应用平台。
 
@@ -31,9 +31,9 @@ hex-doc 是一个面向企业文档与知识库场景的后端项目。当前版
 - 问答目前为单轮调用，没有 Planner、Workflow 或复杂 Agent 编排。
 - 尚未实现 API Gateway、AI Gateway、Tool Runtime，以及 CRM、DB、MQ 等工具连接器。
 - 尚未建立完整的 Trace、Cost、Metrics、Audit 体系。
-- `hex-doc-queries` 当前是预留模块，尚无查询侧实现代码。
+- `hex-workspace-queries` 当前是预留模块，尚无查询侧实现代码。
 - Java 自动化测试尚未补齐；当前 Maven 配置默认跳过测试。
-- `hex-doc-app` 的 Spring Boot Maven 插件仍残留旧模板入口 `cn.bugstack.Application`；源码真实入口为 `com.hector.HexDocApplication`，当前应从 IDE 运行真实入口，打包 JAR 的启动配置需要后续修复。
+- `hex-workspace-app` 的 Spring Boot Maven 插件仍残留旧模板入口 `cn.bugstack.Application`；源码真实入口为 `com.hector.HexWorkspaceApplication`，当前应从 IDE 运行真实入口，打包 JAR 的启动配置需要后续修复。
 - 当前配置面向本地开发，生产环境的密钥管理、数据库迁移、容灾与安全加固仍需完善。
 
 ## MVP 链路
@@ -66,14 +66,14 @@ hex-doc 是一个面向企业文档与知识库场景的后端项目。当前版
 ## 工程结构
 
 ```text
-hex-doc
-├── hex-doc-app             # Spring Boot 启动模块与运行配置
-├── hex-doc-api             # 对外 DTO、请求与统一响应模型
-├── hex-doc-trigger         # HTTP Controller、安全过滤器、MQ Listener
-├── hex-doc-domain          # 领域模型、领域服务、仓储与外部能力端口
-├── hex-doc-infrastructure  # MyBatis、MinIO、RabbitMQ、模型与向量库适配器
-├── hex-doc-types           # 通用枚举与业务异常
-├── hex-doc-queries         # 查询侧预留模块
+hex-workspace
+├── hex-workspace-app             # Spring Boot 启动模块与运行配置
+├── hex-workspace-api             # 对外 DTO、请求与统一响应模型
+├── hex-workspace-trigger         # HTTP Controller、安全过滤器、MQ Listener
+├── hex-workspace-domain          # 领域模型、领域服务、仓储与外部能力端口
+├── hex-workspace-infrastructure  # MyBatis、MinIO、RabbitMQ、模型与向量库适配器
+├── hex-workspace-types           # 通用枚举与业务异常
+├── hex-workspace-queries         # 查询侧预留模块
 ├── docs/devops             # 本地依赖与 MySQL 初始化脚本
 └── rag-eval                # RAG 数据集、配置、执行器与运行结果目录
 ```
@@ -133,7 +133,7 @@ docker compose -f docs/devops/docker-compose.yml up -d
 | RabbitMQ Console | `http://127.0.0.1:15672` |
 | Qdrant HTTP | `http://127.0.0.1:6333` |
 
-首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-doc.sql`。已有旧数据卷如缺少 `file_purpose` 字段，需要手动执行 `002-add-file-purpose.sql`。
+首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。已有旧数据卷如缺少 `file_purpose` 字段，需要手动执行 `002-add-file-purpose.sql`。
 
 ### 3. 配置模型密钥
 
@@ -145,7 +145,7 @@ export OPENAI_API_KEY='你的 OpenAI 或兼容服务 API Key'
 export OPENAI_BASE_URL='https://api.openai.com/v1'
 ```
 
-默认模型配置位于 `hex-doc-app/src/main/resources/application-dev.yml`：
+默认模型配置位于 `hex-workspace-app/src/main/resources/application-dev.yml`：
 
 - Embedding：`text-embedding-v4`，1024 维。
 - Chat：`gpt-5.4`。
@@ -161,10 +161,10 @@ mvn clean package -DskipTests
 当前请在 IntelliJ IDEA 中运行：
 
 ```text
-hex-doc-app/src/main/java/com/hector/HexDocApplication.java
+hex-workspace-app/src/main/java/com/hector/HexWorkspaceApplication.java
 ```
 
-现有 `hex-doc-app/pom.xml` 的 Spring Boot Maven 插件仍指向旧模板入口，因此暂不建议直接执行打包 JAR。修正插件的 `mainClass` 和版本后，再恢复标准的 `java -jar` 或 `spring-boot:run` 启动方式。
+现有 `hex-workspace-app/pom.xml` 的 Spring Boot Maven 插件仍指向旧模板入口，因此暂不建议直接执行打包 JAR。修正插件的 `mainClass` 和版本后，再恢复标准的 `java -jar` 或 `spring-boot:run` 启动方式。
 
 应用默认监听：
 
@@ -256,8 +256,8 @@ curl -X POST 'http://127.0.0.1:8098/api/v1/tenants/1/knowledge/ask' \
 首次在专用评测租户中运行：
 
 ```bash
-export HEX_DOC_TOKEN='<JWT>'
-export HEX_DOC_TENANT_ID=1
+export HEX_WORKSPACE_TOKEN='<JWT>'
+export HEX_WORKSPACE_TENANT_ID=1
 python3 rag-eval/scripts/run_baseline_v1.py --upload
 ```
 

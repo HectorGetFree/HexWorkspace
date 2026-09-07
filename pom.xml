@@ -4,18 +4,18 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.hector</groupId>
-    <artifactId>hex-doc</artifactId>
+    <artifactId>hex-workspace</artifactId>
     <version>1.1</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>hex-doc-app</module>
-        <module>hex-doc-domain</module>
-        <module>hex-doc-trigger</module>
-        <module>hex-doc-infrastructure</module>
-        <module>hex-doc-types</module>
-        <module>hex-doc-api</module>
-        <module>hex-doc-queries</module>
+        <module>hex-workspace-app</module>
+        <module>hex-workspace-domain</module>
+        <module>hex-workspace-trigger</module>
+        <module>hex-workspace-infrastructure</module>
+        <module>hex-workspace-types</module>
+        <module>hex-workspace-api</module>
+        <module>hex-workspace-queries</module>
     </modules>
 
     <properties>
@@ -144,32 +144,32 @@
             <!-- 工程依赖 -->
             <dependency>
                 <groupId>com.hector</groupId>
-                <artifactId>hex-doc-domain</artifactId>
+                <artifactId>hex-workspace-domain</artifactId>
                 <version>1.1</version>
             </dependency>
             <dependency>
                 <groupId>com.hector</groupId>
-                <artifactId>hex-doc-infrastructure</artifactId>
+                <artifactId>hex-workspace-infrastructure</artifactId>
                 <version>1.1</version>
             </dependency>
             <dependency>
                 <groupId>com.hector</groupId>
-                <artifactId>hex-doc-types</artifactId>
+                <artifactId>hex-workspace-types</artifactId>
                 <version>1.1</version>
             </dependency>
             <dependency>
                 <groupId>com.hector</groupId>
-                <artifactId>hex-doc-trigger</artifactId>
+                <artifactId>hex-workspace-trigger</artifactId>
                 <version>1.1</version>
             </dependency>
             <dependency>
                 <groupId>com.hector</groupId>
-                <artifactId>hex-doc-queries</artifactId>
+                <artifactId>hex-workspace-queries</artifactId>
                 <version>1.1</version>
             </dependency>
             <dependency>
                 <groupId>com.hector</groupId>
-                <artifactId>hex-doc-api</artifactId>
+                <artifactId>hex-workspace-api</artifactId>
                 <version>1.1</version>
             </dependency>
         </dependencies>

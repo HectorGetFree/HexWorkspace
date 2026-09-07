@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hex-doc.local/rag-eval/dataset-v1.0/document.schema.json",
+  "$id": "https://hex-workspace.local/rag-eval/dataset-v1.0/document.schema.json",
   "title": "RAG evaluation document manifest",
   "type": "object",
   "required": ["documentKey", "title", "format", "rawFile", "canonicalTextFile", "rawSha256"],

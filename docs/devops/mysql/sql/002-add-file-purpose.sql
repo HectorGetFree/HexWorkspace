@@ -1,4 +1,4 @@
-USE `hex_doc`;
+USE `hex_workspace`;
 
 -- 已初始化的本地 MySQL 不会再次执行 001；升级环境需执行本脚本补充文件用途字段。
 ALTER TABLE `file`

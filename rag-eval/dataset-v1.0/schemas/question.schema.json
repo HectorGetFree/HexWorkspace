@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://hex-doc.local/rag-eval/dataset-v1.0/question.schema.json",
+  "$id": "https://hex-workspace.local/rag-eval/dataset-v1.0/question.schema.json",
   "title": "RAG evaluation question",
   "type": "object",
   "required": ["id", "question", "answerable", "evidences", "category", "difficulty"],

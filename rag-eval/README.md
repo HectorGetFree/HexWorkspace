@@ -1,6 +1,6 @@
 # RAG 评测基线
 
-本目录用于保存 hex-doc RAG 链路的可复现评测资产，不属于 Spring Boot 运行时模块。
+本目录用于保存 hex-workspace RAG 链路的可复现评测资产，不属于 Spring Boot 运行时模块。
 
 ## 目录约定
 
@@ -21,8 +21,8 @@
 评测执行器只通过公开 HTTP 接口工作：首次在**专用评测租户**上传语料，之后复用本次运行生成的文档映射，避免重复上传文档污染向量检索结果。
 
 ```bash
-export HEX_DOC_TOKEN='你的 JWT'
-export HEX_DOC_TENANT_ID=1
+export HEX_WORKSPACE_TOKEN='你的 JWT'
+export HEX_WORKSPACE_TENANT_ID=1
 
 # 首次：上传 40 份语料、等待解析成功并跑 test 集
 python3 rag-eval/scripts/run_baseline_v1.py --upload

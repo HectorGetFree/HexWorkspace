@@ -51,7 +51,7 @@
 
 ## 数据与环境
 - Docker 与初始化脚本统一放在 `docs/devops` 下。
-- MySQL 库名固定使用 `hex_doc`。
+- MySQL 库名固定使用 `hex_workspace`。
 - MySQL 启动时要自动加载 `docs/devops/mysql/sql` 下的初始化脚本。
 
 ## Git 规范

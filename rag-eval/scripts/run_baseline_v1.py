@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the dataset-v1.0 baseline against a running hex-doc instance.
+"""Run the dataset-v1.0 baseline against a running hex-workspace instance.
 
 The script intentionally uses only the public HTTP APIs.  A fresh run must use
 ``--upload`` once (preferably against a dedicated evaluation tenant); later runs
@@ -24,7 +24,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_ROOT = PROJECT_ROOT / "rag-eval" / "dataset-v1.0"
-DEFAULT_BASE_URL = os.getenv("HEX_DOC_BASE_URL", "http://localhost:8098")
+DEFAULT_BASE_URL = os.getenv("HEX_WORKSPACE_BASE_URL", "http://localhost:8098")
 REFUSAL_MARKERS = ("无法回答", "无法提供", "信息不足", "未提供足够", "不能回答", "无法确定")
 
 
@@ -35,8 +35,8 @@ class ApiError(RuntimeError):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
-    parser.add_argument("--tenant-id", type=int, default=int(os.getenv("HEX_DOC_TENANT_ID", "0")))
-    parser.add_argument("--token", default=os.getenv("HEX_DOC_TOKEN", ""))
+    parser.add_argument("--tenant-id", type=int, default=int(os.getenv("HEX_WORKSPACE_TENANT_ID", "0")))
+    parser.add_argument("--token", default=os.getenv("HEX_WORKSPACE_TOKEN", ""))
     parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--run-id", default=datetime.now(timezone.utc).strftime("baseline-v1-%Y%m%dT%H%M%SZ"))
     parser.add_argument("--upload", action="store_true", help="upload the raw corpus and create a document map")
@@ -51,13 +51,13 @@ def parse_args():
     parser.add_argument("--skip-ask", action="store_true", help="run search metrics only")
     args = parser.parse_args()
     if args.tenant_id <= 0 or not args.token:
-        parser.error("请提供 --tenant-id 和 --token，或设置 HEX_DOC_TENANT_ID / HEX_DOC_TOKEN")
+        parser.error("请提供 --tenant-id 和 --token，或设置 HEX_WORKSPACE_TENANT_ID / HEX_WORKSPACE_TOKEN")
     if args.upload == bool(args.document_map):
         parser.error("首次运行使用 --upload；复用已有语料时只使用 --document-map PATH")
     return args
 
 
-class HexDocApi:
+class HexWorkspaceApi:
     def __init__(self, base_url, token, timeout, retries):
         self.base_url = base_url.rstrip("/")
         self.headers = {"Authorization": f"Bearer {token}"}
@@ -102,7 +102,7 @@ class HexDocApi:
         return payload.get("data")
 
     def upload(self, tenant_id, raw_path, title):
-        boundary = "----hexdoc-eval-" + uuid.uuid4().hex
+        boundary = "----hexworkspace-eval-" + uuid.uuid4().hex
         mime = mimetypes.guess_type(raw_path.name)[0] or "application/octet-stream"
         content = raw_path.read_bytes()
         chunks = []
@@ -276,7 +276,7 @@ def aggregate(results, args, run_dir, runtime_info, config_sha256):
         "split": "test",
         "tenantId": args.tenant_id,
         "runtime": {
-            "hexDocBaseUrl": args.base_url,
+            "hexWorkspaceBaseUrl": args.base_url,
             "chatModel": runtime_info.get("chatModel"),
             "embeddingModel": runtime_info.get("embeddingModel"),
             "requestTimeoutSeconds": args.request_timeout,
@@ -312,7 +312,7 @@ def main():
     if config_path.exists():
         shutil.copyfile(config_path, run_dir / "baseline-v1.yml")
         config_sha256 = hashlib.sha256(config_path.read_bytes()).hexdigest()
-    api = HexDocApi(args.base_url, args.token, args.request_timeout, args.http_retries)
+    api = HexWorkspaceApi(args.base_url, args.token, args.request_timeout, args.http_retries)
     runtime_info = api.runtime_info()
     if args.upload:
         mapping = upload_corpus(api, args, manifest, run_dir)
