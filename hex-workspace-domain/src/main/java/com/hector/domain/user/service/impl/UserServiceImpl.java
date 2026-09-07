@@ -5,6 +5,7 @@ import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.model.valobj.UserStatusVO;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.domain.user.service.IUserService;
+import com.hector.domain.workspace.service.IWorkspaceService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
@@ -29,6 +30,9 @@ public class UserServiceImpl implements IUserService {
     @Resource
     private IPasswordService passwordService;
 
+    @Resource
+    private IWorkspaceService workspaceService;
+
     @Override
     @Transactional
     public UserEntity registerUser(String username, String rawPassword) {
@@ -50,6 +54,8 @@ public class UserServiceImpl implements IUserService {
                 .updatedAt(now)
                 .build();
         UserEntity savedUserEntity = userRepository.save(userEntity);
+        // 注册与默认个人 Workspace 共用事务，防止产生没有资料库的可登录用户。
+        workspaceService.ensurePersonalWorkspace(savedUserEntity.getId(), savedUserEntity.getUsername());
         log.info("用户领域服务-注册用户完成 userId:{} username:{}", savedUserEntity.getId(), savedUserEntity.getUsername());
         return savedUserEntity;
     }

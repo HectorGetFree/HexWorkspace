@@ -1,6 +1,6 @@
 # hex-workspace
 
-hex-workspace 是一个面向企业文档与知识库场景的后端项目。当前版本已经完成第一版 MVP：以 DDD 分层组织用户、租户、成员、文件、文档和知识库能力，打通文档上传、异步解析、分段、向量化、租户级检索与 RAG 问答链路，并提供可复现的 RAG 评测基线。
+hex-workspace 是一个面向个人与团队文档资料库的智能工作台后端。当前版本在原有文档知识库 MVP 基础上，已建立 Workspace 聚合：新用户注册后会自动创建个人 Workspace。文档、文件、成员和知识检索仍暂以既有 `tenant` 运行契约承载，后续将分阶段迁移到 Workspace。
 
 项目后续将在现有 MVP 上继续完成 DocAI 的 DDD 重构与缺陷补足，并逐步演进为包含 AI Gateway、AI Orchestrator、Tool Runtime、RAG Runtime 和可观测体系的 AI 应用平台。
 
@@ -11,6 +11,7 @@ hex-workspace 是一个面向企业文档与知识库场景的后端项目。当
 ### 已实现
 
 - 用户注册、登录、JWT 鉴权、当前用户查询与登出接口。
+- Workspace 聚合及 `PERSONAL`、`TEAM` 类型；新用户注册时在同一事务内创建默认个人 Workspace。
 - 租户创建、查询，以及用户所属租户列表。
 - 租户成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
 - 基于 MinIO 的租户级文件存储，区分用户原始文件与系统派生文件。
@@ -87,6 +88,7 @@ hex-workspace
 - `file`：租户级底层文件资源与对象存储。
 - `document`：文档聚合、不可变版本和异步解析状态。
 - `knowledge`：分段、向量化、检索和知识库问答。
+- `workspace`：Workspace 类型、生命周期和默认个人 Workspace 创建；资源树和成员迁移尚未完成。
 
 ## 技术栈
 
@@ -133,7 +135,7 @@ docker compose -f docs/devops/docker-compose.yml up -d
 | RabbitMQ Console | `http://127.0.0.1:15672` |
 | Qdrant HTTP | `http://127.0.0.1:6333` |
 
-首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。已有旧数据卷如缺少 `file_purpose` 字段，需要手动执行 `002-add-file-purpose.sql`。
+首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。已有旧数据卷需要依次手动执行 `002-add-file-purpose.sql` 与 `003-add-workspace.sql`；后者会为已有用户幂等补齐个人 Workspace，并保证后续新注册用户自动创建个人 Workspace。
 
 ### 3. 配置模型密钥
 

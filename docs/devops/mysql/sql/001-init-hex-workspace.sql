@@ -15,6 +15,22 @@ CREATE TABLE IF NOT EXISTS `user` (
     UNIQUE KEY `uk_user_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
+CREATE TABLE IF NOT EXISTS `workspace` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `workspace_code` VARCHAR(64) NOT NULL COMMENT 'Workspace编码',
+    `workspace_name` VARCHAR(128) NOT NULL COMMENT 'Workspace名称',
+    `workspace_type` VARCHAR(16) NOT NULL COMMENT 'PERSONAL / TEAM',
+    `status` VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / ARCHIVED / DELETED',
+    `owner_user_id` BIGINT NOT NULL COMMENT 'Workspace拥有者用户ID',
+    `description` VARCHAR(255) DEFAULT NULL COMMENT 'Workspace描述',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_workspace_code` (`workspace_code`),
+    KEY `idx_workspace_owner_type` (`owner_user_id`, `workspace_type`),
+    KEY `idx_workspace_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace表';
+
 CREATE TABLE IF NOT EXISTS `tenant` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `tenant_code` VARCHAR(64) NOT NULL COMMENT '租户编码',
