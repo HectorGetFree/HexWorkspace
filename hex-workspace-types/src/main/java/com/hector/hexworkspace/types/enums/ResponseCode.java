@@ -47,6 +47,7 @@ public enum ResponseCode {
     EMPTY_TENANT_CODE("T400", "租户编码不能为空"),
     EMPTY_TENANT_NAME("T400", "租户名称不能为空"),
     EMPTY_OWNER_USER_ID("T400", "租户拥有者不能为空"),
+    EMPTY_WORKSPACE_NAME("W400", "Workspace名称不能为空"),
     EMPTY_TENANT_ID("T400", "租户ID不能为空"),
     EMPTY_USER_ID("U400", "用户ID不能为空"),
     ;

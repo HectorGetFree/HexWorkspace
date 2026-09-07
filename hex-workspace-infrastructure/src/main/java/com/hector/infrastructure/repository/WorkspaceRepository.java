@@ -10,6 +10,8 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /** Workspace 的 MySQL 仓储实现。 */
 @Repository
@@ -43,6 +45,13 @@ public class WorkspaceRepository implements IWorkspaceRepository {
     public Optional<WorkspaceEntity> findByOwnerUserIdAndType(Long ownerUserId, WorkspaceTypeVO type) {
         return Optional.ofNullable(workspaceDao.queryWorkspaceByOwnerUserIdAndType(ownerUserId, type.name()))
                 .map(this::toEntity);
+    }
+
+    @Override
+    public List<WorkspaceEntity> listByOwnerUserId(Long ownerUserId) {
+        return workspaceDao.queryWorkspacesByOwnerUserId(ownerUserId).stream()
+                .map(this::toEntity)
+                .collect(Collectors.toList());
     }
 
     private WorkspaceEntity toEntity(Workspace workspace) {

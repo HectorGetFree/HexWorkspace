@@ -13,9 +13,11 @@ import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.List;
 import java.util.UUID;
 
 /** Workspace 领域服务实现。 */
@@ -74,6 +76,47 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
         return savedWorkspace;
     }
 
+    @Override
+    @Transactional
+    public WorkspaceEntity createTeamWorkspace(String workspaceName, Long ownerUserId, String description) {
+        // 1. 规范化请求内容，保证团队空间名称、拥有者与描述可安全进入后续业务判断。
+        String normalizedWorkspaceName = normalizeWorkspaceName(workspaceName);
+        Long normalizedOwnerUserId = normalizeOwnerUserId(ownerUserId);
+        String normalizedDescription = normalizeDescription(description);
+        log.info("Workspace领域服务-创建团队Workspace开始 workspaceName:{} ownerUserId:{}",
+                normalizedWorkspaceName, normalizedOwnerUserId);
+
+        // 2. 校验拥有者存在且可用，防止已失效账号创建无人可管理的团队空间。
+        UserEntity ownerUser = getActiveOwner(normalizedOwnerUserId);
+
+        // 3. 构建 TEAM 初始快照；成员关系将在下一阶段迁移，当前拥有者是唯一的空间管理主体。
+        LocalDateTime now = LocalDateTime.now();
+        WorkspaceEntity workspaceEntity = WorkspaceEntity.builder()
+                .workspaceCode(generateWorkspaceCode())
+                .workspaceName(normalizedWorkspaceName)
+                .type(WorkspaceTypeVO.TEAM)
+                .status(WorkspaceStatusVO.ACTIVE)
+                .ownerUserId(ownerUser.getId())
+                .description(normalizedDescription)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+
+        // 4. 持久化团队空间；当前事务提交后，才允许后续成员或资源写入引用它。
+        WorkspaceEntity savedWorkspace = workspaceRepository.save(workspaceEntity);
+        log.info("Workspace领域服务-创建团队Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
+                savedWorkspace.getId(), savedWorkspace.getWorkspaceCode(), normalizedOwnerUserId);
+        return savedWorkspace;
+    }
+
+    @Override
+    public List<WorkspaceEntity> listOwnedWorkspaces(Long ownerUserId) {
+        Long normalizedOwnerUserId = normalizeOwnerUserId(ownerUserId);
+        // 查询前先校验用户有效，避免已失效账号继续读取私有资料空间。
+        getActiveOwner(normalizedOwnerUserId);
+        return workspaceRepository.listByOwnerUserId(normalizedOwnerUserId);
+    }
+
     private Long normalizeOwnerUserId(Long ownerUserId) {
         if (ownerUserId == null || ownerUserId <= 0) {
             throw new BusinessException(ResponseCode.EMPTY_OWNER_USER_ID);
@@ -86,6 +129,29 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
             throw new BusinessException(ResponseCode.EMPTY_USERNAME);
         }
         return ownerUsername.trim();
+    }
+
+    private String normalizeWorkspaceName(String workspaceName) {
+        if (workspaceName == null || workspaceName.trim().isEmpty()) {
+            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_NAME);
+        }
+        return workspaceName.trim();
+    }
+
+    private String normalizeDescription(String description) {
+        if (description == null || description.trim().isEmpty()) {
+            return null;
+        }
+        return description.trim();
+    }
+
+    private UserEntity getActiveOwner(Long ownerUserId) {
+        UserEntity ownerUser = userRepository.findById(ownerUserId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
+        if (!ownerUser.isActive()) {
+            throw new BusinessException(ResponseCode.USER_STATUS_UNAVAILABLE);
+        }
+        return ownerUser;
     }
 
     private String generateWorkspaceCode() {

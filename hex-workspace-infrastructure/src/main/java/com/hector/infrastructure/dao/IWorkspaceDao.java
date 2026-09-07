@@ -4,6 +4,8 @@ import com.hector.infrastructure.dao.po.Workspace;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /** Workspace DAO。 */
 @Mapper
 public interface IWorkspaceDao {
@@ -14,4 +16,6 @@ public interface IWorkspaceDao {
 
     Workspace queryWorkspaceByOwnerUserIdAndType(@Param("ownerUserId") Long ownerUserId,
                                                   @Param("workspaceType") String workspaceType);
+
+    List<Workspace> queryWorkspacesByOwnerUserId(@Param("ownerUserId") Long ownerUserId);
 }

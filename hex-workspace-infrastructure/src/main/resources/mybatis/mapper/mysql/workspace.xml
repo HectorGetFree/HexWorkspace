@@ -33,4 +33,11 @@
         ORDER BY id ASC LIMIT 1
     </select>
 
+    <select id="queryWorkspacesByOwnerUserId" resultMap="workspaceResultMap">
+        SELECT id, workspace_code, workspace_name, workspace_type, status, owner_user_id, description, created_at, updated_at
+        FROM workspace
+        WHERE owner_user_id = #{ownerUserId}
+        ORDER BY created_at ASC, id ASC
+    </select>
+
 </mapper>

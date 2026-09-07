@@ -12,6 +12,7 @@ hex-workspace 是一个面向个人与团队文档资料库的智能工作台后
 
 - 用户注册、登录、JWT 鉴权、当前用户查询与登出接口。
 - Workspace 聚合及 `PERSONAL`、`TEAM` 类型；新用户注册时在同一事务内创建默认个人 Workspace。
+- 已支持创建团队 Workspace，以及查询当前用户拥有的个人和团队 Workspace；团队成员关系迁移尚未开始。
 - 租户创建、查询，以及用户所属租户列表。
 - 租户成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
 - 基于 MinIO 的租户级文件存储，区分用户原始文件与系统派生文件。
@@ -191,6 +192,8 @@ Authorization: Bearer <JWT>
 | 创建租户 | POST | `/api/v1/tenants` |
 | 查询租户 | GET | `/api/v1/tenants/{tenantId}` |
 | 查询我的租户 | GET | `/api/v1/tenants/my` |
+| 创建团队 Workspace | POST | `/api/v1/workspaces` |
+| 查询我拥有的 Workspace | GET | `/api/v1/workspaces/my` |
 | 初始化租户 Owner | POST | `/api/v1/tenants/{tenantId}/members/owner` |
 | 添加成员 | POST | `/api/v1/tenants/{tenantId}/members` |
 | 查询租户成员 | GET | `/api/v1/tenants/{tenantId}/members` |
