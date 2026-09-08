@@ -13,6 +13,12 @@ public interface IWorkspaceService {
     /** 创建由当前用户拥有的资料 Workspace。 */
     WorkspaceEntity createWorkspace(String workspaceName, Long ownerUserId, String description);
 
+    /** 获取当前可用的 Workspace。 */
+    WorkspaceEntity getActiveWorkspace(Long workspaceId);
+
+    /** 校验用户是否为 Workspace Owner；资源创建属于 Owner 的写入能力。 */
+    WorkspaceEntity assertOwner(Long workspaceId, Long userId);
+
     /** 查询当前用户拥有的 Workspace。 */
     List<WorkspaceEntity> listOwnedWorkspaces(Long ownerUserId);
 }

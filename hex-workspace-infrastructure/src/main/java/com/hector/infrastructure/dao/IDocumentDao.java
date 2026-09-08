@@ -20,5 +20,5 @@ public interface IDocumentDao {
 
     Document queryByDocumentCode(@Param("documentCode") String documentCode);
 
-    List<Document> queryByTenantId(@Param("tenantId") Long tenantId);
+    List<Document> queryByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

@@ -1,4 +1,4 @@
-package com.hector.infrastructure.segment;
+package com.hector.infrastructure.rag.segment;
 
 import com.hector.domain.knowledge.adapter.port.IDocumentSegmenter;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSegmentVO;

@@ -7,7 +7,7 @@
     <resultMap id="fileResultMap" type="com.hector.infrastructure.dao.po.File">
         <id property="id" column="id"/>
         <result property="fileCode" column="file_code"/>
-        <result property="tenantId" column="tenant_id"/>
+        <result property="workspaceId" column="workspace_id"/>
         <result property="creatorUserId" column="creator_user_id"/>
         <result property="purpose" column="file_purpose"/>
         <result property="fileName" column="file_name"/>
@@ -27,7 +27,7 @@
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.File" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `file` (
             file_code,
-            tenant_id,
+            workspace_id,
             creator_user_id,
             file_purpose,
             file_name,
@@ -44,7 +44,7 @@
             updated_at
         ) VALUES (
             #{fileCode},
-            #{tenantId},
+            #{workspaceId},
             #{creatorUserId},
             #{purpose},
             #{fileName},
@@ -66,7 +66,7 @@
         UPDATE `file`
         SET
             file_code = #{fileCode},
-            tenant_id = #{tenantId},
+            workspace_id = #{workspaceId},
             creator_user_id = #{creatorUserId},
             file_purpose = #{purpose},
             file_name = #{fileName},
@@ -85,7 +85,7 @@
     </update>
 
     <select id="queryFileById" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
+        SELECT id, file_code, workspace_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
@@ -94,7 +94,7 @@
     </select>
 
     <select id="queryFileByFileCode" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
+        SELECT id, file_code, workspace_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
@@ -102,12 +102,12 @@
         LIMIT 1
     </select>
 
-    <select id="queryFilesByTenantId" resultMap="fileResultMap">
-        SELECT id, file_code, tenant_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
+    <select id="queryFilesByWorkspaceId" resultMap="fileResultMap">
+        SELECT id, file_code, workspace_id, creator_user_id, file_purpose, file_name, origin_name, file_suffix,
                content_type, file_size, storage_type, bucket_name, storage_path, file_hash, status,
                created_at, updated_at
         FROM `file`
-        WHERE tenant_id = #{tenantId}
+        WHERE workspace_id = #{workspaceId}
         ORDER BY id DESC
     </select>
 

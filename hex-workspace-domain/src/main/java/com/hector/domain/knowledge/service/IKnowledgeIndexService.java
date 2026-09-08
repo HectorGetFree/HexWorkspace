@@ -12,5 +12,5 @@ public interface IKnowledgeIndexService {
 
     void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedFileId);
 
-    List<KnowledgeSearchHitVO> search(Long tenantId, String question);
+    List<KnowledgeSearchHitVO> search(Long workspaceId, String question);
 }

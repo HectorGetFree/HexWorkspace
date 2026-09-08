@@ -22,10 +22,10 @@ public class DocumentParseListener {
 
     @RabbitListener(queues = "hex.doc.document.parse.queue")
     public void onDocumentParseRequested(DocumentParseRequestedEvent event) {
-        log.info("文档解析监听器-接收消息 tenantId:{} documentId:{} versionNumber:{}",
-                event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
+        log.info("文档解析监听器-接收消息 workspaceId:{} documentId:{} versionNumber:{}",
+                event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
         documentParseService.parse(event);
-        log.info("文档解析监听器-处理完成 tenantId:{} documentId:{} versionNumber:{}",
-                event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
+        log.info("文档解析监听器-处理完成 workspaceId:{} documentId:{} versionNumber:{}",
+                event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
     }
 }

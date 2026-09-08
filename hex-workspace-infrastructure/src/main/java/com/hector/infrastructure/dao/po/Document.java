@@ -18,7 +18,7 @@ public class Document {
 
     private Long id;
     private String documentCode;
-    private Long tenantId;
+    private Long workspaceId;
     private Long ownerUserId;
     private Long sourceFileId;
     private String title;

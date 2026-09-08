@@ -6,8 +6,8 @@
 - 代码风格优先参考 `~/Desktop/big_market_review/big-market`。
 
 ## 领域与分层
-- `user`、`tenant`、`membership` 作为同一业务下的三个子域，职责分开。
-- `user` 只管用户主体；`tenant` 只管租户主体；`membership` 只管成员关系。
+- `user`、`workspace`、资源授权 作为同一业务下的三个子域，职责分开。
+- `user` 只管用户主体；`workspace` 只管资料容器；资源授权只管文档与文件夹访问。
 - `app` 模块只保留启动类和配置类，不放领域 Service 实现。
 - `trigger` 负责接口适配、参数校验、响应包装和异常捕捉。
 - `domain` 放领域接口、业务规则和领域实体。
@@ -21,7 +21,7 @@
 - `service` 实现类必须在对应接口父级目录的 `impl` 子目录下，并以 `Impl` 结尾。
 
 ## 持久化规范
-- 用户、租户等基础 CRUD 统一使用 MySQL + MyBatis。
+- 用户、Workspace等基础 CRUD 统一使用 MySQL + MyBatis。
 - DAO 接口与 `mapper.xml` 必须同步补齐。
 - 领域层不直接写 SQL。
 - 当前 `user` 仓储先保持纯 MySQL，不引入 Redis 缓存。
@@ -38,7 +38,7 @@
 
 ## 日志规范
 - 所有关键方法要打印中文日志。
-- 日志要包含必要业务信息，如 `userId`、`tenantId`、`username`、`token` 等。
+- 日志要包含必要业务信息，如 `userId`、`workspaceId`、`username`、`token` 等。
 - 方法真正执行前要打开始日志。
 - 异常发生时必须打异常日志。
 - 日志风格参考 `big-market`：中文动作语义 + 关键字段 + 开始/完成/异常。
@@ -61,7 +61,7 @@
 - 及时清理 `.idea`、`target`、生成物等不该进版本库的内容。
 
 ## 当前阶段约定
-- 先按顺序推进 `user`、`tenant`、`membership`。
+- 先按顺序推进 `user`、`workspace`、资源授权。
 - 当前如果明确说“先不做某领域”，就不要主动扩展那个领域。
 
 # DDD 架构设计框架

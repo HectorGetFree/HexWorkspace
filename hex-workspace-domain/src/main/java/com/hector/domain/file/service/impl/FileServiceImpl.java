@@ -6,8 +6,8 @@ import com.hector.domain.file.model.valobj.FilePurposeVO;
 import com.hector.domain.file.repository.IFileRepository;
 import com.hector.domain.file.repository.IFileStorageRepository;
 import com.hector.domain.file.service.IFileService;
-import com.hector.domain.tenant.model.entity.TenantEntity;
-import com.hector.domain.tenant.repository.ITenantRepository;
+import com.hector.domain.workspace.model.entity.WorkspaceEntity;
+import com.hector.domain.workspace.repository.IWorkspaceRepository;
 import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.hexworkspace.types.enums.ResponseCode;
@@ -43,28 +43,28 @@ public class FileServiceImpl implements IFileService {
     private IUserRepository userRepository;
 
     @Resource
-    private ITenantRepository tenantRepository;
+    private IWorkspaceRepository workspaceRepository;
 
     @Override
     @Transactional
-    public FileEntity uploadFile(Long tenantId, Long operatorUserId, String originalFilename, String contentType, byte[] fileBytes) {
-        return storeFile(tenantId, operatorUserId, originalFilename, contentType, fileBytes, FilePurposeVO.ORIGINAL);
+    public FileEntity uploadFile(Long workspaceId, Long operatorUserId, String originalFilename, String contentType, byte[] fileBytes) {
+        return storeFile(workspaceId, operatorUserId, originalFilename, contentType, fileBytes, FilePurposeVO.ORIGINAL);
     }
 
     @Override
     @Transactional
-    public FileEntity storeDerivedFile(Long tenantId, Long operatorUserId, String filename, String contentType, byte[] fileBytes) {
-        return storeFile(tenantId, operatorUserId, filename, contentType, fileBytes, FilePurposeVO.DERIVED);
+    public FileEntity storeDerivedFile(Long workspaceId, Long operatorUserId, String filename, String contentType, byte[] fileBytes) {
+        return storeFile(workspaceId, operatorUserId, filename, contentType, fileBytes, FilePurposeVO.DERIVED);
     }
 
     /**
      * 统一管理对象写入与元数据落库；入口方法保留原始/派生语义，避免调用方用“上传”描述系统生成内容。
      */
-    private FileEntity storeFile(Long tenantId, Long operatorUserId, String originalFilename, String contentType,
+    private FileEntity storeFile(Long workspaceId, Long operatorUserId, String originalFilename, String contentType,
                                  byte[] fileBytes, FilePurposeVO purpose) {
-        log.info("文件领域服务-保存文件开始 tenantId:{} operatorUserId:{} purpose:{} filename:{}",
-                tenantId, operatorUserId, purpose, originalFilename);
-        TenantEntity tenantEntity = getActiveTenant(tenantId);
+        log.info("文件领域服务-保存文件开始 workspaceId:{} operatorUserId:{} purpose:{} filename:{}",
+                workspaceId, operatorUserId, purpose, originalFilename);
+        WorkspaceEntity workspaceEntity = getActiveWorkspace(workspaceId);
         UserEntity userEntity = getAvailableUser(operatorUserId);
         validateFile(fileBytes, originalFilename);
 
@@ -72,7 +72,7 @@ public class FileServiceImpl implements IFileService {
         String fileCode = generateUniqueFileCode();
         String bucketName = fileStorageRepository.getBucketName();
         String safeOriginalFilename = normalizeFilename(originalFilename);
-        String objectKey = buildObjectKey(tenantEntity.getId(), purpose, fileCode, safeOriginalFilename);
+        String objectKey = buildObjectKey(workspaceEntity.getId(), purpose, fileCode, safeOriginalFilename);
         String fileSuffix = extractFileSuffix(originalFilename);
         LocalDateTime now = LocalDateTime.now();
         String fileHash = DigestUtils.md5Hex(fileBytes);
@@ -81,7 +81,7 @@ public class FileServiceImpl implements IFileService {
             fileStorageRepository.upload(objectKey, fileBytes, normalizeContentType(contentType));
             FileEntity fileEntity = FileEntity.builder()
                     .fileCode(fileCode)
-                    .tenantId(tenantEntity.getId())
+                    .workspaceId(workspaceEntity.getId())
                     .creatorUserId(userEntity.getId())
                     .purpose(purpose)
                     .fileName(originalFilename)
@@ -98,8 +98,8 @@ public class FileServiceImpl implements IFileService {
                     .updatedAt(now)
                     .build();
             FileEntity savedFileEntity = fileRepository.save(fileEntity);
-            log.info("文件领域服务-保存文件完成 fileId:{} fileCode:{} tenantId:{} creatorUserId:{} purpose:{}",
-                    savedFileEntity.getId(), savedFileEntity.getFileCode(), savedFileEntity.getTenantId(), savedFileEntity.getCreatorUserId(), savedFileEntity.getPurpose());
+            log.info("文件领域服务-保存文件完成 fileId:{} fileCode:{} workspaceId:{} creatorUserId:{} purpose:{}",
+                    savedFileEntity.getId(), savedFileEntity.getFileCode(), savedFileEntity.getWorkspaceId(), savedFileEntity.getCreatorUserId(), savedFileEntity.getPurpose());
             return savedFileEntity;
         } catch (Exception exception) {
             try {
@@ -108,39 +108,39 @@ public class FileServiceImpl implements IFileService {
                 log.warn("文件领域服务-上传失败后清理对象失败 fileCode:{} objectKey:{} error:{}",
                         fileCode, objectKey, cleanupException.getMessage(), cleanupException);
             }
-            log.error("文件领域服务-保存文件失败 fileCode:{} tenantId:{} creatorUserId:{} purpose:{} error:{}",
-                    fileCode, tenantEntity.getId(), userEntity.getId(), purpose, exception.getMessage(), exception);
+            log.error("文件领域服务-保存文件失败 fileCode:{} workspaceId:{} creatorUserId:{} purpose:{} error:{}",
+                    fileCode, workspaceEntity.getId(), userEntity.getId(), purpose, exception.getMessage(), exception);
             throw new BusinessException(ResponseCode.FILE_UPLOAD_FAILED);
         }
     }
 
     @Override
-    public FileEntity getAvailableFile(Long tenantId, Long fileId) {
-        TenantEntity tenantEntity = getActiveTenant(tenantId);
-        log.info("文件领域服务-查询文件开始 tenantId:{} fileId:{}", tenantEntity.getId(), fileId);
-        FileEntity fileEntity = getTenantAvailableFile(tenantEntity.getId(), fileId);
-        log.info("文件领域服务-查询文件完成 tenantId:{} fileId:{} fileCode:{}",
-                tenantEntity.getId(), fileEntity.getId(), fileEntity.getFileCode());
+    public FileEntity getAvailableFile(Long workspaceId, Long fileId) {
+        WorkspaceEntity workspaceEntity = getActiveWorkspace(workspaceId);
+        log.info("文件领域服务-查询文件开始 workspaceId:{} fileId:{}", workspaceEntity.getId(), fileId);
+        FileEntity fileEntity = getWorkspaceAvailableFile(workspaceEntity.getId(), fileId);
+        log.info("文件领域服务-查询文件完成 workspaceId:{} fileId:{} fileCode:{}",
+                workspaceEntity.getId(), fileEntity.getId(), fileEntity.getFileCode());
         return fileEntity;
     }
 
     @Override
-    public byte[] readFileContent(Long tenantId, Long fileId) {
-        TenantEntity tenantEntity = getActiveTenant(tenantId);
-        log.info("文件领域服务-读取文件内容开始 tenantId:{} fileId:{}", tenantEntity.getId(), fileId);
-        FileEntity fileEntity = getTenantAvailableFile(tenantEntity.getId(), fileId);
+    public byte[] readFileContent(Long workspaceId, Long fileId) {
+        WorkspaceEntity workspaceEntity = getActiveWorkspace(workspaceId);
+        log.info("文件领域服务-读取文件内容开始 workspaceId:{} fileId:{}", workspaceEntity.getId(), fileId);
+        FileEntity fileEntity = getWorkspaceAvailableFile(workspaceEntity.getId(), fileId);
         byte[] fileContent = fileStorageRepository.download(fileEntity.getStoragePath());
-        log.info("文件领域服务-读取文件内容完成 tenantId:{} fileId:{} fileSize:{}",
-                tenantEntity.getId(), fileEntity.getId(), fileContent.length);
+        log.info("文件领域服务-读取文件内容完成 workspaceId:{} fileId:{} fileSize:{}",
+                workspaceEntity.getId(), fileEntity.getId(), fileContent.length);
         return fileContent;
     }
 
     @Override
     @Transactional
-    public FileEntity deleteFile(Long tenantId, Long fileId) {
-        TenantEntity tenantEntity = getActiveTenant(tenantId);
-        log.info("文件领域服务-删除文件开始 tenantId:{} fileId:{}", tenantEntity.getId(), fileId);
-        FileEntity fileEntity = getTenantAvailableFile(tenantEntity.getId(), fileId);
+    public FileEntity deleteFile(Long workspaceId, Long fileId) {
+        WorkspaceEntity workspaceEntity = getActiveWorkspace(workspaceId);
+        log.info("文件领域服务-删除文件开始 workspaceId:{} fileId:{}", workspaceEntity.getId(), fileId);
+        FileEntity fileEntity = getWorkspaceAvailableFile(workspaceEntity.getId(), fileId);
 
         FileEntity deletedFileEntity = rebuildFile(fileEntity, FileStatusVO.DELETED, LocalDateTime.now());
         fileRepository.update(deletedFileEntity);
@@ -150,21 +150,21 @@ public class FileServiceImpl implements IFileService {
             log.warn("文件领域服务-删除对象失败但已完成逻辑删除 fileCode:{} objectKey:{} error:{}",
                     fileEntity.getFileCode(), fileEntity.getStoragePath(), exception.getMessage(), exception);
         }
-        log.info("文件领域服务-删除文件完成 tenantId:{} fileId:{} fileCode:{}",
-                tenantEntity.getId(), deletedFileEntity.getId(), deletedFileEntity.getFileCode());
+        log.info("文件领域服务-删除文件完成 workspaceId:{} fileId:{} fileCode:{}",
+                workspaceEntity.getId(), deletedFileEntity.getId(), deletedFileEntity.getFileCode());
         return deletedFileEntity;
     }
 
-    private TenantEntity getActiveTenant(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new BusinessException(ResponseCode.EMPTY_TENANT_ID);
+    private WorkspaceEntity getActiveWorkspace(Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_ID);
         }
-        TenantEntity tenantEntity = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.TENANT_NOT_FOUND));
-        if (!tenantEntity.isActive()) {
-            throw new BusinessException(ResponseCode.TENANT_STATUS_UNAVAILABLE);
+        WorkspaceEntity workspaceEntity = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.WORKSPACE_NOT_FOUND));
+        if (!workspaceEntity.isActive()) {
+            throw new BusinessException(ResponseCode.WORKSPACE_STATUS_UNAVAILABLE);
         }
-        return tenantEntity;
+        return workspaceEntity;
     }
 
     private UserEntity getAvailableUser(Long userId) {
@@ -179,13 +179,13 @@ public class FileServiceImpl implements IFileService {
         return userEntity;
     }
 
-    private FileEntity getTenantAvailableFile(Long tenantId, Long fileId) {
+    private FileEntity getWorkspaceAvailableFile(Long workspaceId, Long fileId) {
         if (fileId == null || fileId <= 0) {
             throw new BusinessException(ResponseCode.FILE_NOT_FOUND);
         }
         FileEntity fileEntity = fileRepository.findById(fileId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.FILE_NOT_FOUND));
-        if (!tenantId.equals(fileEntity.getTenantId())
+        if (!workspaceId.equals(fileEntity.getWorkspaceId())
                 || fileEntity.getStatus() == FileStatusVO.DELETED) {
             throw new BusinessException(ResponseCode.FILE_NOT_FOUND);
         }
@@ -215,8 +215,8 @@ public class FileServiceImpl implements IFileService {
     }
 
     // 按用途分目录，方便人工排查对象且不改变 file 表作为统一资源索引的职责。
-    private String buildObjectKey(Long tenantId, FilePurposeVO purpose, String fileCode, String originalFilename) {
-        return "tenant/" + tenantId + "/file/" + purpose.name().toLowerCase(Locale.ROOT) + "/" + fileCode + "_" + originalFilename;
+    private String buildObjectKey(Long workspaceId, FilePurposeVO purpose, String fileCode, String originalFilename) {
+        return "workspace/" + workspaceId + "/file/" + purpose.name().toLowerCase(Locale.ROOT) + "/" + fileCode + "_" + originalFilename;
     }
 
     private String normalizeFilename(String filename) {
@@ -250,7 +250,7 @@ public class FileServiceImpl implements IFileService {
         return FileEntity.builder()
                 .id(source.getId())
                 .fileCode(source.getFileCode())
-                .tenantId(source.getTenantId())
+                .workspaceId(source.getWorkspaceId())
                 .creatorUserId(source.getCreatorUserId())
                 .purpose(source.getPurpose())
                 .fileName(source.getFileName())

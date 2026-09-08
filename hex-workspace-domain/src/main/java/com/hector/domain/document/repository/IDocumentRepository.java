@@ -18,5 +18,5 @@ public interface IDocumentRepository {
 
     Optional<DocumentEntity> findByDocumentCode(String documentCode);
 
-    List<DocumentEntity> listByTenantId(Long tenantId);
+    List<DocumentEntity> listByWorkspaceId(Long workspaceId);
 }

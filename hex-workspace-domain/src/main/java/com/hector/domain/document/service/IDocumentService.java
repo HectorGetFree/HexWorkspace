@@ -11,12 +11,12 @@ import java.util.List;
  */
 public interface IDocumentService {
 
-    DocumentEntity createUploadedDocument(Long tenantId, Long ownerUserId, Long sourceFileId,
+    DocumentEntity createUploadedDocument(Long workspaceId, Long ownerUserId, Long sourceFileId,
                                           String contentHash, String title);
 
-    List<DocumentEntity> listActiveDocuments(Long tenantId);
+    List<DocumentEntity> listActiveDocuments(Long workspaceId);
 
-    DocumentEntity getActiveDocument(Long tenantId, String documentCode);
+    DocumentEntity getActiveDocument(Long workspaceId, String documentCode);
 
     DocumentVersionEntity getCurrentVersion(DocumentEntity documentEntity);
 }

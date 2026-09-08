@@ -45,15 +45,15 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
 
     @Override
     public void parse(DocumentParseRequestedEvent event) {
-        log.info("文档解析领域服务-解析文档版本开始 tenantId:{} documentId:{} versionNumber:{}",
-                event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
+        log.info("文档解析领域服务-解析文档版本开始 workspaceId:{} documentId:{} versionNumber:{}",
+                event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
         DocumentVersionEntity documentVersionEntity = null;
         try {
             // 1. 仅处理事件指定的版本，避免异步任务误更新文档最新版本。
             DocumentEntity documentEntity = documentRepository.findById(event.getDocumentId())
                     .orElseThrow(() -> new IllegalStateException("待解析文档不存在"));
-            if (!event.getTenantId().equals(documentEntity.getTenantId())) {
-                throw new IllegalStateException("待解析文档租户不匹配");
+            if (!event.getWorkspaceId().equals(documentEntity.getWorkspaceId())) {
+                throw new IllegalStateException("待解析文档Workspace不匹配");
             }
             documentVersionEntity = documentVersionRepository
                     .findByDocumentIdAndVersionNumber(documentEntity.getId(), event.getVersionNumber())
@@ -67,15 +67,15 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
             // 2. 先落解析中状态，再读取对象内容并选择具体格式解析器。
             documentVersionEntity.markParsing();
             documentVersionRepository.updateParseResult(documentVersionEntity);
-            FileEntity sourceFileEntity = fileService.getAvailableFile(event.getTenantId(), documentVersionEntity.getFileId());
+            FileEntity sourceFileEntity = fileService.getAvailableFile(event.getWorkspaceId(), documentVersionEntity.getFileId());
             DocumentParseResultVO parseResult = documentContentParser.parse(
                     sourceFileEntity.getOriginName(), sourceFileEntity.getContentType(),
-                    fileService.readFileContent(event.getTenantId(), sourceFileEntity.getId()));
+                    fileService.readFileContent(event.getWorkspaceId(), sourceFileEntity.getId()));
 
             // 3. 解析文本作为派生文件保存，供后续 RAG、摘要和 Agent 能力复用。
             String parsedFilename = documentEntity.getDocumentCode() + "_v"
                     + documentVersionEntity.getVersionNumber() + "_parsed.txt";
-            FileEntity extractedFileEntity = fileService.storeDerivedFile(event.getTenantId(), event.getOperatorUserId(),
+            FileEntity extractedFileEntity = fileService.storeDerivedFile(event.getWorkspaceId(), event.getOperatorUserId(),
                     parsedFilename, "text/plain; charset=utf-8", parseResult.text().getBytes(StandardCharsets.UTF_8));
             documentVersionEntity.markParseSucceeded(extractedFileEntity.getId(), parseResult.parserVersion(), LocalDateTime.now());
             documentVersionRepository.updateParseResult(documentVersionEntity);
@@ -84,18 +84,18 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
             try {
                 knowledgeIndexService.indexParsedDocument(event, extractedFileEntity.getId());
             } catch (Exception exception) {
-                log.error("文档解析领域服务-知识索引异常 tenantId:{} documentId:{} versionNumber:{} extractedFileId:{} error:{}",
-                        event.getTenantId(), documentEntity.getId(), documentVersionEntity.getVersionNumber(), extractedFileEntity.getId(), exception.getMessage(), exception);
+                log.error("文档解析领域服务-知识索引异常 workspaceId:{} documentId:{} versionNumber:{} extractedFileId:{} error:{}",
+                        event.getWorkspaceId(), documentEntity.getId(), documentVersionEntity.getVersionNumber(), extractedFileEntity.getId(), exception.getMessage(), exception);
             }
-            log.info("文档解析领域服务-解析文档版本完成 tenantId:{} documentId:{} versionNumber:{} extractedFileId:{}",
-                    event.getTenantId(), documentEntity.getId(), documentVersionEntity.getVersionNumber(), extractedFileEntity.getId());
+            log.info("文档解析领域服务-解析文档版本完成 workspaceId:{} documentId:{} versionNumber:{} extractedFileId:{}",
+                    event.getWorkspaceId(), documentEntity.getId(), documentVersionEntity.getVersionNumber(), extractedFileEntity.getId());
         } catch (Exception exception) {
             if (documentVersionEntity != null) {
                 documentVersionEntity.markParseFailed("mvp-parser-v1");
                 documentVersionRepository.updateParseResult(documentVersionEntity);
             }
-            log.error("文档解析领域服务-解析文档版本异常 tenantId:{} documentId:{} versionNumber:{} error:{}",
-                    event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), exception.getMessage(), exception);
+            log.error("文档解析领域服务-解析文档版本异常 workspaceId:{} documentId:{} versionNumber:{} error:{}",
+                    event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber(), exception.getMessage(), exception);
         }
     }
 }

@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 /**
  * 文档领域服务实现。
- * 将上传文件转换为租户内的文档聚合，并在同一事务中建立初始版本。
+ * 将上传文件转换为Workspace 内的文档聚合，并在同一事务中建立初始版本。
  */
 @Service
 public class DocumentServiceImpl implements IDocumentService {
@@ -40,17 +40,17 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Override
     @Transactional
-    public DocumentEntity createUploadedDocument(Long tenantId, Long ownerUserId, Long sourceFileId,
+    public DocumentEntity createUploadedDocument(Long workspaceId, Long ownerUserId, Long sourceFileId,
                                                  String contentHash, String title) {
-        log.info("文档领域服务-创建上传文档开始 tenantId:{} ownerUserId:{} sourceFileId:{}",
-                tenantId, ownerUserId, sourceFileId);
-        validateCreateCommand(tenantId, ownerUserId, sourceFileId, title);
+        log.info("文档领域服务-创建上传文档开始 workspaceId:{} ownerUserId:{} sourceFileId:{}",
+                workspaceId, ownerUserId, sourceFileId);
+        validateCreateCommand(workspaceId, ownerUserId, sourceFileId, title);
 
         // 1. 先创建聚合根，当前版本固定从 1 开始。
         LocalDateTime now = LocalDateTime.now();
         DocumentEntity documentEntity = documentRepository.save(DocumentEntity.builder()
                 .documentCode(generateDocumentCode())
-                .tenantId(tenantId)
+                .workspaceId(workspaceId)
                 .ownerUserId(ownerUserId)
                 .sourceFileId(sourceFileId)
                 .title(title.trim())
@@ -71,36 +71,36 @@ public class DocumentServiceImpl implements IDocumentService {
                 .createdByUserId(ownerUserId)
                 .createdAt(now)
                 .build());
-        log.info("文档领域服务-创建上传文档完成 documentId:{} documentCode:{} tenantId:{}",
-                documentEntity.getId(), documentEntity.getDocumentCode(), documentEntity.getTenantId());
+        log.info("文档领域服务-创建上传文档完成 documentId:{} documentCode:{} workspaceId:{}",
+                documentEntity.getId(), documentEntity.getDocumentCode(), documentEntity.getWorkspaceId());
         return documentEntity;
     }
 
     @Override
-    public List<DocumentEntity> listActiveDocuments(Long tenantId) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new BusinessException(ResponseCode.EMPTY_TENANT_ID);
+    public List<DocumentEntity> listActiveDocuments(Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_ID);
         }
-        log.info("文档领域服务-查询活跃文档列表开始 tenantId:{}", tenantId);
-        List<DocumentEntity> documentEntities = documentRepository.listByTenantId(tenantId).stream()
+        log.info("文档领域服务-查询活跃文档列表开始 workspaceId:{}", workspaceId);
+        List<DocumentEntity> documentEntities = documentRepository.listByWorkspaceId(workspaceId).stream()
                 .filter(DocumentEntity::isActive)
                 .collect(Collectors.toList());
-        log.info("文档领域服务-查询活跃文档列表完成 tenantId:{} documentCount:{}", tenantId, documentEntities.size());
+        log.info("文档领域服务-查询活跃文档列表完成 workspaceId:{} documentCount:{}", workspaceId, documentEntities.size());
         return documentEntities;
     }
 
     @Override
-    public DocumentEntity getActiveDocument(Long tenantId, String documentCode) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new BusinessException(ResponseCode.EMPTY_TENANT_ID);
+    public DocumentEntity getActiveDocument(Long workspaceId, String documentCode) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_ID);
         }
         if (documentCode == null || documentCode.isBlank()) {
             throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
         }
-        log.info("文档领域服务-查询活跃文档开始 tenantId:{} documentCode:{}", tenantId, documentCode);
+        log.info("文档领域服务-查询活跃文档开始 workspaceId:{} documentCode:{}", workspaceId, documentCode);
         DocumentEntity documentEntity = documentRepository.findByDocumentCode(documentCode)
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-        if (!tenantId.equals(documentEntity.getTenantId())) {
+        if (!workspaceId.equals(documentEntity.getWorkspaceId())) {
             throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
         }
         if (!documentEntity.isActive()) {
@@ -122,9 +122,9 @@ public class DocumentServiceImpl implements IDocumentService {
         return documentVersionEntity;
     }
 
-    private void validateCreateCommand(Long tenantId, Long ownerUserId, Long sourceFileId, String title) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new BusinessException(ResponseCode.EMPTY_TENANT_ID);
+    private void validateCreateCommand(Long workspaceId, Long ownerUserId, Long sourceFileId, String title) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_ID);
         }
         if (ownerUserId == null || ownerUserId <= 0) {
             throw new BusinessException(ResponseCode.EMPTY_USER_ID);

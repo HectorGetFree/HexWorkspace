@@ -28,13 +28,13 @@ public class DocumentRepository implements IDocumentRepository {
 
     @Override
     public DocumentEntity save(DocumentEntity documentEntity) {
-        log.info("文档仓储-保存文档开始 documentCode:{} tenantId:{} ownerUserId:{}",
-                documentEntity.getDocumentCode(), documentEntity.getTenantId(), documentEntity.getOwnerUserId());
+        log.info("文档仓储-保存文档开始 documentCode:{} workspaceId:{} ownerUserId:{}",
+                documentEntity.getDocumentCode(), documentEntity.getWorkspaceId(), documentEntity.getOwnerUserId());
         Document document = toPo(documentEntity);
         documentDao.insert(document);
         DocumentEntity savedDocumentEntity = toEntity(document);
-        log.info("文档仓储-保存文档完成 documentId:{} documentCode:{} tenantId:{}",
-                savedDocumentEntity.getId(), savedDocumentEntity.getDocumentCode(), savedDocumentEntity.getTenantId());
+        log.info("文档仓储-保存文档完成 documentId:{} documentCode:{} workspaceId:{}",
+                savedDocumentEntity.getId(), savedDocumentEntity.getDocumentCode(), savedDocumentEntity.getWorkspaceId());
         return savedDocumentEntity;
     }
 
@@ -64,12 +64,12 @@ public class DocumentRepository implements IDocumentRepository {
     }
 
     @Override
-    public List<DocumentEntity> listByTenantId(Long tenantId) {
-        log.info("文档仓储-按租户查询列表开始 tenantId:{}", tenantId);
-        List<DocumentEntity> documentEntities = documentDao.queryByTenantId(tenantId).stream()
+    public List<DocumentEntity> listByWorkspaceId(Long workspaceId) {
+        log.info("文档仓储-按Workspace查询列表开始 workspaceId:{}", workspaceId);
+        List<DocumentEntity> documentEntities = documentDao.queryByWorkspaceId(workspaceId).stream()
                 .map(this::toEntity)
                 .collect(Collectors.toList());
-        log.info("文档仓储-按租户查询列表完成 tenantId:{} documentCount:{}", tenantId, documentEntities.size());
+        log.info("文档仓储-按Workspace查询列表完成 workspaceId:{} documentCount:{}", workspaceId, documentEntities.size());
         return documentEntities;
     }
 
@@ -77,7 +77,7 @@ public class DocumentRepository implements IDocumentRepository {
         return Document.builder()
                 .id(documentEntity.getId())
                 .documentCode(documentEntity.getDocumentCode())
-                .tenantId(documentEntity.getTenantId())
+                .workspaceId(documentEntity.getWorkspaceId())
                 .ownerUserId(documentEntity.getOwnerUserId())
                 .sourceFileId(documentEntity.getSourceFileId())
                 .title(documentEntity.getTitle())
@@ -93,7 +93,7 @@ public class DocumentRepository implements IDocumentRepository {
         return DocumentEntity.builder()
                 .id(document.getId())
                 .documentCode(document.getDocumentCode())
-                .tenantId(document.getTenantId())
+                .workspaceId(document.getWorkspaceId())
                 .ownerUserId(document.getOwnerUserId())
                 .sourceFileId(document.getSourceFileId())
                 .title(document.getTitle())

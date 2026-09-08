@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文档聚合根。
- * 保存文档的租户归属、当前状态和当前版本指针，不承载文件存储或 AI 处理细节。
+ * 保存文档的Workspace归属、当前状态和当前版本指针，不承载文件存储或 AI 处理细节。
  */
 @Getter
 @Builder
@@ -23,7 +23,7 @@ public class DocumentEntity {
 
     private String documentCode;
 
-    private Long tenantId;
+    private Long workspaceId;
 
     private Long ownerUserId;
 

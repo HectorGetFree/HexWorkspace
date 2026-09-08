@@ -7,7 +7,7 @@ import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.service.IDocumentService;
 import com.hector.domain.file.model.entity.FileEntity;
 import com.hector.domain.file.service.IFileService;
-import com.hector.domain.membership.service.IMembershipService;
+import com.hector.domain.workspace.service.IWorkspaceService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import com.hector.trigger.api.dto.DocumentCreateResponseDTO;
@@ -15,6 +15,7 @@ import com.hector.trigger.api.dto.DocumentListResponseDTO;
 import com.hector.trigger.api.dto.DocumentProcessingStatusResponseDTO;
 import com.hector.trigger.api.dto.DocumentResponseDTO;
 import com.hector.trigger.api.response.Response;
+import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -35,16 +36,16 @@ import java.util.stream.Collectors;
 
 /**
  * 文档接口控制器。
- * MVP 只提供创建、列表与详情能力；Controller 负责成员校验、文件保存、文档创建和解析事件发布的顺序编排。
+ * MVP 只提供创建、列表与详情能力；Controller 负责 Workspace Owner 校验、文件保存、文档创建和解析事件发布的顺序编排。
  */
 @RestController
-@RequestMapping("/api/v1/tenants/{tenantId}/documents")
+@RequestMapping("/api/v1/workspaces/{workspaceId}/documents")
 public class DocumentController extends BaseController {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
 
     @Resource
-    private IMembershipService membershipService;
+    private IWorkspaceService workspaceService;
 
     @Resource
     private IFileService fileService;
@@ -60,13 +61,13 @@ public class DocumentController extends BaseController {
      * 创建成功即返回 PENDING；PDF、DOCX、TXT、MD 的内容解析由 RabbitMQ 消费者异步完成。
      *
      * curl 示例：
-     * curl -X POST "http://127.0.0.1:8098/api/v1/tenants/1/documents" \
+     * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/documents" \
      *   -H "Authorization: Bearer 替换为实际登录令牌" \
      *   -F "file=@./demo.pdf" \
      *   -F "title=演示文档"
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Response<DocumentCreateResponseDTO> createDocument(@PathVariable("tenantId") Long tenantId,
+    public Response<DocumentCreateResponseDTO> createDocument(@PathVariable("workspaceId") Long workspaceId,
                                                                @RequestPart("file") MultipartFile file,
                                                                @RequestParam(value = "title", required = false) String title) {
         FileEntity fileEntity = null;
@@ -74,28 +75,28 @@ public class DocumentController extends BaseController {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
             String currentUsername = SecurityUserUtil.getCurrentUsername();
-            log.info("创建文档开始 tenantId:{} userId:{} username:{} originalFilename:{}",
-                    tenantId, currentUserId, currentUsername, file == null ? null : file.getOriginalFilename());
+            log.info("创建文档开始 workspaceId:{} userId:{} username:{} originalFilename:{}",
+                    workspaceId, currentUserId, currentUsername, file == null ? null : file.getOriginalFilename());
 
-            // 1. 先确认用户已在租户上下文内，再保存底层文件资源。
-            membershipService.assertActiveMember(currentUserId, tenantId);
+            // 1. 先确认当前用户是 Workspace Owner；协作者写入必须由资源 EDIT 权限单独放行。
+            workspaceService.assertOwner(workspaceId, currentUserId);
             validateSupportedFile(file);
-            fileEntity = fileService.uploadFile(tenantId, currentUserId, file.getOriginalFilename(),
+            fileEntity = fileService.uploadFile(workspaceId, currentUserId, file.getOriginalFilename(),
                     file.getContentType(), file.getBytes());
 
             // 2. 文档聚合与版本 1 落库完成后，发布异步解析事件。
-            DocumentEntity documentEntity = documentService.createUploadedDocument(tenantId, currentUserId,
+            DocumentEntity documentEntity = documentService.createUploadedDocument(workspaceId, currentUserId,
                     fileEntity.getId(), fileEntity.getFileHash(), resolveTitle(title, file.getOriginalFilename()));
             documentCreated = true;
             DocumentVersionEntity documentVersionEntity = documentService.getCurrentVersion(documentEntity);
             documentParseEventPublisher.publish(DocumentParseRequestedEvent.builder()
-                    .tenantId(tenantId)
+                    .workspaceId(workspaceId)
                     .documentId(documentEntity.getId())
                     .versionNumber(documentVersionEntity.getVersionNumber())
                     .operatorUserId(currentUserId)
                     .build());
-            log.info("创建文档完成 tenantId:{} userId:{} documentId:{} documentCode:{} versionNumber:{}",
-                    tenantId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode(),
+            log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{} versionNumber:{}",
+                    workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode(),
                     documentVersionEntity.getVersionNumber());
             return success(DocumentCreateResponseDTO.builder()
                     .documentCode(documentEntity.getDocumentCode())
@@ -103,43 +104,43 @@ public class DocumentController extends BaseController {
                     .parseStatus(documentVersionEntity.getParseStatus().name())
                     .build());
         } catch (BusinessException exception) {
-            cleanupOrphanFile(tenantId, fileEntity, documentCreated);
+            cleanupOrphanFile(workspaceId, fileEntity, documentCreated);
             log.error("创建文档业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());
         } catch (IOException exception) {
-            cleanupOrphanFile(tenantId, fileEntity, documentCreated);
-            log.error("创建文档读取上传文件异常 tenantId:{} error:{}", tenantId, exception.getMessage(), exception);
+            cleanupOrphanFile(workspaceId, fileEntity, documentCreated);
+            log.error("创建文档读取上传文件异常 workspaceId:{} error:{}", workspaceId, exception.getMessage(), exception);
             return failure(ResponseCode.FILE_UPLOAD_FAILED);
         } catch (Exception exception) {
-            cleanupOrphanFile(tenantId, fileEntity, documentCreated);
-            log.error("创建文档系统异常 tenantId:{}", tenantId, exception);
+            cleanupOrphanFile(workspaceId, fileEntity, documentCreated);
+            log.error("创建文档系统异常 workspaceId:{}", workspaceId, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
 
     /**
-     * 查询当前租户下已创建且可用的文档列表。
+     * 查询当前Workspace下已创建且可用的文档列表。
      *
      * curl 示例：
-     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/1/documents" \
+     * curl -X GET "http://127.0.0.1:8098/api/v1/workspaces/1/documents" \
      *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
     @GetMapping
-    public Response<DocumentListResponseDTO> listDocuments(@PathVariable("tenantId") Long tenantId) {
+    public Response<DocumentListResponseDTO> listDocuments(@PathVariable("workspaceId") Long workspaceId) {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
-            log.info("查询文档列表开始 tenantId:{} userId:{}", tenantId, currentUserId);
-            membershipService.assertActiveMember(currentUserId, tenantId);
-            List<DocumentResponseDTO> documents = documentService.listActiveDocuments(tenantId).stream()
+            log.info("查询文档列表开始 workspaceId:{} userId:{}", workspaceId, currentUserId);
+            workspaceService.assertOwner(workspaceId, currentUserId);
+            List<DocumentResponseDTO> documents = documentService.listActiveDocuments(workspaceId).stream()
                     .map(this::toResponse)
                     .collect(Collectors.toList());
-            log.info("查询文档列表完成 tenantId:{} userId:{} documentCount:{}", tenantId, currentUserId, documents.size());
+            log.info("查询文档列表完成 workspaceId:{} userId:{} documentCount:{}", workspaceId, currentUserId, documents.size());
             return success(DocumentListResponseDTO.builder().documents(documents).build());
         } catch (BusinessException exception) {
             log.error("查询文档列表业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());
         } catch (Exception exception) {
-            log.error("查询文档列表系统异常 tenantId:{}", tenantId, exception);
+            log.error("查询文档列表系统异常 workspaceId:{}", workspaceId, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
@@ -148,25 +149,25 @@ public class DocumentController extends BaseController {
      * 查询文档详情及当前版本解析状态。
      *
      * curl 示例：
-     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/1/documents/doc_xxx" \
+     * curl -X GET "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx" \
      *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
     @GetMapping("/{documentCode}")
-    public Response<DocumentResponseDTO> getDocument(@PathVariable("tenantId") Long tenantId,
+    public Response<DocumentResponseDTO> getDocument(@PathVariable("workspaceId") Long workspaceId,
                                                       @PathVariable("documentCode") String documentCode) {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
-            log.info("查询文档详情开始 tenantId:{} userId:{} documentCode:{}", tenantId, currentUserId, documentCode);
-            membershipService.assertActiveMember(currentUserId, tenantId);
-            DocumentEntity documentEntity = documentService.getActiveDocument(tenantId, documentCode);
+            log.info("查询文档详情开始 workspaceId:{} userId:{} documentCode:{}", workspaceId, currentUserId, documentCode);
+            workspaceService.assertOwner(workspaceId, currentUserId);
+            DocumentEntity documentEntity = documentService.getActiveDocument(workspaceId, documentCode);
             DocumentResponseDTO response = toResponse(documentEntity);
-            log.info("查询文档详情完成 tenantId:{} userId:{} documentCode:{}", tenantId, currentUserId, documentCode);
+            log.info("查询文档详情完成 workspaceId:{} userId:{} documentCode:{}", workspaceId, currentUserId, documentCode);
             return success(response);
         } catch (BusinessException exception) {
             log.error("查询文档详情业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());
         } catch (Exception exception) {
-            log.error("查询文档详情系统异常 tenantId:{} documentCode:{}", tenantId, documentCode, exception);
+            log.error("查询文档详情系统异常 workspaceId:{} documentCode:{}", workspaceId, documentCode, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
@@ -175,18 +176,18 @@ public class DocumentController extends BaseController {
      * 查询当前版本的异步解析状态，供上传客户端和评测执行器轮询。
      *
      * curl 示例：
-     * curl -X GET "http://127.0.0.1:8098/api/v1/tenants/1/documents/doc_xxx/processing-status" \\
+     * curl -X GET "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/processing-status" \\
      *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
     @GetMapping("/{documentCode}/processing-status")
     public Response<DocumentProcessingStatusResponseDTO> getProcessingStatus(
-            @PathVariable("tenantId") Long tenantId,
+            @PathVariable("workspaceId") Long workspaceId,
             @PathVariable("documentCode") String documentCode) {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
-            log.info("查询文档处理状态开始 tenantId:{} userId:{} documentCode:{}", tenantId, currentUserId, documentCode);
-            membershipService.assertActiveMember(currentUserId, tenantId);
-            DocumentEntity documentEntity = documentService.getActiveDocument(tenantId, documentCode);
+            log.info("查询文档处理状态开始 workspaceId:{} userId:{} documentCode:{}", workspaceId, currentUserId, documentCode);
+            workspaceService.assertOwner(workspaceId, currentUserId);
+            DocumentEntity documentEntity = documentService.getActiveDocument(workspaceId, documentCode);
             DocumentVersionEntity version = documentService.getCurrentVersion(documentEntity);
             DocumentProcessingStatusResponseDTO response = DocumentProcessingStatusResponseDTO.builder()
                     .documentCode(documentEntity.getDocumentCode())
@@ -197,14 +198,14 @@ public class DocumentController extends BaseController {
                     .parserVersion(version.getParserVersion())
                     .parsedAt(version.getParsedAt())
                     .build();
-            log.info("查询文档处理状态完成 tenantId:{} userId:{} documentCode:{} parseStatus:{}",
-                    tenantId, currentUserId, documentCode, response.getParseStatus());
+            log.info("查询文档处理状态完成 workspaceId:{} userId:{} documentCode:{} parseStatus:{}",
+                    workspaceId, currentUserId, documentCode, response.getParseStatus());
             return success(response);
         } catch (BusinessException exception) {
             log.error("查询文档处理状态业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());
         } catch (Exception exception) {
-            log.error("查询文档处理状态系统异常 tenantId:{} documentCode:{}", tenantId, documentCode, exception);
+            log.error("查询文档处理状态系统异常 workspaceId:{} documentCode:{}", workspaceId, documentCode, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
@@ -214,7 +215,7 @@ public class DocumentController extends BaseController {
         return DocumentResponseDTO.builder()
                 .documentId(documentEntity.getId())
                 .documentCode(documentEntity.getDocumentCode())
-                .tenantId(documentEntity.getTenantId())
+                .workspaceId(documentEntity.getWorkspaceId())
                 .ownerUserId(documentEntity.getOwnerUserId())
                 .title(documentEntity.getTitle())
                 .documentType(documentEntity.getDocumentType().name())
@@ -250,15 +251,15 @@ public class DocumentController extends BaseController {
         return suffixIndex > 0 ? originalFilename.substring(0, suffixIndex) : originalFilename;
     }
 
-    private void cleanupOrphanFile(Long tenantId, FileEntity fileEntity, boolean documentCreated) {
+    private void cleanupOrphanFile(Long workspaceId, FileEntity fileEntity, boolean documentCreated) {
         if (fileEntity == null || documentCreated) {
             return;
         }
         try {
-            fileService.deleteFile(tenantId, fileEntity.getId());
+            fileService.deleteFile(workspaceId, fileEntity.getId());
         } catch (Exception exception) {
-            log.warn("创建文档失败后清理孤儿文件异常 tenantId:{} fileId:{} error:{}",
-                    tenantId, fileEntity.getId(), exception.getMessage(), exception);
+            log.warn("创建文档失败后清理孤儿文件异常 workspaceId:{} fileId:{} error:{}",
+                    workspaceId, fileEntity.getId(), exception.getMessage(), exception);
         }
     }
 }

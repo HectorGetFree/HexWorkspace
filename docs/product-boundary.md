@@ -47,7 +47,7 @@ Workspace 是用户资料的一级容器，不是“先加入团队才能协作�
 | Folder / Document | 一个创建者/所有者 | 权限授予和访问审批的实际对象 |
 | 协作者组 | 无独立所有权 | 某个 Folder 或 Document 的有效授权用户集合 |
 
-当前代码里的 `Tenant` 可以作为 Workspace 的暂存实现，但领域设计应逐步收敛为：
+当前代码已经以 `Workspace` 作为唯一资料容器，后续补齐 Folder 与资源级授权：
 
 ```text
 User 1 ── N Workspace
@@ -162,7 +162,7 @@ Agent 生成的 Markdown 草稿、摘要或报告先作为 Workspace 内的新�
 - `knowledge`：解析、分段、Embedding、索引和检索。
 - `task/agent`：后续接入 Task、AgentRun 和 Artifact。
 
-当前已有 `tenant`、`file`、`document`、`knowledge` 领域可以作为迁移起点，但不应继续扩大 `Tenant` 的职责。
+当前已有 `workspace`、`file`、`document`、`knowledge` 领域可以作为演进起点；资源协作不应回退为 Workspace 成员制。
 
 ## 8. 领域对象边界
 
@@ -180,7 +180,7 @@ User
 
 ### Workspace
 
-产品一级资料容器，承载资料、任务、Agent 配置和审计。当前 `Tenant` 可以作为基础设施实现，但产品语义应逐步从“租户”提升为“Workspace”；不要让 Tenant 继续承担文档目录、任务或 Agent 配置的全部职责。
+产品一级资料容器，承载资料、任务、Agent 配置和审计；不承担文档目录、任务或 Agent 配置的全部权限规则。
 
 ### Document 与 DocumentVersion
 

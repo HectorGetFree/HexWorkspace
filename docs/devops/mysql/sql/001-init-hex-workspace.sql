@@ -31,41 +31,10 @@ CREATE TABLE IF NOT EXISTS `workspace` (
     KEY `idx_workspace_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace表';
 
-CREATE TABLE IF NOT EXISTS `tenant` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `tenant_code` VARCHAR(64) NOT NULL COMMENT '租户编码',
-    `tenant_name` VARCHAR(128) NOT NULL COMMENT '租户名称',
-    `status` VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / SUSPENDED',
-    `owner_user_id` BIGINT NOT NULL COMMENT '租户拥有者ID',
-    `description` VARCHAR(255) DEFAULT NULL COMMENT '租户描述',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tenant_code` (`tenant_code`),
-    KEY `idx_tenant_owner_user_id` (`owner_user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户表';
-
-CREATE TABLE IF NOT EXISTS `membership` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `user_id` BIGINT NOT NULL COMMENT '用户ID',
-    `tenant_id` BIGINT NOT NULL COMMENT '租户ID',
-    `role` VARCHAR(16) NOT NULL COMMENT 'ADMIN / MEMBER',
-    `status` VARCHAR(16) NOT NULL COMMENT 'INVITED / ACTIVE / SUSPENDED / LEFT / REMOVED',
-    `joined_at` DATETIME DEFAULT NULL COMMENT '正式加入时间',
-    `invited_at` DATETIME DEFAULT NULL COMMENT '发出邀请时间',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_membership_user_tenant` (`user_id`, `tenant_id`),
-    KEY `idx_membership_user_id` (`user_id`),
-    KEY `idx_membership_tenant_id` (`tenant_id`),
-    KEY `idx_membership_tenant_status` (`tenant_id`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户成员关系表';
-
 CREATE TABLE IF NOT EXISTS `file` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `file_code` VARCHAR(64) NOT NULL COMMENT '文件编码',
-    `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
+    `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace ID',
     `creator_user_id` BIGINT NOT NULL COMMENT '创建者用户ID',
     `file_purpose` VARCHAR(16) NOT NULL DEFAULT 'ORIGINAL' COMMENT 'ORIGINAL 用户上传原始文件 / DERIVED 系统派生文件',
     `file_name` VARCHAR(255) NOT NULL COMMENT '文件展示名称',
@@ -82,17 +51,17 @@ CREATE TABLE IF NOT EXISTS `file` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_file_code` (`file_code`),
-    KEY `idx_file_tenant_id` (`tenant_id`),
+    KEY `idx_file_workspace_id` (`workspace_id`),
     KEY `idx_file_bucket_name` (`bucket_name`),
     KEY `idx_file_creator_user_id` (`creator_user_id`),
-    KEY `idx_file_tenant_purpose` (`tenant_id`, `file_purpose`),
+    KEY `idx_file_workspace_purpose` (`workspace_id`, `file_purpose`),
     KEY `idx_file_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件表';
 
 CREATE TABLE IF NOT EXISTS `document` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `document_code` VARCHAR(64) NOT NULL COMMENT '文档唯一编码',
-    `tenant_id` BIGINT NOT NULL COMMENT '所属租户ID',
+    `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace ID',
     `owner_user_id` BIGINT NOT NULL COMMENT '文档拥有者用户ID',
     `source_file_id` BIGINT NOT NULL COMMENT '初始上传文件ID',
     `title` VARCHAR(255) NOT NULL COMMENT '文档标题',
@@ -103,7 +72,7 @@ CREATE TABLE IF NOT EXISTS `document` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_document_code` (`document_code`),
-    KEY `idx_document_tenant_status_updated_at` (`tenant_id`, `status`, `updated_at`),
+    KEY `idx_document_workspace_status_updated_at` (`workspace_id`, `status`, `updated_at`),
     KEY `idx_document_owner_user_id` (`owner_user_id`),
     KEY `idx_document_source_file_id` (`source_file_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档聚合当前状态表';
@@ -129,5 +98,5 @@ CREATE TABLE IF NOT EXISTS `document_version` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档不可变版本快照表';
 
 -- 业务约束：
--- 1. 不使用数据库外键，交由应用层保证 user_id / tenant_id / owner_user_id 的引用一致性。
--- 2. 每个租户必须至少保留一个 ACTIVE 状态的 ADMIN，该约束需在成员退出、移除、冻结或降权时由应用服务校验。
+-- 1. 不使用数据库外键，交由应用层保证 user_id / workspace_id / owner_user_id 的引用一致性。
+-- 2. Workspace 只表达资料归属；访问能力由资源级权限承载，不存在 Workspace 成员角色。

@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * 知识库问答领域服务。
- * 先由后端确定可用来源，再把受限上下文交给聊天模型，避免模型越过租户检索边界自行编造引用。
+ * 先由后端确定可用来源，再把受限上下文交给聊天模型，避免模型越过Workspace检索边界自行编造引用。
  */
 @Service
 public class KnowledgeAnswerServiceImpl implements IKnowledgeAnswerService {
@@ -32,18 +32,18 @@ public class KnowledgeAnswerServiceImpl implements IKnowledgeAnswerService {
     private IChatModel chatModel;
 
     @Override
-    public KnowledgeAnswerVO answer(Long tenantId, String question) {
-        log.info("知识问答领域服务-生成回答开始 tenantId:{} questionLength:{}", tenantId, question == null ? 0 : question.length());
-        List<KnowledgeSearchHitVO> sources = knowledgeIndexService.search(tenantId, question);
+    public KnowledgeAnswerVO answer(Long workspaceId, String question) {
+        log.info("知识问答领域服务-生成回答开始 workspaceId:{} questionLength:{}", workspaceId, question == null ? 0 : question.length());
+        List<KnowledgeSearchHitVO> sources = knowledgeIndexService.search(workspaceId, question);
         if (sources.isEmpty()) {
-            log.info("知识问答领域服务-无检索来源，直接返回拒答 tenantId:{}", tenantId);
+            log.info("知识问答领域服务-无检索来源，直接返回拒答 workspaceId:{}", workspaceId);
             return new KnowledgeAnswerVO(NO_ANSWER, List.of());
         }
 
         // 1. 只拼入后端实际召回的片段，并限制上下文体积，避免单次模型调用不可控地膨胀。
         String userPrompt = buildUserPrompt(question, sources);
         String answer = chatModel.complete(SYSTEM_PROMPT, userPrompt);
-        log.info("知识问答领域服务-生成回答完成 tenantId:{} sourceCount:{} model:{}", tenantId, sources.size(), chatModel.modelName());
+        log.info("知识问答领域服务-生成回答完成 workspaceId:{} sourceCount:{} model:{}", workspaceId, sources.size(), chatModel.modelName());
         return new KnowledgeAnswerVO(answer, sources);
     }
 

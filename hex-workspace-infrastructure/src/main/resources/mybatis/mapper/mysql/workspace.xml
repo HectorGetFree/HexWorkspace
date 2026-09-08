@@ -21,6 +21,11 @@
         VALUES (#{workspaceCode}, #{workspaceName}, #{isDefault}, #{status}, #{ownerUserId}, #{description}, #{createdAt}, #{updatedAt})
     </insert>
 
+    <select id="queryWorkspaceById" resultMap="workspaceResultMap">
+        SELECT id, workspace_code, workspace_name, is_default, status, owner_user_id, description, created_at, updated_at
+        FROM workspace WHERE id = #{id} LIMIT 1
+    </select>
+
     <select id="queryWorkspaceByCode" resultMap="workspaceResultMap">
         SELECT id, workspace_code, workspace_name, is_default, status, owner_user_id, description, created_at, updated_at
         FROM workspace WHERE workspace_code = #{workspaceCode} LIMIT 1

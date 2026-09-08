@@ -21,10 +21,10 @@ public class DocumentParseEventPublisher implements IDocumentParseEventPublisher
 
     @Override
     public void publish(DocumentParseRequestedEvent event) {
-        log.info("文档解析事件发布开始 tenantId:{} documentId:{} versionNumber:{}",
-                event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
+        log.info("文档解析事件发布开始 workspaceId:{} documentId:{} versionNumber:{}",
+                event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
         rabbitTemplate.convertAndSend("hex.doc.document.exchange", "document.parse.requested", event);
-        log.info("文档解析事件发布完成 tenantId:{} documentId:{} versionNumber:{}",
-                event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
+        log.info("文档解析事件发布完成 workspaceId:{} documentId:{} versionNumber:{}",
+                event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
     }
 }

@@ -1,4 +1,4 @@
-package com.hector.infrastructure.vector;
+package com.hector.infrastructure.rag.vector;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -22,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Qdrant REST 适配器。
- * Qdrant 仅保存可再生的向量索引；租户、文档版本与解析产物仍由 MySQL/MinIO 管理。
+ * Qdrant 仅保存可再生的向量索引；Workspace、文档版本与解析产物仍由 MySQL/MinIO 管理。
  */
 @Component
 public class QdrantVectorStore implements IVectorStore {
@@ -34,15 +34,15 @@ public class QdrantVectorStore implements IVectorStore {
     private String collection;
 
     @Override
-    public void replaceDocumentVersion(Long tenantId, Long documentId, Integer versionNumber,
+    public void replaceDocumentVersion(Long workspaceId, Long documentId, Integer versionNumber,
                                        List<KnowledgeVectorPointVO> points) {
         if (points.isEmpty()) return;
         ensureCollection(points.get(0).vector().size());
 
-        // 1. 仅替换指定租户、文档、版本的索引点，保留该文档其他版本以支持版本追溯。
+        // 1. 仅替换指定Workspace、文档、版本的索引点，保留该文档其他版本以支持版本追溯。
         JSONObject filter = new JSONObject();
         filter.put("must", List.of(
-                buildMatchCondition("tenant_id", tenantId),
+                buildMatchCondition("workspace_id", workspaceId),
                 buildMatchCondition("document_id", documentId),
                 buildMatchCondition("version_number", versionNumber)
         ));
@@ -54,7 +54,7 @@ public class QdrantVectorStore implements IVectorStore {
         JSONArray qdrantPoints = new JSONArray();
         for (KnowledgeVectorPointVO pointValue : points) {
             JSONObject payload = new JSONObject();
-            payload.put("tenant_id", tenantId); payload.put("document_id", documentId); payload.put("version_number", versionNumber);
+            payload.put("workspace_id", workspaceId); payload.put("document_id", documentId); payload.put("version_number", versionNumber);
             payload.put("document_code", pointValue.documentCode()); payload.put("chunk_no", pointValue.chunkNo());
             payload.put("heading", pointValue.heading()); payload.put("content", pointValue.content());
             JSONObject point = new JSONObject();
@@ -68,9 +68,9 @@ public class QdrantVectorStore implements IVectorStore {
     }
 
     @Override
-    public List<KnowledgeSearchHitVO> search(Long tenantId, List<Float> queryVector, int topK) {
-        JSONObject match = new JSONObject(); match.put("value", tenantId);
-        JSONObject condition = new JSONObject(); condition.put("key", "tenant_id"); condition.put("match", match);
+    public List<KnowledgeSearchHitVO> search(Long workspaceId, List<Float> queryVector, int topK) {
+        JSONObject match = new JSONObject(); match.put("value", workspaceId);
+        JSONObject condition = new JSONObject(); condition.put("key", "workspace_id"); condition.put("match", match);
         JSONObject filter = new JSONObject(); filter.put("must", List.of(condition));
         JSONObject body = new JSONObject(); body.put("vector", queryVector); body.put("limit", topK); body.put("with_payload", true); body.put("filter", filter);
         JSONObject result = JSON.parseObject(request("POST", "/collections/" + collection + "/points/search", body.toJSONString()));

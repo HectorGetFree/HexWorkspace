@@ -36,6 +36,11 @@ public class WorkspaceRepository implements IWorkspaceRepository {
     }
 
     @Override
+    public Optional<WorkspaceEntity> findById(Long workspaceId) {
+        return Optional.ofNullable(workspaceDao.queryWorkspaceById(workspaceId)).map(this::toEntity);
+    }
+
+    @Override
     public Optional<WorkspaceEntity> findByWorkspaceCode(String workspaceCode) {
         return Optional.ofNullable(workspaceDao.queryWorkspaceByCode(workspaceCode)).map(this::toEntity);
     }

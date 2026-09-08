@@ -28,8 +28,8 @@ public class FileRepository implements IFileRepository {
 
     @Override
     public FileEntity save(FileEntity fileEntity) {
-        log.info("文件仓储-保存文件开始 fileCode:{} tenantId:{} creatorUserId:{} fileName:{}",
-                fileEntity.getFileCode(), fileEntity.getTenantId(), fileEntity.getCreatorUserId(), fileEntity.getFileName());
+        log.info("文件仓储-保存文件开始 fileCode:{} workspaceId:{} creatorUserId:{} fileName:{}",
+                fileEntity.getFileCode(), fileEntity.getWorkspaceId(), fileEntity.getCreatorUserId(), fileEntity.getFileName());
         File file = toPo(fileEntity);
         fileDao.insert(file);
         FileEntity savedFileEntity = toEntity(file);
@@ -65,12 +65,12 @@ public class FileRepository implements IFileRepository {
     }
 
     @Override
-    public List<FileEntity> listByTenantId(Long tenantId) {
-        log.info("文件仓储-按租户查询列表开始 tenantId:{}", tenantId);
-        List<FileEntity> fileEntities = fileDao.queryFilesByTenantId(tenantId).stream()
+    public List<FileEntity> listByWorkspaceId(Long workspaceId) {
+        log.info("文件仓储-按Workspace查询列表开始 workspaceId:{}", workspaceId);
+        List<FileEntity> fileEntities = fileDao.queryFilesByWorkspaceId(workspaceId).stream()
                 .map(this::toEntity)
                 .collect(Collectors.toList());
-        log.info("文件仓储-按租户查询列表完成 tenantId:{} fileCount:{}", tenantId, fileEntities.size());
+        log.info("文件仓储-按Workspace查询列表完成 workspaceId:{} fileCount:{}", workspaceId, fileEntities.size());
         return fileEntities;
     }
 
@@ -78,7 +78,7 @@ public class FileRepository implements IFileRepository {
         return File.builder()
                 .id(fileEntity.getId())
                 .fileCode(fileEntity.getFileCode())
-                .tenantId(fileEntity.getTenantId())
+                .workspaceId(fileEntity.getWorkspaceId())
                 .creatorUserId(fileEntity.getCreatorUserId())
                 .purpose(fileEntity.getPurpose().name())
                 .fileName(fileEntity.getFileName())
@@ -100,7 +100,7 @@ public class FileRepository implements IFileRepository {
         return FileEntity.builder()
                 .id(file.getId())
                 .fileCode(file.getFileCode())
-                .tenantId(file.getTenantId())
+                .workspaceId(file.getWorkspaceId())
                 .creatorUserId(file.getCreatorUserId())
                 .purpose(FilePurposeVO.valueOf(file.getPurpose()))
                 .fileName(file.getFileName())

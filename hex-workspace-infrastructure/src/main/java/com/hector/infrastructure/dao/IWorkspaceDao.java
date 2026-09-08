@@ -12,6 +12,8 @@ public interface IWorkspaceDao {
 
     int insert(Workspace workspace);
 
+    Workspace queryWorkspaceById(@Param("id") Long id);
+
     Workspace queryWorkspaceByCode(@Param("workspaceCode") String workspaceCode);
 
     Workspace queryDefaultWorkspaceByOwnerUserId(@Param("ownerUserId") Long ownerUserId);

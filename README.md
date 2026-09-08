@@ -1,6 +1,6 @@
 # hex-workspace
 
-hex-workspace 是一个面向个人与团队文档资料库的智能工作台后端。当前版本在原有文档知识库 MVP 基础上，已建立 Workspace 聚合：新用户注册后会自动创建个人 Workspace。文档、文件、成员和知识检索仍暂以既有 `tenant` 运行契约承载，后续将分阶段迁移到 Workspace。
+hex-workspace 是一个面向个人与团队文档资料库的智能工作台后端。当前版本在原有文档知识库 MVP 基础上，已建立 Workspace 聚合：新用户注册后会自动创建个人 Workspace。文档、文件、成员和知识检索仍暂以既有 `Workspace` 运行契约承载，后续将分阶段迁移到 Workspace。
 
 项目后续将在现有 MVP 上继续完成 DocAI 的 DDD 重构与缺陷补足，并逐步演进为包含 AI Gateway、AI Orchestrator、Tool Runtime、RAG Runtime 和可观测体系的 AI 应用平台。
 
@@ -13,15 +13,15 @@ hex-workspace 是一个面向个人与团队文档资料库的智能工作台后
 - 用户注册、登录、JWT 鉴权、当前用户查询与登出接口。
 - Workspace 聚合及 `PERSONAL`、`TEAM` 类型；新用户注册时在同一事务内创建默认个人 Workspace。
 - 已支持注册默认 Workspace、创建自己的资料 Workspace，以及查询当前用户拥有的 Workspace；协作权限将在 Folder/Document 层实现。
-- 租户创建、查询，以及用户所属租户列表。
-- 租户成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
-- 基于 MinIO 的租户级文件存储，区分用户原始文件与系统派生文件。
+- Workspace创建、查询，以及用户所属Workspace列表。
+- Workspace成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
+- 基于 MinIO 的Workspace级文件存储，区分用户原始文件与系统派生文件。
 - 文档及不可变版本建模，支持文档创建、列表、详情和解析状态查询。
 - 支持 TXT、Markdown、PDF、DOCX 文件上传，单文件上限 50 MB。
 - 通过 RabbitMQ 异步完成文档解析，解析文本作为 MinIO 派生文件保存。
 - 章节优先、固定窗口兜底的文档分段策略，默认窗口 1000 字符、重叠 100 字符。
 - 通过 DashScope `text-embedding-v4` 批量生成 1024 维向量。
-- 使用 Qdrant 保存租户隔离的文档向量，支持 Top-K 语义检索。
+- 使用 Qdrant 保存Workspace隔离的文档向量，支持 Top-K 语义检索。
 - 基于 OpenAI Chat Completions 兼容接口的单轮知识库问答，并返回实际检索来源。
 - AI 模型运行信息及连通性检测接口。
 - RAG `dataset-v1.0`、Baseline V1 执行器，以及 Hit Rate@6、Recall@6、MRR@6、回答正确率、拒答率和延迟指标。
@@ -57,7 +57,7 @@ hex-workspace 是一个面向个人与团队文档资料库的智能工作台后
               ├─ MinIO：解析后的 TXT 派生文件
               ├─ Document Segmenter：章节识别与固定窗口分段
               ├─ DashScope：Embedding
-              └─ Qdrant：租户级向量索引
+              └─ Qdrant：Workspace级向量索引
                          │
                          ▼
                    Search / RAG Ask
@@ -84,9 +84,9 @@ hex-workspace
 
 - `user`：平台用户。
 - `auth`：密码校验、JWT 签发与认证会话。
-- `tenant`：租户及其生命周期。
-- `membership`：用户与租户之间的成员关系。
-- `file`：租户级底层文件资源与对象存储。
+- `Workspace`：Workspace及其生命周期。
+- `membership`：用户与Workspace之间的资源协作关系。
+- `file`：Workspace级底层文件资源与对象存储。
 - `document`：文档聚合、不可变版本和异步解析状态。
 - `knowledge`：分段、向量化、检索和知识库问答。
 - `workspace`：Workspace 类型、生命周期和默认个人 Workspace 创建；资源树和成员迁移尚未完成。
@@ -189,22 +189,22 @@ Authorization: Bearer <JWT>
 | 用户登录 | POST | `/api/v1/users/login` |
 | 用户登出 | POST | `/api/v1/users/logout` |
 | 当前用户 | GET | `/api/v1/users/me` |
-| 创建租户 | POST | `/api/v1/tenants` |
-| 查询租户 | GET | `/api/v1/tenants/{tenantId}` |
-| 查询我的租户 | GET | `/api/v1/tenants/my` |
+| 创建Workspace | POST | `/api/v1/Workspaces` |
+| 查询Workspace | GET | `/api/v1/workspaces/{workspaceId}` |
+| 查询我的Workspace | GET | `/api/v1/workspaces/my` |
 | 创建 Workspace | POST | `/api/v1/workspaces` |
 | 查询我的 Workspace | GET | `/api/v1/workspaces/my` |
-| 初始化租户 Owner | POST | `/api/v1/tenants/{tenantId}/members/owner` |
-| 添加成员 | POST | `/api/v1/tenants/{tenantId}/members` |
-| 查询租户成员 | GET | `/api/v1/tenants/{tenantId}/members` |
-| 查询我的成员关系 | GET | `/api/v1/my` |
-| 移除成员 | DELETE | `/api/v1/tenants/{tenantId}/members/{targetUserId}` |
-| 上传并创建文档 | POST | `/api/v1/tenants/{tenantId}/documents` |
-| 文档列表 | GET | `/api/v1/tenants/{tenantId}/documents` |
-| 文档详情 | GET | `/api/v1/tenants/{tenantId}/documents/{documentCode}` |
-| 文档处理状态 | GET | `/api/v1/tenants/{tenantId}/documents/{documentCode}/processing-status` |
-| 知识检索 | GET | `/api/v1/tenants/{tenantId}/knowledge/search?question=...` |
-| 知识问答 | POST | `/api/v1/tenants/{tenantId}/knowledge/ask` |
+| 初始化Workspace Owner | POST | `/api/v1/workspaces/{workspaceId}/members/owner` |
+| 添加成员 | POST | `/api/v1/workspaces/{workspaceId}/members` |
+| 查询Workspace成员 | GET | `/api/v1/workspaces/{workspaceId}/members` |
+| 查询我的资源协作关系 | GET | `/api/v1/my` |
+| 移除成员 | DELETE | `/api/v1/workspaces/{workspaceId}/members/{targetUserId}` |
+| 上传并创建文档 | POST | `/api/v1/workspaces/{workspaceId}/documents` |
+| 文档列表 | GET | `/api/v1/workspaces/{workspaceId}/documents` |
+| 文档详情 | GET | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}` |
+| 文档处理状态 | GET | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/processing-status` |
+| 知识检索 | GET | `/api/v1/workspaces/{workspaceId}/knowledge/search?question=...` |
+| 知识问答 | POST | `/api/v1/workspaces/{workspaceId}/knowledge/ask` |
 | AI 运行信息 | GET | `/api/v1/ai/runtime-info` |
 | AI 连通性检测 | GET | `/api/v1/ai/ping` |
 
@@ -239,7 +239,7 @@ curl -X POST 'http://127.0.0.1:8098/api/v1/users/login' \
 上传文档：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8098/api/v1/tenants/1/documents' \
+curl -X POST 'http://127.0.0.1:8098/api/v1/workspaces/1/documents' \
   -H 'Authorization: Bearer <JWT>' \
   -F 'file=@./demo.pdf' \
   -F 'title=演示文档'
@@ -248,7 +248,7 @@ curl -X POST 'http://127.0.0.1:8098/api/v1/tenants/1/documents' \
 知识库问答：
 
 ```bash
-curl -X POST 'http://127.0.0.1:8098/api/v1/tenants/1/knowledge/ask' \
+curl -X POST 'http://127.0.0.1:8098/api/v1/workspaces/1/knowledge/ask' \
   -H 'Authorization: Bearer <JWT>' \
   -H 'Content-Type: application/json' \
   -d '{"question":"这份文档的主要内容是什么？"}'
@@ -258,11 +258,11 @@ curl -X POST 'http://127.0.0.1:8098/api/v1/tenants/1/knowledge/ask' \
 
 评测资产位于 `rag-eval/`。`dataset-v1.0` 包含 40 份自编语料与 240 条固定问题，其中 train 40 条、dev 40 条、test 160 条。
 
-首次在专用评测租户中运行：
+首次在专用评测Workspace中运行：
 
 ```bash
 export HEX_WORKSPACE_TOKEN='<JWT>'
-export HEX_WORKSPACE_TENANT_ID=1
+export HEX_WORKSPACE_WORKSPACE_ID=1
 python3 rag-eval/scripts/run_baseline_v1.py --upload
 ```
 

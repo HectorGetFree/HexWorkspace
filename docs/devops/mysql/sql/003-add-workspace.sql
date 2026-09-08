@@ -1,6 +1,6 @@
 USE `hex_workspace`;
 
--- 第一阶段仅新增 Workspace 聚合，不迁移既有 tenant_id 运行契约。
+-- 历史升级脚本：仅适用于 004 之前的旧版本；新安装请直接执行 001。
 CREATE TABLE IF NOT EXISTS `workspace` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `workspace_code` VARCHAR(64) NOT NULL COMMENT 'Workspace编码',

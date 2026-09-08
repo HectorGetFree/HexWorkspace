@@ -20,7 +20,7 @@ public class File {
 
     private String fileCode;
 
-    private Long tenantId;
+    private Long workspaceId;
 
     private Long creatorUserId;
 

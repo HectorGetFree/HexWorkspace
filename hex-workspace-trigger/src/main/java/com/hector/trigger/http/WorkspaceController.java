@@ -9,6 +9,7 @@ import com.hector.trigger.api.dto.WorkspaceListResponseDTO;
 import com.hector.trigger.api.dto.WorkspaceResponseDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
+import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -48,7 +49,7 @@ public class WorkspaceController extends BaseController {
             // 1. 从认证上下文取得拥有者，禁止客户端伪造 ownerUserId。
             WorkspaceCreateRequestDTO data = requireData(request);
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
-            log.info("创建团队Workspace开始 workspaceName:{} ownerUserId:{}", data.getWorkspaceName(), currentUserId);
+            log.info("创建Workspace开始 workspaceName:{} ownerUserId:{}", data.getWorkspaceName(), currentUserId);
 
             // 2. 创建 Owner 的资料容器；Folder/Document 权限将由后续资源授权领域处理。
             WorkspaceEntity workspaceEntity = workspaceService.createWorkspace(
@@ -57,17 +58,17 @@ public class WorkspaceController extends BaseController {
             // 3. 返回脱敏后的资源标识和状态，不暴露领域实体本身。
             return success(toResponse(workspaceEntity));
         } catch (BusinessException exception) {
-            log.error("创建团队Workspace业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
+            log.error("创建Workspace业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());
         } catch (Exception exception) {
-            log.error("创建团队Workspace系统异常", exception);
+            log.error("创建Workspace系统异常", exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
     }
 
     /**
      * 查询当前用户拥有的资料 Workspace。
-     * 当前不包含成员身份加入的团队空间，待 Membership 迁移后扩展。
+     * 当前只列出 Owner 的 Workspace；资源级授权不会把他人的 Workspace 误呈现为用户自己的资料库。
      *
      * curl 示例：
      * curl -X GET "http://127.0.0.1:8098/api/v1/workspaces/my" \
@@ -77,7 +78,7 @@ public class WorkspaceController extends BaseController {
     public Response<WorkspaceListResponseDTO> listMyOwnedWorkspaces() {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
-            // 查询边界限定为拥有者；成员可见空间将在 WorkspaceMembership 迁移后另行合并。
+            // 查询边界限定为拥有者；成员可见空间将在 资源权限 迁移后另行合并。
             List<WorkspaceResponseDTO> workspaces = workspaceService.listOwnedWorkspaces(currentUserId).stream()
                     .map(this::toResponse)
                     .collect(Collectors.toList());

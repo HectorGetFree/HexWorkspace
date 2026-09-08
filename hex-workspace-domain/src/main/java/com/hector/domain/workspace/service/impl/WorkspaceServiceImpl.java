@@ -109,6 +109,29 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
     }
 
     @Override
+    public WorkspaceEntity getActiveWorkspace(Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_ID);
+        }
+        WorkspaceEntity workspace = workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.WORKSPACE_NOT_FOUND));
+        if (!workspace.isActive()) {
+            throw new BusinessException(ResponseCode.WORKSPACE_STATUS_UNAVAILABLE);
+        }
+        return workspace;
+    }
+
+    @Override
+    public WorkspaceEntity assertOwner(Long workspaceId, Long userId) {
+        Long normalizedUserId = normalizeOwnerUserId(userId);
+        WorkspaceEntity workspace = getActiveWorkspace(workspaceId);
+        if (!normalizedUserId.equals(workspace.getOwnerUserId())) {
+            throw new BusinessException(ResponseCode.WORKSPACE_OWNER_REQUIRED);
+        }
+        return workspace;
+    }
+
+    @Override
     public List<WorkspaceEntity> listOwnedWorkspaces(Long ownerUserId) {
         Long normalizedOwnerUserId = normalizeOwnerUserId(ownerUserId);
         // 查询前先校验用户有效，避免已失效账号继续读取私有资料空间。

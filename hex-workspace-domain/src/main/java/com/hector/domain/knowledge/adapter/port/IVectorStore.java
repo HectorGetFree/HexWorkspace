@@ -10,8 +10,8 @@ import java.util.List;
  */
 public interface IVectorStore {
 
-    void replaceDocumentVersion(Long tenantId, Long documentId, Integer versionNumber,
+    void replaceDocumentVersion(Long workspaceId, Long documentId, Integer versionNumber,
                                 List<KnowledgeVectorPointVO> points);
 
-    List<KnowledgeSearchHitVO> search(Long tenantId, List<Float> queryVector, int topK);
+    List<KnowledgeSearchHitVO> search(Long workspaceId, List<Float> queryVector, int topK);
 }

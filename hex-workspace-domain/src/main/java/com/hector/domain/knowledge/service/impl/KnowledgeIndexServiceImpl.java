@@ -45,14 +45,14 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
 
     @Override
     public void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedFileId) {
-        log.info("知识索引领域服务-建立索引开始 tenantId:{} documentId:{} versionNumber:{}", event.getTenantId(), event.getDocumentId(), event.getVersionNumber());
+        log.info("知识索引领域服务-建立索引开始 workspaceId:{} documentId:{} versionNumber:{}", event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
         // 1. 解析产物是唯一文本输入；重新索引时也可从 MinIO 重放，不依赖向量库保留正文。
         DocumentEntity documentEntity = documentRepository.findById(event.getDocumentId())
                 .orElseThrow(() -> new IllegalStateException("待索引文档不存在"));
-        if (!event.getTenantId().equals(documentEntity.getTenantId())) {
-            throw new IllegalStateException("待索引文档租户不匹配");
+        if (!event.getWorkspaceId().equals(documentEntity.getWorkspaceId())) {
+            throw new IllegalStateException("待索引文档Workspace不匹配");
         }
-        String content = new String(fileService.readFileContent(event.getTenantId(), extractedFileId), StandardCharsets.UTF_8);
+        String content = new String(fileService.readFileContent(event.getWorkspaceId(), extractedFileId), StandardCharsets.UTF_8);
         List<KnowledgeSegmentVO> segments = documentSegmenter.segment(content);
         if (segments.isEmpty()) {
             throw new IllegalArgumentException("解析文本为空，无法建立知识索引");
@@ -72,19 +72,19 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
                     documentEntity.getDocumentCode(), segment.chunkNo(), segment.heading(), segment.content(), vectors.get(index)
             ));
         }
-        vectorStore.replaceDocumentVersion(event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), points);
-        log.info("知识索引领域服务-建立索引完成 tenantId:{} documentId:{} versionNumber:{} segmentCount:{} strategy:{} model:{}",
-                event.getTenantId(), event.getDocumentId(), event.getVersionNumber(), segments.size(), documentSegmenter.strategyVersion(), embeddingModel.modelName());
+        vectorStore.replaceDocumentVersion(event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber(), points);
+        log.info("知识索引领域服务-建立索引完成 workspaceId:{} documentId:{} versionNumber:{} segmentCount:{} strategy:{} model:{}",
+                event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber(), segments.size(), documentSegmenter.strategyVersion(), embeddingModel.modelName());
     }
 
     @Override
-    public List<KnowledgeSearchHitVO> search(Long tenantId, String question) {
-        log.info("知识索引领域服务-检索开始 tenantId:{} questionLength:{}", tenantId, question == null ? 0 : question.length());
+    public List<KnowledgeSearchHitVO> search(Long workspaceId, String question) {
+        log.info("知识索引领域服务-检索开始 workspaceId:{} questionLength:{}", workspaceId, question == null ? 0 : question.length());
         if (question == null || question.isBlank()) {
             throw new IllegalArgumentException("检索问题不能为空");
         }
         // 1. 先从向量库扩大召回，再限制单个文档版本最多贡献两个片段，避免一个长文档垄断上下文。
-        List<KnowledgeSearchHitVO> candidates = vectorStore.search(tenantId, embeddingModel.embed(List.of(question.trim())).get(0), 8);
+        List<KnowledgeSearchHitVO> candidates = vectorStore.search(workspaceId, embeddingModel.embed(List.of(question.trim())).get(0), 8);
         List<KnowledgeSearchHitVO> hits = candidates.stream()
                 .filter(new java.util.function.Predicate<>() {
                     private final Map<String, Integer> accepted = new java.util.HashMap<>();
@@ -97,7 +97,7 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
                     }
                 })
                 .limit(6).collect(Collectors.toList());
-        log.info("知识索引领域服务-检索完成 tenantId:{} hitCount:{}", tenantId, hits.size());
+        log.info("知识索引领域服务-检索完成 workspaceId:{} hitCount:{}", workspaceId, hits.size());
         return hits;
     }
 }

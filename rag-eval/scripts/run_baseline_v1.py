@@ -2,7 +2,7 @@
 """Run the dataset-v1.0 baseline against a running hex-workspace instance.
 
 The script intentionally uses only the public HTTP APIs.  A fresh run must use
-``--upload`` once (preferably against a dedicated evaluation tenant); later runs
+``--upload`` once (preferably against a dedicated evaluation Workspace); later runs
 should reuse the generated ``document-map.json`` to avoid duplicate documents.
 """
 from __future__ import annotations
@@ -35,7 +35,7 @@ class ApiError(RuntimeError):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
-    parser.add_argument("--tenant-id", type=int, default=int(os.getenv("HEX_WORKSPACE_TENANT_ID", "0")))
+    parser.add_argument("--workspace-id", type=int, default=int(os.getenv("HEX_WORKSPACE_WORKSPACE_ID", "0")))
     parser.add_argument("--token", default=os.getenv("HEX_WORKSPACE_TOKEN", ""))
     parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
     parser.add_argument("--run-id", default=datetime.now(timezone.utc).strftime("baseline-v1-%Y%m%dT%H%M%SZ"))
@@ -50,8 +50,8 @@ def parse_args():
                         help="retry count for idempotent GET requests after transient HTTP failures")
     parser.add_argument("--skip-ask", action="store_true", help="run search metrics only")
     args = parser.parse_args()
-    if args.tenant_id <= 0 or not args.token:
-        parser.error("请提供 --tenant-id 和 --token，或设置 HEX_WORKSPACE_TENANT_ID / HEX_WORKSPACE_TOKEN")
+    if args.workspace_id <= 0 or not args.token:
+        parser.error("请提供 --workspace-id 和 --token，或设置 HEX_WORKSPACE_WORKSPACE_ID / HEX_WORKSPACE_TOKEN")
     if args.upload == bool(args.document_map):
         parser.error("首次运行使用 --upload；复用已有语料时只使用 --document-map PATH")
     return args
@@ -101,7 +101,7 @@ class HexWorkspaceApi:
             raise ApiError(f"HTTP {method} {path} returned {payload.get('code')}: {payload.get('info')}")
         return payload.get("data")
 
-    def upload(self, tenant_id, raw_path, title):
+    def upload(self, workspace_id, raw_path, title):
         boundary = "----hexworkspace-eval-" + uuid.uuid4().hex
         mime = mimetypes.guess_type(raw_path.name)[0] or "application/octet-stream"
         content = raw_path.read_bytes()
@@ -110,19 +110,19 @@ class HexWorkspaceApi:
         chunks.append((f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{raw_path.name}\"\r\n"
                        f"Content-Type: {mime}\r\n\r\n").encode() + content + b"\r\n")
         chunks.append(f"--{boundary}--\r\n".encode())
-        return self.request("POST", f"/api/v1/tenants/{tenant_id}/documents",
+        return self.request("POST", f"/api/v1/workspaces/{workspace_id}/documents",
                             body=b"".join(chunks), content_type=f"multipart/form-data; boundary={boundary}")
 
-    def processing_status(self, tenant_id, document_code):
-        return self.request("GET", f"/api/v1/tenants/{tenant_id}/documents/{document_code}/processing-status")
+    def processing_status(self, workspace_id, document_code):
+        return self.request("GET", f"/api/v1/workspaces/{workspace_id}/documents/{document_code}/processing-status")
 
-    def search(self, tenant_id, question):
+    def search(self, workspace_id, question):
         encoded = urllib.parse.quote(question, safe="")
-        return self.request("GET", f"/api/v1/tenants/{tenant_id}/knowledge/search?question={encoded}")
+        return self.request("GET", f"/api/v1/workspaces/{workspace_id}/knowledge/search?question={encoded}")
 
-    def ask(self, tenant_id, question):
+    def ask(self, workspace_id, question):
         body = json.dumps({"question": question}, ensure_ascii=False).encode("utf-8")
-        return self.request("POST", f"/api/v1/tenants/{tenant_id}/knowledge/ask",
+        return self.request("POST", f"/api/v1/workspaces/{workspace_id}/knowledge/ask",
                             body=body, content_type="application/json")
 
     def runtime_info(self):
@@ -137,7 +137,7 @@ def upload_corpus(api, args, manifest, run_dir):
     mapping = {}
     for index, document in enumerate(manifest, start=1):
         raw_path = args.dataset_root / document["rawFile"]
-        response = api.upload(args.tenant_id, raw_path, document["title"])
+        response = api.upload(args.workspace_id, raw_path, document["title"])
         mapping[document["documentKey"]] = {
             "documentCode": response["documentCode"],
             "versionNumber": response["versionNumber"],
@@ -156,7 +156,7 @@ def wait_until_ready(api, args, mapping):
     while pending and time.monotonic() < deadline:
         for key in list(pending):
             code = mapping[key]["documentCode"]
-            status = api.processing_status(args.tenant_id, code)
+            status = api.processing_status(args.workspace_id, code)
             latest[key] = status
             state = status.get("parseStatus")
             if state == "SUCCESS":
@@ -192,7 +192,7 @@ def evaluate(api, args, dataset_root, mapping, questions, run_dir):
         started = time.perf_counter()
         try:
             search_started = time.perf_counter()
-            search_data = api.search(args.tenant_id, item["question"])
+            search_data = api.search(args.workspace_id, item["question"])
             search_ms = round((time.perf_counter() - search_started) * 1000, 2)
             hits = search_data.get("hits", []) if search_data else []
             retrieved_keys = [reverse.get(hit.get("documentCode"), "unknown") for hit in hits]
@@ -204,7 +204,7 @@ def evaluate(api, args, dataset_root, mapping, questions, run_dir):
             ask_ms = None
             if not args.skip_ask:
                 ask_started = time.perf_counter()
-                ask_data = api.ask(args.tenant_id, item["question"])
+                ask_data = api.ask(args.workspace_id, item["question"])
                 ask_ms = round((time.perf_counter() - ask_started) * 1000, 2)
                 answer = (ask_data or {}).get("answer")
             answer_correct = None if args.skip_ask else (
@@ -274,7 +274,7 @@ def aggregate(results, args, run_dir, runtime_info, config_sha256):
         "runId": args.run_id,
         "dataset": "dataset-v1.0",
         "split": "test",
-        "tenantId": args.tenant_id,
+        "workspaceId": args.workspace_id,
         "runtime": {
             "hexWorkspaceBaseUrl": args.base_url,
             "chatModel": runtime_info.get("chatModel"),

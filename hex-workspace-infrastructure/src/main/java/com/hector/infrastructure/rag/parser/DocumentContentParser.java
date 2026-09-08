@@ -1,4 +1,4 @@
-package com.hector.infrastructure.parser;
+package com.hector.infrastructure.rag.parser;
 
 import com.hector.domain.document.adapter.port.IDocumentContentParser;
 import com.hector.domain.document.model.valobj.DocumentParseResultVO;

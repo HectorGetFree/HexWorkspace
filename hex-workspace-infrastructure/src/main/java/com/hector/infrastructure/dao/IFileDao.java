@@ -33,7 +33,7 @@ public interface IFileDao {
     File queryFileByFileCode(@Param("fileCode") String fileCode);
 
     /**
-     * 按租户ID查询文件列表。
+     * 按Workspace ID查询文件列表。
      */
-    List<File> queryFilesByTenantId(@Param("tenantId") Long tenantId);
+    List<File> queryFilesByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

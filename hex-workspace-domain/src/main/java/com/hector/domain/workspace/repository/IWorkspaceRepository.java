@@ -9,6 +9,8 @@ public interface IWorkspaceRepository {
 
     WorkspaceEntity save(WorkspaceEntity workspaceEntity);
 
+    Optional<WorkspaceEntity> findById(Long workspaceId);
+
     Optional<WorkspaceEntity> findByWorkspaceCode(String workspaceCode);
 
     Optional<WorkspaceEntity> findDefaultByOwnerUserId(Long ownerUserId);

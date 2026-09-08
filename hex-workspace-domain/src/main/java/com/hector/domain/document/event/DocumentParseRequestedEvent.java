@@ -19,7 +19,7 @@ public class DocumentParseRequestedEvent implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private Long tenantId;
+    private Long workspaceId;
     private Long documentId;
     private Integer versionNumber;
     private Long operatorUserId;

@@ -7,7 +7,7 @@
     <resultMap id="documentResultMap" type="com.hector.infrastructure.dao.po.Document">
         <id property="id" column="id"/>
         <result property="documentCode" column="document_code"/>
-        <result property="tenantId" column="tenant_id"/>
+        <result property="workspaceId" column="workspace_id"/>
         <result property="ownerUserId" column="owner_user_id"/>
         <result property="sourceFileId" column="source_file_id"/>
         <result property="title" column="title"/>
@@ -20,10 +20,10 @@
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
-            document_code, tenant_id, owner_user_id, source_file_id, title,
+            document_code, workspace_id, owner_user_id, source_file_id, title,
             document_type, status, current_version, created_at, updated_at
         ) VALUES (
-            #{documentCode}, #{tenantId}, #{ownerUserId}, #{sourceFileId}, #{title},
+            #{documentCode}, #{workspaceId}, #{ownerUserId}, #{sourceFileId}, #{title},
             #{documentType}, #{status}, #{currentVersion}, #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -39,7 +39,7 @@
     </update>
 
     <select id="queryById" resultMap="documentResultMap">
-        SELECT id, document_code, tenant_id, owner_user_id, source_file_id, title,
+        SELECT id, document_code, workspace_id, owner_user_id, source_file_id, title,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
@@ -47,18 +47,18 @@
     </select>
 
     <select id="queryByDocumentCode" resultMap="documentResultMap">
-        SELECT id, document_code, tenant_id, owner_user_id, source_file_id, title,
+        SELECT id, document_code, workspace_id, owner_user_id, source_file_id, title,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
         LIMIT 1
     </select>
 
-    <select id="queryByTenantId" resultMap="documentResultMap">
-        SELECT id, document_code, tenant_id, owner_user_id, source_file_id, title,
+    <select id="queryByWorkspaceId" resultMap="documentResultMap">
+        SELECT id, document_code, workspace_id, owner_user_id, source_file_id, title,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
-        WHERE tenant_id = #{tenantId}
+        WHERE workspace_id = #{workspaceId}
         ORDER BY updated_at DESC, id DESC
     </select>
 
