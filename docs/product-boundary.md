@@ -27,7 +27,7 @@ WorkBuddy 的公开产品资料强调工作空间、自然语言驱动的多步�
 
 个人收集 PDF、Markdown、DOCX、网页摘录和笔记，形成可搜索资料库；hexgent 可以回答问题、总结资料、比较版本、起草文档，并保留引用来源。
 
-### 团队 Workspace
+### 资源协作组
 
 团队按项目、产品或主题管理共享资料；成员拥有不同的查看、评论、编辑、管理权限；hexgent 只能使用当前用户有权访问的资料，并在执行前说明将读取或修改的范围。
 
@@ -39,36 +39,35 @@ WorkBuddy 的公开产品资料强调工作空间、自然语言驱动的多步�
 
 ### 4.1 统一概念
 
-产品只保留一个 Workspace 概念，不为个人资料库和团队空间建立两套平行产品模型。
+Workspace 是用户资料的一级容器，不是“先加入团队才能协作”的组织单元。用户注册后拥有默认个人 Workspace，也可以创建更多自己的资料容器；所谓“团队”是某个 Folder 或 Document 上当前获得授权的协作者集合，是权限投影，不是独立 Workspace 类型或全局成员制。
 
-| 类型 | 产品名称 | 所有权 | 成员模型 | 默认用途 |
-| --- | --- | --- | --- | --- |
-| `PERSONAL` | 个人 Workspace | 一个用户 | 仅 Owner；后续可通过受控分享临时授权 | 用户自己的资料库、私人笔记和个人 Agent 工作 |
-| `TEAM` | 团队 Workspace | Workspace 本身 | Owner、管理员、成员、访客等 | 团队共享资料、协作编辑和团队 Agent 工作 |
-
-用户注册后应拥有一个默认个人 Workspace；用户新建的团队 Workspace 也使用同一套 Workspace 页面、目录、文档、检索和 Agent 入口。差异只来自类型、成员关系和权限策略，而不是另一套业务流程。
+| 概念 | 所有权 | 作用 |
+| --- | --- | --- |
+| Workspace | 一个 Owner | 组织自己的资料、任务和 Agent 配置 |
+| Folder / Document | 一个创建者/所有者 | 权限授予和访问审批的实际对象 |
+| 协作者组 | 无独立所有权 | 某个 Folder 或 Document 的有效授权用户集合 |
 
 当前代码里的 `Tenant` 可以作为 Workspace 的暂存实现，但领域设计应逐步收敛为：
 
 ```text
 User 1 ── N Workspace
-Workspace ── WorkspaceType(PERSONAL | TEAM)
 Workspace ── 1 Owner
-Workspace ── N Membership
 Workspace ── 1 RootFolder
+Folder / Document ── N PermissionGrant
+Folder / Document ── N AccessRequest
 ```
 
-个人 Workspace 仍然可以有一条 Owner Membership，但不能把“没有成员”当作个人空间的判断依据；类型必须显式保存。团队 Workspace 必须显式管理成员和角色。
+Workspace Owner 是资料容器的技术所有者。Folder 或 Document 的创建者/所有者负责审批访问申请和变更该资源的权限；没有“加入团队后自动获得整个 Workspace 内容”的规则。
 
 ### 4.2 Workspace 生命周期
 
-- 创建：个人 Workspace 由注册流程自动创建；团队 Workspace 由有权限的用户主动创建。
+- 创建：注册流程自动创建默认 Workspace；用户可额外创建自己的 Workspace。
 - 激活：只有 `ACTIVE` 的 Workspace 才能上传、导入、创建和检索资源。
 - 归档：停止日常使用但保留资源和历史 Run；归档空间默认不可写。
 - 删除：建议先进入回收站，再由 Owner 在保留期后确认清理；删除前必须处理文档版本、索引、派生文件和 Agent 产物。
-- 离开：成员离开团队 Workspace 后失去所有资源访问权；自己创建的文档归 Workspace，不随个人离开而转移。
+- 取消授权：Folder 或 Document 所有者撤销某个授权后，该用户立刻失去该资源及其继承范围内的访问资格；自己创建的文档归其 Workspace，不因他人取消授权而转移。
 
-团队 Workspace 的 Owner 转移、成员邀请和成员移除属于 Workspace 领域；文档具体读写权限属于资源授权领域，不应继续全部塞进 Membership。
+不存在 Workspace 层的团队成员关系。访问申请、审批和权限授予属于 Folder/Document 权限领域；“团队协作者”只由这些授权记录实时聚合得出。
 
 ### 4.3 Workspace 内的资源树
 
@@ -139,7 +138,7 @@ Workspace 支持两类资源进入方式，但二者的语义不能混淆：
 
 ## 6. 权限与 Agent 边界
 
-个人 Workspace 默认只有 Owner 可访问；团队 Workspace 通过 Membership 和资源权限控制访问。Workspace 类型不能绕过资源授权。
+用户只能访问自己拥有，或被 Folder/Document 明确授权的资源。即使两个用户在同一个 Workspace 的协作视图中出现，也不意味着其中一个可以读取另一个未授权的文件。
 
 Agent 使用的资料范围仍然遵循：
 
@@ -155,8 +154,8 @@ Agent 生成的 Markdown 草稿、摘要或报告先作为 Workspace 内的新�
 
 第一阶段可按以下边界演进，不急于拆成微服务：
 
-- `workspace`：Workspace、类型、状态、Owner 和生命周期。
-- `membership`：成员关系、角色、邀请、加入和离开。
+- `workspace`：Workspace、Owner、状态和生命周期；不承担团队成员关系。
+- `permission`：Folder/Document 的授权、访问申请、审批、撤销和权限继承。
 - `resource`：Folder、File、来源、版本、移动、重命名和回收站。
 - `editor`：格式能力和编辑会话；初期只实现 Markdown。
 - `import`：本地文件/文件夹导入任务、去重、失败重试和结果。
@@ -169,19 +168,19 @@ Agent 生成的 Markdown 草稿、摘要或报告先作为 Workspace 内的新�
 
 ```text
 User
-  └─ Membership ── Workspace
-                     ├─ Space / Folder
-                     │    └─ Document ── DocumentVersion
-                     ├─ KnowledgeIndex
-                     ├─ Task ── AgentRun ── Artifact
-                     ├─ Comment / Review
-                     ├─ Connection / Skill
-                     └─ AuditEvent
+  └─ Workspace
+       ├─ Space / Folder ── PermissionGrant / AccessRequest
+       │    └─ Document ── DocumentVersion ── PermissionGrant / AccessRequest
+       ├─ KnowledgeIndex
+       ├─ Task ── AgentRun ── Artifact
+       ├─ Comment / Review
+       ├─ Connection / Skill
+       └─ AuditEvent
 ```
 
 ### Workspace
 
-产品一级边界，承载成员、资料、任务、Agent 配置和审计。当前 `Tenant` 可以作为基础设施实现，但产品语义应逐步从“租户”提升为“Workspace”；不要让 Tenant 继续承担文档目录、任务或 Agent 配置的全部职责。
+产品一级资料容器，承载资料、任务、Agent 配置和审计。当前 `Tenant` 可以作为基础设施实现，但产品语义应逐步从“租户”提升为“Workspace”；不要让 Tenant 继续承担文档目录、任务或 Agent 配置的全部职责。
 
 ### Document 与 DocumentVersion
 
@@ -202,19 +201,22 @@ Document 是稳定身份和权限主体；DocumentVersion 是不可变内容快�
 
 ## 9. 权限与安全边界
 
-权限至少分三层，不能只用一个 `MEMBER` 角色解决：
+权限至少分三层，且核心授权发生在 Folder/Document，不发生在“团队成员”身份上：
 
-1. Workspace 权限：加入、邀请、成员管理、配置管理。
-2. 资源权限：Space/Folder/Document 的查看、评论、编辑、分享、删除、管理版本。
+1. Workspace 所有权：Owner 管理自己的资料容器；它不自动把其中全部资源授权给其他用户。
+2. Folder / Document 权限：创建者/所有者天然为 `MANAGE`；其他用户只能被显式授予 `MANAGE`、`EDIT`、`VIEW` 或 `NONE`。
 3. Agent 操作权限：读取哪些资源、是否允许创建 Artifact、是否允许写回文档、是否允许调用外部连接器。
 
 默认规则：
 
 - Agent 的有效资料范围 = 用户当前可见范围 ∩ Task 明确范围 ∩ Agent 本次授权范围。
+- 文档访问申请必须处于 `PENDING`，经文档所有者审批后才创建实际授权；首次批准默认授予 `VIEW`。
+- 手机号短信和分享链接是未来的申请入口，不是访问令牌；点击链接后仍必须完成身份确认与所有者审批。
+- 文件夹授权默认向下继承至其子 Folder/Document；直接授予 Document 的权限优先于继承权限，资源所有者始终拥有 `MANAGE`。
 - 检索结果必须在生成答案前做权限过滤，不能只在 UI 隐藏无权文档。
 - 写回、删除、外部发送、代表用户提交等副作用操作默认需要用户确认。
 - 每个 Run 记录使用过的文档版本、引用片段、工具、授权和最终写入对象。
-- 分享链接是独立的访问授予，不应等同于“知道 URL 就能读取”。
+- 分享链接只承载访问申请标识，不等同于授权；知道 URL 也不能直接读取文档。
 
 ## 10. 协作边界
 

@@ -8,7 +8,7 @@
         <id property="id" column="id"/>
         <result property="workspaceCode" column="workspace_code"/>
         <result property="workspaceName" column="workspace_name"/>
-        <result property="workspaceType" column="workspace_type"/>
+        <result property="isDefault" column="is_default"/>
         <result property="status" column="status"/>
         <result property="ownerUserId" column="owner_user_id"/>
         <result property="description" column="description"/>
@@ -17,24 +17,24 @@
     </resultMap>
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Workspace" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO workspace (workspace_code, workspace_name, workspace_type, status, owner_user_id, description, created_at, updated_at)
-        VALUES (#{workspaceCode}, #{workspaceName}, #{workspaceType}, #{status}, #{ownerUserId}, #{description}, #{createdAt}, #{updatedAt})
+        INSERT INTO workspace (workspace_code, workspace_name, is_default, status, owner_user_id, description, created_at, updated_at)
+        VALUES (#{workspaceCode}, #{workspaceName}, #{isDefault}, #{status}, #{ownerUserId}, #{description}, #{createdAt}, #{updatedAt})
     </insert>
 
     <select id="queryWorkspaceByCode" resultMap="workspaceResultMap">
-        SELECT id, workspace_code, workspace_name, workspace_type, status, owner_user_id, description, created_at, updated_at
+        SELECT id, workspace_code, workspace_name, is_default, status, owner_user_id, description, created_at, updated_at
         FROM workspace WHERE workspace_code = #{workspaceCode} LIMIT 1
     </select>
 
-    <select id="queryWorkspaceByOwnerUserIdAndType" resultMap="workspaceResultMap">
-        SELECT id, workspace_code, workspace_name, workspace_type, status, owner_user_id, description, created_at, updated_at
+    <select id="queryDefaultWorkspaceByOwnerUserId" resultMap="workspaceResultMap">
+        SELECT id, workspace_code, workspace_name, is_default, status, owner_user_id, description, created_at, updated_at
         FROM workspace
-        WHERE owner_user_id = #{ownerUserId} AND workspace_type = #{workspaceType}
+        WHERE owner_user_id = #{ownerUserId} AND is_default = TRUE
         ORDER BY id ASC LIMIT 1
     </select>
 
     <select id="queryWorkspacesByOwnerUserId" resultMap="workspaceResultMap">
-        SELECT id, workspace_code, workspace_name, workspace_type, status, owner_user_id, description, created_at, updated_at
+        SELECT id, workspace_code, workspace_name, is_default, status, owner_user_id, description, created_at, updated_at
         FROM workspace
         WHERE owner_user_id = #{ownerUserId}
         ORDER BY created_at ASC, id ASC

@@ -17,7 +17,7 @@ public class Workspace {
     private Long id;
     private String workspaceCode;
     private String workspaceName;
-    private String workspaceType;
+    private Boolean isDefault;
     private String status;
     private Long ownerUserId;
     private String description;

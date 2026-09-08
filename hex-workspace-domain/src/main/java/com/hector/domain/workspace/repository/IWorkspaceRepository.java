@@ -1,8 +1,6 @@
 package com.hector.domain.workspace.repository;
 
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;
-import com.hector.domain.workspace.model.valobj.WorkspaceTypeVO;
-
 import java.util.Optional;
 import java.util.List;
 
@@ -13,7 +11,7 @@ public interface IWorkspaceRepository {
 
     Optional<WorkspaceEntity> findByWorkspaceCode(String workspaceCode);
 
-    Optional<WorkspaceEntity> findByOwnerUserIdAndType(Long ownerUserId, WorkspaceTypeVO type);
+    Optional<WorkspaceEntity> findDefaultByOwnerUserId(Long ownerUserId);
 
     List<WorkspaceEntity> listByOwnerUserId(Long ownerUserId);
 }

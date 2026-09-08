@@ -17,7 +17,7 @@ public class WorkspaceResponseDTO implements Serializable {
     private Long workspaceId;
     private String workspaceCode;
     private String workspaceName;
-    private String type;
+    private Boolean isDefault;
     private String status;
     private Long ownerUserId;
     private String description;

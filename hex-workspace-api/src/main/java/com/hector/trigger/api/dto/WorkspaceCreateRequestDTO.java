@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
-/** 创建团队 Workspace 请求。拥有者始终由服务端从登录态确定。 */
+/** 创建资料 Workspace 请求。拥有者始终由服务端从登录态确定。 */
 @Data
 @Builder
 @NoArgsConstructor

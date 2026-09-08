@@ -12,7 +12,7 @@ hex-workspace 是一个面向个人与团队文档资料库的智能工作台后
 
 - 用户注册、登录、JWT 鉴权、当前用户查询与登出接口。
 - Workspace 聚合及 `PERSONAL`、`TEAM` 类型；新用户注册时在同一事务内创建默认个人 Workspace。
-- 已支持创建团队 Workspace，以及查询当前用户拥有的个人和团队 Workspace；团队成员关系迁移尚未开始。
+- 已支持注册默认 Workspace、创建自己的资料 Workspace，以及查询当前用户拥有的 Workspace；协作权限将在 Folder/Document 层实现。
 - 租户创建、查询，以及用户所属租户列表。
 - 租户成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
 - 基于 MinIO 的租户级文件存储，区分用户原始文件与系统派生文件。
@@ -136,7 +136,7 @@ docker compose -f docs/devops/docker-compose.yml up -d
 | RabbitMQ Console | `http://127.0.0.1:15672` |
 | Qdrant HTTP | `http://127.0.0.1:6333` |
 
-首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。已有旧数据卷需要依次手动执行 `002-add-file-purpose.sql` 与 `003-add-workspace.sql`；后者会为已有用户幂等补齐个人 Workspace，并保证后续新注册用户自动创建个人 Workspace。
+首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。已有旧数据卷需要依次手动执行 `002-add-file-purpose.sql`、`003-add-workspace.sql` 与 `004-remove-workspace-team-type.sql`；后两者会补齐默认 Workspace，并将旧 TEAM 数据收敛为 Owner 的普通资料容器。
 
 ### 3. 配置模型密钥
 
@@ -192,8 +192,8 @@ Authorization: Bearer <JWT>
 | 创建租户 | POST | `/api/v1/tenants` |
 | 查询租户 | GET | `/api/v1/tenants/{tenantId}` |
 | 查询我的租户 | GET | `/api/v1/tenants/my` |
-| 创建团队 Workspace | POST | `/api/v1/workspaces` |
-| 查询我拥有的 Workspace | GET | `/api/v1/workspaces/my` |
+| 创建 Workspace | POST | `/api/v1/workspaces` |
+| 查询我的 Workspace | GET | `/api/v1/workspaces/my` |
 | 初始化租户 Owner | POST | `/api/v1/tenants/{tenantId}/members/owner` |
 | 添加成员 | POST | `/api/v1/tenants/{tenantId}/members` |
 | 查询租户成员 | GET | `/api/v1/tenants/{tenantId}/members` |

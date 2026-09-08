@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `workspace` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `workspace_code` VARCHAR(64) NOT NULL COMMENT 'Workspace编码',
     `workspace_name` VARCHAR(128) NOT NULL COMMENT 'Workspace名称',
-    `workspace_type` VARCHAR(16) NOT NULL COMMENT 'PERSONAL / TEAM',
+    `is_default` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为注册自动创建的默认资料库',
     `status` VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / ARCHIVED / DELETED',
     `owner_user_id` BIGINT NOT NULL COMMENT 'Workspace拥有者用户ID',
     `description` VARCHAR(255) DEFAULT NULL COMMENT 'Workspace描述',
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS `workspace` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_workspace_code` (`workspace_code`),
-    KEY `idx_workspace_owner_type` (`owner_user_id`, `workspace_type`),
+    KEY `idx_workspace_owner_default` (`owner_user_id`, `is_default`),
     KEY `idx_workspace_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace表';
 

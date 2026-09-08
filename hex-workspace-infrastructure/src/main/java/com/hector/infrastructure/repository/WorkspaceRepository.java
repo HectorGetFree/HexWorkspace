@@ -2,7 +2,6 @@ package com.hector.infrastructure.repository;
 
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;
 import com.hector.domain.workspace.model.valobj.WorkspaceStatusVO;
-import com.hector.domain.workspace.model.valobj.WorkspaceTypeVO;
 import com.hector.domain.workspace.repository.IWorkspaceRepository;
 import com.hector.infrastructure.dao.IWorkspaceDao;
 import com.hector.infrastructure.dao.po.Workspace;
@@ -25,7 +24,7 @@ public class WorkspaceRepository implements IWorkspaceRepository {
         Workspace workspace = Workspace.builder()
                 .workspaceCode(workspaceEntity.getWorkspaceCode())
                 .workspaceName(workspaceEntity.getWorkspaceName())
-                .workspaceType(workspaceEntity.getType().name())
+                .isDefault(workspaceEntity.isDefault())
                 .status(workspaceEntity.getStatus().name())
                 .ownerUserId(workspaceEntity.getOwnerUserId())
                 .description(workspaceEntity.getDescription())
@@ -42,8 +41,8 @@ public class WorkspaceRepository implements IWorkspaceRepository {
     }
 
     @Override
-    public Optional<WorkspaceEntity> findByOwnerUserIdAndType(Long ownerUserId, WorkspaceTypeVO type) {
-        return Optional.ofNullable(workspaceDao.queryWorkspaceByOwnerUserIdAndType(ownerUserId, type.name()))
+    public Optional<WorkspaceEntity> findDefaultByOwnerUserId(Long ownerUserId) {
+        return Optional.ofNullable(workspaceDao.queryDefaultWorkspaceByOwnerUserId(ownerUserId))
                 .map(this::toEntity);
     }
 
@@ -59,7 +58,7 @@ public class WorkspaceRepository implements IWorkspaceRepository {
                 .id(workspace.getId())
                 .workspaceCode(workspace.getWorkspaceCode())
                 .workspaceName(workspace.getWorkspaceName())
-                .type(WorkspaceTypeVO.valueOf(workspace.getWorkspaceType()))
+                .isDefault(workspace.getIsDefault())
                 .status(WorkspaceStatusVO.valueOf(workspace.getStatus()))
                 .ownerUserId(workspace.getOwnerUserId())
                 .description(workspace.getDescription())

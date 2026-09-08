@@ -33,7 +33,7 @@ public class WorkspaceController extends BaseController {
     private IWorkspaceService workspaceService;
 
     /**
-     * 创建团队 Workspace。个人 Workspace 只能由注册流程自动创建。
+     * 创建当前用户拥有的资料 Workspace；协作权限不在此接口授予。
      *
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces" \
@@ -42,7 +42,7 @@ public class WorkspaceController extends BaseController {
      *   -d '{"data":{"workspaceName":"产品团队","description":"产品资料与协作空间"}}'
      */
     @PostMapping
-    public Response<WorkspaceResponseDTO> createTeamWorkspace(
+    public Response<WorkspaceResponseDTO> createWorkspace(
             @RequestBody Request<WorkspaceCreateRequestDTO> request) {
         try {
             // 1. 从认证上下文取得拥有者，禁止客户端伪造 ownerUserId。
@@ -50,8 +50,8 @@ public class WorkspaceController extends BaseController {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
             log.info("创建团队Workspace开始 workspaceName:{} ownerUserId:{}", data.getWorkspaceName(), currentUserId);
 
-            // 2. 仅调用 TEAM 创建用例；个人空间不允许通过通用创建接口伪造。
-            WorkspaceEntity workspaceEntity = workspaceService.createTeamWorkspace(
+            // 2. 创建 Owner 的资料容器；Folder/Document 权限将由后续资源授权领域处理。
+            WorkspaceEntity workspaceEntity = workspaceService.createWorkspace(
                     data.getWorkspaceName(), currentUserId, data.getDescription());
 
             // 3. 返回脱敏后的资源标识和状态，不暴露领域实体本身。
@@ -66,7 +66,7 @@ public class WorkspaceController extends BaseController {
     }
 
     /**
-     * 查询当前用户拥有的个人和团队 Workspace。
+     * 查询当前用户拥有的资料 Workspace。
      * 当前不包含成员身份加入的团队空间，待 Membership 迁移后扩展。
      *
      * curl 示例：
@@ -96,7 +96,7 @@ public class WorkspaceController extends BaseController {
                 .workspaceId(workspaceEntity.getId())
                 .workspaceCode(workspaceEntity.getWorkspaceCode())
                 .workspaceName(workspaceEntity.getWorkspaceName())
-                .type(workspaceEntity.getType().name())
+                .isDefault(workspaceEntity.isDefault())
                 .status(workspaceEntity.getStatus().name())
                 .ownerUserId(workspaceEntity.getOwnerUserId())
                 .description(workspaceEntity.getDescription())

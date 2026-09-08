@@ -4,7 +4,6 @@ import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;
 import com.hector.domain.workspace.model.valobj.WorkspaceStatusVO;
-import com.hector.domain.workspace.model.valobj.WorkspaceTypeVO;
 import com.hector.domain.workspace.repository.IWorkspaceRepository;
 import com.hector.domain.workspace.service.IWorkspaceService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
@@ -42,9 +41,9 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
         log.info("Workspace领域服务-确保个人Workspace开始 ownerUserId:{} username:{}",
                 normalizedOwnerUserId, normalizedOwnerUsername);
 
-        // 2. 先按“拥有者 + PERSONAL 类型”查询，保证注册重试不会为同一用户重复创建资料库。
+        // 2. 先按拥有者查询默认资料库，保证注册重试不会为同一用户重复创建默认 Workspace。
         WorkspaceEntity existingWorkspace = workspaceRepository
-                .findByOwnerUserIdAndType(normalizedOwnerUserId, WorkspaceTypeVO.PERSONAL)
+                .findDefaultByOwnerUserId(normalizedOwnerUserId)
                 .orElse(null);
         if (existingWorkspace != null) {
             return existingWorkspace;
@@ -57,12 +56,12 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
             throw new BusinessException(ResponseCode.USER_STATUS_UNAVAILABLE);
         }
 
-        // 4. 构建个人 Workspace 的初始快照；PERSONAL 类型和 ACTIVE 状态由领域规则固定。
+        // 4. 构建默认资料库快照；默认标识和 ACTIVE 状态由领域规则固定。
         LocalDateTime now = LocalDateTime.now();
         WorkspaceEntity workspaceEntity = WorkspaceEntity.builder()
                 .workspaceCode(generateWorkspaceCode())
                 .workspaceName(normalizedOwnerUsername + " 的个人资料库")
-                .type(WorkspaceTypeVO.PERSONAL)
+                .isDefault(true)
                 .status(WorkspaceStatusVO.ACTIVE)
                 .ownerUserId(normalizedOwnerUserId)
                 .createdAt(now)
@@ -78,23 +77,23 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
 
     @Override
     @Transactional
-    public WorkspaceEntity createTeamWorkspace(String workspaceName, Long ownerUserId, String description) {
-        // 1. 规范化请求内容，保证团队空间名称、拥有者与描述可安全进入后续业务判断。
+    public WorkspaceEntity createWorkspace(String workspaceName, Long ownerUserId, String description) {
+        // 1. 规范化请求内容，保证资料容器名称、拥有者与描述可安全进入后续业务判断。
         String normalizedWorkspaceName = normalizeWorkspaceName(workspaceName);
         Long normalizedOwnerUserId = normalizeOwnerUserId(ownerUserId);
         String normalizedDescription = normalizeDescription(description);
-        log.info("Workspace领域服务-创建团队Workspace开始 workspaceName:{} ownerUserId:{}",
+        log.info("Workspace领域服务-创建Workspace开始 workspaceName:{} ownerUserId:{}",
                 normalizedWorkspaceName, normalizedOwnerUserId);
 
-        // 2. 校验拥有者存在且可用，防止已失效账号创建无人可管理的团队空间。
+        // 2. 校验拥有者存在且可用，防止已失效账号创建无人负责的资料容器。
         UserEntity ownerUser = getActiveOwner(normalizedOwnerUserId);
 
-        // 3. 构建 TEAM 初始快照；成员关系将在下一阶段迁移，当前拥有者是唯一的空间管理主体。
+        // 3. 构建 Owner 的非默认资料容器；协作权限不在 Workspace 层建立。
         LocalDateTime now = LocalDateTime.now();
         WorkspaceEntity workspaceEntity = WorkspaceEntity.builder()
                 .workspaceCode(generateWorkspaceCode())
                 .workspaceName(normalizedWorkspaceName)
-                .type(WorkspaceTypeVO.TEAM)
+                .isDefault(false)
                 .status(WorkspaceStatusVO.ACTIVE)
                 .ownerUserId(ownerUser.getId())
                 .description(normalizedDescription)
@@ -102,9 +101,9 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
                 .updatedAt(now)
                 .build();
 
-        // 4. 持久化团队空间；当前事务提交后，才允许后续成员或资源写入引用它。
+        // 4. 持久化 Workspace；当前事务提交后，资源才能引用该稳定容器。
         WorkspaceEntity savedWorkspace = workspaceRepository.save(workspaceEntity);
-        log.info("Workspace领域服务-创建团队Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
+        log.info("Workspace领域服务-创建Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
                 savedWorkspace.getId(), savedWorkspace.getWorkspaceCode(), normalizedOwnerUserId);
         return savedWorkspace;
     }
