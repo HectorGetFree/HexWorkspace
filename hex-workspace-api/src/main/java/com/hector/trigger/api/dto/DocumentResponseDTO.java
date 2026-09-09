@@ -20,8 +20,12 @@ public class DocumentResponseDTO implements Serializable {
     private Long documentId;
     private String documentCode;
     private Long workspaceId;
+    private Long parentId;
     private Long ownerUserId;
     private String title;
+    private String fileName;
+    private String source;
+    private String content;
     private String documentType;
     private String status;
     private Integer currentVersion;

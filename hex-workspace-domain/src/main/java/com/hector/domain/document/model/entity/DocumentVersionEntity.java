@@ -18,28 +18,40 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class DocumentVersionEntity {
 
+    /** 文档版本主键 ID。 */
     private Long id;
 
+    /** 该版本所属的文档 ID。 */
     private Long documentId;
 
+    /** 文档内单调递增的版本号。 */
     private Integer versionNumber;
 
+    /** 当前版本原始内容对应的底层对象 ID。 */
     private Long fileId;
 
+    /** 当前版本内容摘要，用于完整性校验和幂等判断。 */
     private String contentHash;
 
+    /** 文档解析后生成的纯文本派生对象 ID。 */
     private Long extractedFileId;
 
+    /** 当前版本的知识解析处理状态。 */
     private DocumentParseStatusVO parseStatus;
 
+    /** 生成解析结果时使用的解析器版本。 */
     private String parserVersion;
 
+    /** 当前版本完成解析的时间。 */
     private LocalDateTime parsedAt;
 
+    /** 当前版本相对上一版本的变更说明。 */
     private String changeSummary;
 
+    /** 创建当前版本的用户 ID。 */
     private Long createdByUserId;
 
+    /** 当前版本创建时间。 */
     private LocalDateTime createdAt;
 
     /**

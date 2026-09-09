@@ -189,19 +189,21 @@ Authorization: Bearer <JWT>
 | 用户登录 | POST | `/api/v1/users/login` |
 | 用户登出 | POST | `/api/v1/users/logout` |
 | 当前用户 | GET | `/api/v1/users/me` |
-| 创建Workspace | POST | `/api/v1/Workspaces` |
-| 查询Workspace | GET | `/api/v1/workspaces/{workspaceId}` |
-| 查询我的Workspace | GET | `/api/v1/workspaces/my` |
-| 创建 Workspace | POST | `/api/v1/workspaces` |
 | 查询我的 Workspace | GET | `/api/v1/workspaces/my` |
-| 初始化Workspace Owner | POST | `/api/v1/workspaces/{workspaceId}/members/owner` |
-| 添加成员 | POST | `/api/v1/workspaces/{workspaceId}/members` |
-| 查询Workspace成员 | GET | `/api/v1/workspaces/{workspaceId}/members` |
-| 查询我的资源协作关系 | GET | `/api/v1/my` |
-| 移除成员 | DELETE | `/api/v1/workspaces/{workspaceId}/members/{targetUserId}` |
-| 上传并创建文档 | POST | `/api/v1/workspaces/{workspaceId}/documents` |
+| 查询根目录 | GET | `/api/v1/workspaces/{workspaceId}/folders/root` |
+| 查询目录内容 | GET | `/api/v1/workspaces/{workspaceId}/folders/{folderId}/children` |
+| 新建文件夹 | POST | `/api/v1/workspaces/{workspaceId}/folders` |
+| 文件夹重命名 | PATCH | `/api/v1/workspaces/{workspaceId}/folders/{folderId}/name` |
+| 移动文件夹 | PATCH | `/api/v1/workspaces/{workspaceId}/folders/{folderId}/parent` |
+| 删除文件夹 | DELETE | `/api/v1/workspaces/{workspaceId}/folders/{folderId}` |
+| 上传云文档 | POST | `/api/v1/workspaces/{workspaceId}/documents` |
+| 新建 Markdown | POST | `/api/v1/workspaces/{workspaceId}/documents/markdown` |
 | 文档列表 | GET | `/api/v1/workspaces/{workspaceId}/documents` |
 | 文档详情 | GET | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}` |
+| 编辑 Markdown | PUT | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/content` |
+| 文档重命名 | PATCH | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/name` |
+| 移动文档 | PATCH | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/parent` |
+| 删除文档 | DELETE | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}` |
 | 文档处理状态 | GET | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/processing-status` |
 | 知识检索 | GET | `/api/v1/workspaces/{workspaceId}/knowledge/search?question=...` |
 | 知识问答 | POST | `/api/v1/workspaces/{workspaceId}/knowledge/ask` |
@@ -242,7 +244,7 @@ curl -X POST 'http://127.0.0.1:8098/api/v1/users/login' \
 curl -X POST 'http://127.0.0.1:8098/api/v1/workspaces/1/documents' \
   -H 'Authorization: Bearer <JWT>' \
   -F 'file=@./demo.pdf' \
-  -F 'title=演示文档'
+  -F 'parentId=1'
 ```
 
 知识库问答：

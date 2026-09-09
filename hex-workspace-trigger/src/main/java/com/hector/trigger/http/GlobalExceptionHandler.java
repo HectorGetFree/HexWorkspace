@@ -1,6 +1,7 @@
 package com.hector.trigger.http;
 
 import com.hector.hexworkspace.types.enums.ResponseCode;
+import com.hector.hexworkspace.types.exception.BusinessException;
 import com.hector.trigger.api.response.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,17 @@ import org.springframework.web.multipart.MultipartException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(BusinessException.class)
+    public Response<Void> handleBusinessException(BusinessException exception) {
+        return Response.<Void>builder().code(exception.getCode()).info(exception.getInfo()).build();
+    }
+
+    @ExceptionHandler(Exception.class)
+    public Response<Void> handleUnexpectedException(Exception exception) {
+        log.error("全局异常处理-未预期异常", exception);
+        return Response.<Void>builder().code(ResponseCode.SYSTEM_ERROR.getCode()).info(ResponseCode.SYSTEM_ERROR.getInfo()).build();
+    }
 
     /**
      * 处理 multipart 请求异常。

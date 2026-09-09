@@ -73,14 +73,28 @@ public class DocumentRepository implements IDocumentRepository {
         return documentEntities;
     }
 
+    @Override
+    public List<DocumentEntity> listActiveByParentId(Long workspaceId, Long parentId) {
+        return documentDao.queryActiveByParentId(workspaceId, parentId).stream()
+                .map(this::toEntity).collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<DocumentEntity> findActiveByParentIdAndFileName(Long workspaceId, Long parentId, String fileName) {
+        return Optional.ofNullable(documentDao.queryActiveByParentIdAndFileName(workspaceId, parentId, fileName))
+                .map(this::toEntity);
+    }
+
     private Document toPo(DocumentEntity documentEntity) {
         return Document.builder()
                 .id(documentEntity.getId())
                 .documentCode(documentEntity.getDocumentCode())
                 .workspaceId(documentEntity.getWorkspaceId())
+                .parentId(documentEntity.getParentId())
                 .ownerUserId(documentEntity.getOwnerUserId())
                 .sourceFileId(documentEntity.getSourceFileId())
                 .title(documentEntity.getTitle())
+                .fileName(documentEntity.getFileName())
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
                 .currentVersion(documentEntity.getCurrentVersion())
@@ -94,9 +108,11 @@ public class DocumentRepository implements IDocumentRepository {
                 .id(document.getId())
                 .documentCode(document.getDocumentCode())
                 .workspaceId(document.getWorkspaceId())
+                .parentId(document.getParentId())
                 .ownerUserId(document.getOwnerUserId())
                 .sourceFileId(document.getSourceFileId())
                 .title(document.getTitle())
+                .fileName(document.getFileName())
                 .documentType(DocumentTypeVO.valueOf(document.getDocumentType()))
                 .status(DocumentStatusVO.valueOf(document.getStatus()))
                 .currentVersion(document.getCurrentVersion())

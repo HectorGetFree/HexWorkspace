@@ -11,8 +11,23 @@ import java.util.List;
  */
 public interface IDocumentService {
 
-    DocumentEntity createUploadedDocument(Long workspaceId, Long ownerUserId, Long sourceFileId,
-                                          String contentHash, String title);
+    DocumentEntity createUploadedDocument(Long workspaceId, Long ownerUserId, Long parentId, Long sourceFileId,
+                                          String contentHash, String fileName);
+
+    DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
+                                          String fileName, String content);
+
+    DocumentEntity editMarkdownDocument(Long workspaceId, String documentCode, Long operatorUserId, String content);
+
+    byte[] readCurrentContent(Long workspaceId, String documentCode);
+
+    DocumentEntity renameDocument(Long workspaceId, String documentCode, String fileName);
+
+    DocumentEntity moveDocument(Long workspaceId, String documentCode, Long targetParentId);
+
+    DocumentEntity deleteDocument(Long workspaceId, String documentCode);
+
+    List<DocumentEntity> listActiveDocumentsByParentId(Long workspaceId, Long parentId);
 
     List<DocumentEntity> listActiveDocuments(Long workspaceId);
 

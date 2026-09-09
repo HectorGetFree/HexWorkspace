@@ -66,7 +66,7 @@ public class FileServiceImpl implements IFileService {
                 workspaceId, operatorUserId, purpose, originalFilename);
         WorkspaceEntity workspaceEntity = getActiveWorkspace(workspaceId);
         UserEntity userEntity = getAvailableUser(operatorUserId);
-        validateFile(fileBytes, originalFilename);
+        validateFile(fileBytes, originalFilename, purpose);
 
         // file_ + 12 位 UUID
         String fileCode = generateUniqueFileCode();
@@ -192,8 +192,8 @@ public class FileServiceImpl implements IFileService {
         return fileEntity;
     }
 
-    private void validateFile(byte[] fileBytes, String originalFilename) {
-        if (fileBytes == null || fileBytes.length == 0) {
+    private void validateFile(byte[] fileBytes, String originalFilename, FilePurposeVO purpose) {
+        if (fileBytes == null || (fileBytes.length == 0 && purpose == FilePurposeVO.ORIGINAL)) {
             throw new BusinessException(ResponseCode.EMPTY_FILE);
         }
         if (originalFilename == null || originalFilename.isBlank()) {

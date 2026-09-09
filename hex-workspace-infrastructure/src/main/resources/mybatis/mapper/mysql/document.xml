@@ -8,9 +8,11 @@
         <id property="id" column="id"/>
         <result property="documentCode" column="document_code"/>
         <result property="workspaceId" column="workspace_id"/>
+        <result property="parentId" column="parent_id"/>
         <result property="ownerUserId" column="owner_user_id"/>
         <result property="sourceFileId" column="source_file_id"/>
         <result property="title" column="title"/>
+        <result property="fileName" column="file_name"/>
         <result property="documentType" column="document_type"/>
         <result property="status" column="status"/>
         <result property="currentVersion" column="current_version"/>
@@ -20,10 +22,10 @@
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
-            document_code, workspace_id, owner_user_id, source_file_id, title,
+            document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
             document_type, status, current_version, created_at, updated_at
         ) VALUES (
-            #{documentCode}, #{workspaceId}, #{ownerUserId}, #{sourceFileId}, #{title},
+            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{sourceFileId}, #{title}, #{fileName},
             #{documentType}, #{status}, #{currentVersion}, #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -31,7 +33,9 @@
     <update id="update" parameterType="com.hector.infrastructure.dao.po.Document">
         UPDATE `document`
         SET
+            parent_id = #{parentId},
             title = #{title},
+            file_name = #{fileName},
             status = #{status},
             current_version = #{currentVersion},
             updated_at = #{updatedAt}
@@ -39,7 +43,7 @@
     </update>
 
     <select id="queryById" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, owner_user_id, source_file_id, title,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
@@ -47,7 +51,7 @@
     </select>
 
     <select id="queryByDocumentCode" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, owner_user_id, source_file_id, title,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
@@ -55,11 +59,27 @@
     </select>
 
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, owner_user_id, source_file_id, title,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
         ORDER BY updated_at DESC, id DESC
+    </select>
+
+    <select id="queryActiveByParentId" resultMap="documentResultMap">
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+               document_type, status, current_version, created_at, updated_at
+        FROM `document`
+        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status = 'ACTIVE'
+        ORDER BY file_name ASC, id ASC
+    </select>
+
+    <select id="queryActiveByParentIdAndFileName" resultMap="documentResultMap">
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+               document_type, status, current_version, created_at, updated_at
+        FROM `document`
+        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND file_name = #{fileName} AND status = 'ACTIVE'
+        LIMIT 1
     </select>
 
 </mapper>

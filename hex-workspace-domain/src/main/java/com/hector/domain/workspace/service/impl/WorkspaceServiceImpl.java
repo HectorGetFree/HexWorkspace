@@ -1,6 +1,7 @@
 package com.hector.domain.workspace.service.impl;
 
 import com.hector.domain.user.model.entity.UserEntity;
+import com.hector.domain.folder.service.IFolderService;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;
 import com.hector.domain.workspace.model.valobj.WorkspaceStatusVO;
@@ -33,6 +34,9 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
     @Resource
     private IUserRepository userRepository;
 
+    @Resource
+    private IFolderService folderService;
+
     @Override
     public WorkspaceEntity ensurePersonalWorkspace(Long ownerUserId, String ownerUsername) {
         // 1. 统一入口参数，避免后续查询和持久化使用不合法的用户身份或展示名称。
@@ -46,6 +50,7 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
                 .findDefaultByOwnerUserId(normalizedOwnerUserId)
                 .orElse(null);
         if (existingWorkspace != null) {
+            folderService.ensureRootFolder(existingWorkspace.getId());
             return existingWorkspace;
         }
 
@@ -70,40 +75,8 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
 
         // 5. 持久化后返回带主键的聚合，外层注册事务负责与用户创建一起提交或回滚。
         WorkspaceEntity savedWorkspace = workspaceRepository.save(workspaceEntity);
+        folderService.ensureRootFolder(savedWorkspace.getId());
         log.info("Workspace领域服务-创建个人Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
-                savedWorkspace.getId(), savedWorkspace.getWorkspaceCode(), normalizedOwnerUserId);
-        return savedWorkspace;
-    }
-
-    @Override
-    @Transactional
-    public WorkspaceEntity createWorkspace(String workspaceName, Long ownerUserId, String description) {
-        // 1. 规范化请求内容，保证资料容器名称、拥有者与描述可安全进入后续业务判断。
-        String normalizedWorkspaceName = normalizeWorkspaceName(workspaceName);
-        Long normalizedOwnerUserId = normalizeOwnerUserId(ownerUserId);
-        String normalizedDescription = normalizeDescription(description);
-        log.info("Workspace领域服务-创建Workspace开始 workspaceName:{} ownerUserId:{}",
-                normalizedWorkspaceName, normalizedOwnerUserId);
-
-        // 2. 校验拥有者存在且可用，防止已失效账号创建无人负责的资料容器。
-        UserEntity ownerUser = getActiveOwner(normalizedOwnerUserId);
-
-        // 3. 构建 Owner 的非默认资料容器；协作权限不在 Workspace 层建立。
-        LocalDateTime now = LocalDateTime.now();
-        WorkspaceEntity workspaceEntity = WorkspaceEntity.builder()
-                .workspaceCode(generateWorkspaceCode())
-                .workspaceName(normalizedWorkspaceName)
-                .isDefault(false)
-                .status(WorkspaceStatusVO.ACTIVE)
-                .ownerUserId(ownerUser.getId())
-                .description(normalizedDescription)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        // 4. 持久化 Workspace；当前事务提交后，资源才能引用该稳定容器。
-        WorkspaceEntity savedWorkspace = workspaceRepository.save(workspaceEntity);
-        log.info("Workspace领域服务-创建Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
                 savedWorkspace.getId(), savedWorkspace.getWorkspaceCode(), normalizedOwnerUserId);
         return savedWorkspace;
     }
@@ -151,20 +124,6 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
             throw new BusinessException(ResponseCode.EMPTY_USERNAME);
         }
         return ownerUsername.trim();
-    }
-
-    private String normalizeWorkspaceName(String workspaceName) {
-        if (workspaceName == null || workspaceName.trim().isEmpty()) {
-            throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_NAME);
-        }
-        return workspaceName.trim();
-    }
-
-    private String normalizeDescription(String description) {
-        if (description == null || description.trim().isEmpty()) {
-            return null;
-        }
-        return description.trim();
     }
 
     private UserEntity getActiveOwner(Long ownerUserId) {

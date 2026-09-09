@@ -10,9 +10,6 @@ public interface IWorkspaceService {
     /** 为新注册用户创建默认个人 Workspace；已存在则直接返回。 */
     WorkspaceEntity ensurePersonalWorkspace(Long ownerUserId, String ownerUsername);
 
-    /** 创建由当前用户拥有的资料 Workspace。 */
-    WorkspaceEntity createWorkspace(String workspaceName, Long ownerUserId, String description);
-
     /** 获取当前可用的 Workspace。 */
     WorkspaceEntity getActiveWorkspace(Long workspaceId);
 

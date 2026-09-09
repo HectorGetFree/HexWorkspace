@@ -1,7 +1,5 @@
 package com.hector.trigger.http;
 
-import com.hector.domain.document.adapter.event.IDocumentParseEventPublisher;
-import com.hector.domain.document.event.DocumentParseRequestedEvent;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.service.IDocumentService;
@@ -14,6 +12,8 @@ import com.hector.trigger.api.dto.DocumentCreateResponseDTO;
 import com.hector.trigger.api.dto.DocumentListResponseDTO;
 import com.hector.trigger.api.dto.DocumentProcessingStatusResponseDTO;
 import com.hector.trigger.api.dto.DocumentResponseDTO;
+import com.hector.trigger.api.dto.DocumentCommandRequestDTO;
+import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
 import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
@@ -21,9 +21,13 @@ import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -31,7 +35,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -53,9 +59,6 @@ public class DocumentController extends BaseController {
     @Resource
     private IDocumentService documentService;
 
-    @Resource
-    private IDocumentParseEventPublisher documentParseEventPublisher;
-
     /**
      * 上传文件并创建文档。
      * 创建成功即返回 PENDING；PDF、DOCX、TXT、MD 的内容解析由 RabbitMQ 消费者异步完成。
@@ -69,7 +72,7 @@ public class DocumentController extends BaseController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Response<DocumentCreateResponseDTO> createDocument(@PathVariable("workspaceId") Long workspaceId,
                                                                @RequestPart("file") MultipartFile file,
-                                                               @RequestParam(value = "title", required = false) String title) {
+                                                               @RequestParam("parentId") Long parentId) {
         FileEntity fileEntity = null;
         boolean documentCreated = false;
         try {
@@ -80,21 +83,15 @@ public class DocumentController extends BaseController {
 
             // 1. 先确认当前用户是 Workspace Owner；协作者写入必须由资源 EDIT 权限单独放行。
             workspaceService.assertOwner(workspaceId, currentUserId);
-            validateSupportedFile(file);
+            validateUpload(file);
             fileEntity = fileService.uploadFile(workspaceId, currentUserId, file.getOriginalFilename(),
                     file.getContentType(), file.getBytes());
 
-            // 2. 文档聚合与版本 1 落库完成后，发布异步解析事件。
-            DocumentEntity documentEntity = documentService.createUploadedDocument(workspaceId, currentUserId,
-                    fileEntity.getId(), fileEntity.getFileHash(), resolveTitle(title, file.getOriginalFilename()));
+            // 2. 任意格式上传后直接创建云文档与版本 1；RAG 不再决定上传是否成功。
+            DocumentEntity documentEntity = documentService.createUploadedDocument(workspaceId, currentUserId, parentId,
+                    fileEntity.getId(), fileEntity.getFileHash(), file.getOriginalFilename());
             documentCreated = true;
             DocumentVersionEntity documentVersionEntity = documentService.getCurrentVersion(documentEntity);
-            documentParseEventPublisher.publish(DocumentParseRequestedEvent.builder()
-                    .workspaceId(workspaceId)
-                    .documentId(documentEntity.getId())
-                    .versionNumber(documentVersionEntity.getVersionNumber())
-                    .operatorUserId(currentUserId)
-                    .build());
             log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{} versionNumber:{}",
                     workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode(),
                     documentVersionEntity.getVersionNumber());
@@ -116,6 +113,94 @@ public class DocumentController extends BaseController {
             log.error("创建文档系统异常 workspaceId:{}", workspaceId, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
+    }
+
+    /**
+     * 在平台内新建 Markdown 文档。
+     * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/documents/markdown" -H "Content-Type: application/json" -d '{"data":{"parentId":10,"fileName":"说明.md","content":"# 标题"}}'
+     */
+    @PostMapping("/markdown")
+    public Response<DocumentResponseDTO> createMarkdown(@PathVariable("workspaceId") Long workspaceId,
+                                                         @RequestBody Request<DocumentCommandRequestDTO> request) {
+        return execute("新建Markdown文档", workspaceId, () -> {
+            Long userId = SecurityUserUtil.getCurrentUserId();
+            workspaceService.assertOwner(workspaceId, userId);
+            DocumentCommandRequestDTO data = requireData(request);
+            DocumentEntity document = documentService.createMarkdownDocument(
+                    workspaceId, userId, data.getParentId(), data.getFileName(), data.getContent());
+            log.info("新建Markdown文档完成 workspaceId:{} documentCode:{}", workspaceId, document.getDocumentCode());
+            return success(toResponse(document, true));
+        });
+    }
+
+    /**
+     * 编辑 Markdown 文档正文并生成新版本。
+     * curl -X PUT "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/content" -H "Content-Type: application/json" -d '{"data":{"content":"更新后的内容"}}'
+     */
+    @PutMapping("/{documentCode}/content")
+    public Response<DocumentResponseDTO> editMarkdown(@PathVariable("workspaceId") Long workspaceId,
+                                                       @PathVariable("documentCode") String documentCode,
+                                                       @RequestBody Request<DocumentCommandRequestDTO> request) {
+        return execute("编辑Markdown文档", workspaceId, () -> {
+            Long userId = SecurityUserUtil.getCurrentUserId();
+            workspaceService.assertOwner(workspaceId, userId);
+            DocumentEntity document = documentService.editMarkdownDocument(
+                    workspaceId, documentCode, userId, requireData(request).getContent());
+            log.info("编辑Markdown文档完成 workspaceId:{} documentCode:{} versionNumber:{}",
+                    workspaceId, documentCode, document.getCurrentVersion());
+            return success(toResponse(document, true));
+        });
+    }
+
+    /**
+     * 重命名文档。
+     * curl -X PATCH "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/name" -H "Content-Type: application/json" -d '{"data":{"fileName":"新名称.md"}}'
+     */
+    @PatchMapping("/{documentCode}/name")
+    public Response<DocumentResponseDTO> rename(@PathVariable("workspaceId") Long workspaceId,
+                                                @PathVariable("documentCode") String documentCode,
+                                                @RequestBody Request<DocumentCommandRequestDTO> request) {
+        return execute("重命名文档", workspaceId, () -> {
+            workspaceService.assertOwner(workspaceId, SecurityUserUtil.getCurrentUserId());
+            DocumentEntity document = documentService.renameDocument(
+                    workspaceId, documentCode, requireData(request).getFileName());
+            log.info("重命名文档完成 workspaceId:{} documentCode:{} fileName:{}",
+                    workspaceId, documentCode, document.getFileName());
+            return success(toResponse(document));
+        });
+    }
+
+    /**
+     * 移动文档到新的父目录。
+     * curl -X PATCH "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/parent" -H "Content-Type: application/json" -d '{"data":{"targetParentId":20}}'
+     */
+    @PatchMapping("/{documentCode}/parent")
+    public Response<DocumentResponseDTO> move(@PathVariable("workspaceId") Long workspaceId,
+                                              @PathVariable("documentCode") String documentCode,
+                                              @RequestBody Request<DocumentCommandRequestDTO> request) {
+        return execute("移动文档", workspaceId, () -> {
+            workspaceService.assertOwner(workspaceId, SecurityUserUtil.getCurrentUserId());
+            DocumentEntity document = documentService.moveDocument(
+                    workspaceId, documentCode, requireData(request).getTargetParentId());
+            log.info("移动文档完成 workspaceId:{} documentCode:{} parentId:{}",
+                    workspaceId, documentCode, document.getParentId());
+            return success(toResponse(document));
+        });
+    }
+
+    /**
+     * 逻辑删除文档。
+     * curl -X DELETE "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx" -H "Authorization: Bearer 登录令牌"
+     */
+    @DeleteMapping("/{documentCode}")
+    public Response<DocumentResponseDTO> delete(@PathVariable("workspaceId") Long workspaceId,
+                                                @PathVariable("documentCode") String documentCode) {
+        return execute("删除文档", workspaceId, () -> {
+            workspaceService.assertOwner(workspaceId, SecurityUserUtil.getCurrentUserId());
+            DocumentEntity document = documentService.deleteDocument(workspaceId, documentCode);
+            log.info("删除文档完成 workspaceId:{} documentCode:{}", workspaceId, documentCode);
+            return success(toResponse(document));
+        });
     }
 
     /**
@@ -160,7 +245,7 @@ public class DocumentController extends BaseController {
             log.info("查询文档详情开始 workspaceId:{} userId:{} documentCode:{}", workspaceId, currentUserId, documentCode);
             workspaceService.assertOwner(workspaceId, currentUserId);
             DocumentEntity documentEntity = documentService.getActiveDocument(workspaceId, documentCode);
-            DocumentResponseDTO response = toResponse(documentEntity);
+            DocumentResponseDTO response = toResponse(documentEntity, true);
             log.info("查询文档详情完成 workspaceId:{} userId:{} documentCode:{}", workspaceId, currentUserId, documentCode);
             return success(response);
         } catch (BusinessException exception) {
@@ -211,13 +296,20 @@ public class DocumentController extends BaseController {
     }
 
     private DocumentResponseDTO toResponse(DocumentEntity documentEntity) {
+        return toResponse(documentEntity, false);
+    }
+
+    private DocumentResponseDTO toResponse(DocumentEntity documentEntity, boolean includeContent) {
         DocumentVersionEntity documentVersionEntity = documentService.getCurrentVersion(documentEntity);
-        return DocumentResponseDTO.builder()
+        DocumentResponseDTO response = DocumentResponseDTO.builder()
                 .documentId(documentEntity.getId())
                 .documentCode(documentEntity.getDocumentCode())
                 .workspaceId(documentEntity.getWorkspaceId())
+                .parentId(documentEntity.getParentId())
                 .ownerUserId(documentEntity.getOwnerUserId())
                 .title(documentEntity.getTitle())
+                .fileName(documentEntity.getFileName())
+                .source(documentEntity.getDocumentType().name())
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
                 .currentVersion(documentEntity.getCurrentVersion())
@@ -230,25 +322,32 @@ public class DocumentController extends BaseController {
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();
+        if (includeContent && documentEntity.getFileName().toLowerCase().endsWith(".md")) {
+            byte[] content = documentService.readCurrentContent(
+                    documentEntity.getWorkspaceId(), documentEntity.getDocumentCode());
+            response.setContent(new String(content, StandardCharsets.UTF_8));
+        }
+        return response;
     }
 
-    private void validateSupportedFile(MultipartFile file) {
+    private <T> Response<T> execute(String operation, Long workspaceId, Supplier<Response<T>> action) {
+        try {
+            log.info("{}开始 workspaceId:{}", operation, workspaceId);
+            return action.get();
+        } catch (BusinessException exception) {
+            log.error("{}业务异常 workspaceId:{} code:{} info:{}",
+                    operation, workspaceId, exception.getCode(), exception.getInfo(), exception);
+            return failure(exception.getCode(), exception.getInfo());
+        } catch (Exception exception) {
+            log.error("{}系统异常 workspaceId:{}", operation, workspaceId, exception);
+            return failure(ResponseCode.SYSTEM_ERROR);
+        }
+    }
+
+    private void validateUpload(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
             throw new BusinessException(ResponseCode.EMPTY_FILE);
         }
-        String normalizedFilename = file.getOriginalFilename().toLowerCase();
-        if (!(normalizedFilename.endsWith(".txt") || normalizedFilename.endsWith(".md")
-                || normalizedFilename.endsWith(".pdf") || normalizedFilename.endsWith(".docx"))) {
-            throw new BusinessException(ResponseCode.DOCUMENT_TYPE_UNSUPPORTED);
-        }
-    }
-
-    private String resolveTitle(String title, String originalFilename) {
-        if (title != null && !title.isBlank()) {
-            return title.trim();
-        }
-        int suffixIndex = originalFilename == null ? -1 : originalFilename.lastIndexOf('.');
-        return suffixIndex > 0 ? originalFilename.substring(0, suffixIndex) : originalFilename;
     }
 
     private void cleanupOrphanFile(Long workspaceId, FileEntity fileEntity, boolean documentCreated) {

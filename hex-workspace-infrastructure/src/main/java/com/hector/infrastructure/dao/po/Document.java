@@ -19,9 +19,11 @@ public class Document {
     private Long id;
     private String documentCode;
     private Long workspaceId;
+    private Long parentId;
     private Long ownerUserId;
     private Long sourceFileId;
     private String title;
+    private String fileName;
     private String documentType;
     private String status;
     private Integer currentVersion;

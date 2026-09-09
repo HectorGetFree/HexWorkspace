@@ -19,4 +19,8 @@ public interface IDocumentRepository {
     Optional<DocumentEntity> findByDocumentCode(String documentCode);
 
     List<DocumentEntity> listByWorkspaceId(Long workspaceId);
+
+    List<DocumentEntity> listActiveByParentId(Long workspaceId, Long parentId);
+
+    Optional<DocumentEntity> findActiveByParentIdAndFileName(Long workspaceId, Long parentId, String fileName);
 }

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IFolderDao">
+    <resultMap id="map" type="com.hector.infrastructure.dao.po.Folder">
+        <id property="id" column="id"/>
+        <result property="folderCode" column="folder_code"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="name" column="name"/>
+        <result property="root" column="is_root"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="columns">
+        id, folder_code, workspace_id, parent_id, name, is_root, status, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO folder (
+            folder_code, workspace_id, parent_id, name, is_root, status, created_at, updated_at
+        ) VALUES (
+            #{folderCode}, #{workspaceId}, #{parentId}, #{name}, #{root}, #{status}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update">
+        UPDATE folder
+        SET parent_id = #{parentId},
+            name = #{name},
+            status = #{status},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="queryById" resultMap="map">
+        SELECT <include refid="columns"/>
+        FROM folder
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="queryRootByWorkspaceId" resultMap="map">
+        SELECT <include refid="columns"/>
+        FROM folder
+        WHERE workspace_id = #{workspaceId}
+          AND is_root = 1
+        LIMIT 1
+    </select>
+
+    <select id="queryActiveByParentIdAndName" resultMap="map">
+        SELECT <include refid="columns"/>
+        FROM folder
+        WHERE workspace_id = #{workspaceId}
+          AND parent_id = #{parentId}
+          AND name = #{name}
+          AND status = 'ACTIVE'
+        LIMIT 1
+    </select>
+
+    <select id="queryActiveByParentId" resultMap="map">
+        SELECT <include refid="columns"/>
+        FROM folder
+        WHERE workspace_id = #{workspaceId}
+          AND parent_id = #{parentId}
+          AND status = 'ACTIVE'
+        ORDER BY name, id
+    </select>
+</mapper>

@@ -21,4 +21,10 @@ public interface IDocumentDao {
     Document queryByDocumentCode(@Param("documentCode") String documentCode);
 
     List<Document> queryByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
+    List<Document> queryActiveByParentId(@Param("workspaceId") Long workspaceId, @Param("parentId") Long parentId);
+
+    Document queryActiveByParentIdAndFileName(@Param("workspaceId") Long workspaceId,
+                                              @Param("parentId") Long parentId,
+                                              @Param("fileName") String fileName);
 }
