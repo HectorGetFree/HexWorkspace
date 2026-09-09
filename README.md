@@ -1,6 +1,6 @@
 # hex-workspace
 
-hex-workspace 是一个面向个人与团队文档资料库的智能工作台后端。当前版本在原有文档知识库 MVP 基础上，已建立 Workspace 聚合：新用户注册后会自动创建个人 Workspace。文档、文件、成员和知识检索仍暂以既有 `Workspace` 运行契约承载，后续将分阶段迁移到 Workspace。
+hex-workspace 是一个面向个人与团队文档资料库的智能工作台后端。当前版本已建立个人 Workspace、目录树、云文档及文档知识检索能力；新用户注册后会自动获得唯一的个人 Workspace。
 
 项目后续将在现有 MVP 上继续完成 DocAI 的 DDD 重构与缺陷补足，并逐步演进为包含 AI Gateway、AI Orchestrator、Tool Runtime、RAG Runtime 和可观测体系的 AI 应用平台。
 
@@ -15,10 +15,10 @@ hex-workspace 是一个面向个人与团队文档资料库的智能工作台后
 - 已支持注册默认 Workspace、创建自己的资料 Workspace，以及查询当前用户拥有的 Workspace；协作权限将在 Folder/Document 层实现。
 - Workspace创建、查询，以及用户所属Workspace列表。
 - Workspace成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
-- 基于 MinIO 的Workspace级文件存储，区分用户原始文件与系统派生文件。
+- 文档版本内容以 MinIO 对象快照保存，对用户不形成独立文件资源。
 - 文档及不可变版本建模，支持文档创建、列表、详情和解析状态查询。
 - 支持 TXT、Markdown、PDF、DOCX 文件上传，单文件上限 50 MB。
-- 通过 RabbitMQ 异步完成文档解析，解析文本作为 MinIO 派生文件保存。
+- 通过 RabbitMQ 异步完成文档解析，解析文本作为文档版本的派生内容快照保存。
 - 章节优先、固定窗口兜底的文档分段策略，默认窗口 1000 字符、重叠 100 字符。
 - 通过 DashScope `text-embedding-v4` 批量生成 1024 维向量。
 - 使用 Qdrant 保存Workspace隔离的文档向量，支持 Top-K 语义检索。
@@ -48,13 +48,13 @@ hex-workspace 是一个面向个人与团队文档资料库的智能工作台后
   └─ 上传文档
        │
        ├─ MySQL：文档与版本元数据
-       ├─ MinIO：原始文件
+       ├─ MinIO：文档初始内容快照
        └─ RabbitMQ：解析事件
               │
               ▼
          文档解析消费者
               │
-              ├─ MinIO：解析后的 TXT 派生文件
+              ├─ MinIO：解析后的 TXT 派生内容快照
               ├─ Document Segmenter：章节识别与固定窗口分段
               ├─ DashScope：Embedding
               └─ Qdrant：Workspace级向量索引
@@ -86,8 +86,7 @@ hex-workspace
 - `auth`：密码校验、JWT 签发与认证会话。
 - `Workspace`：Workspace及其生命周期。
 - `membership`：用户与Workspace之间的资源协作关系。
-- `file`：Workspace级底层文件资源与对象存储。
-- `document`：文档聚合、不可变版本和异步解析状态。
+- `document`：云文档、不可变版本、内容快照和异步解析状态。
 - `knowledge`：分段、向量化、检索和知识库问答。
 - `workspace`：Workspace 类型、生命周期和默认个人 Workspace 创建；资源树和成员迁移尚未完成。
 
@@ -136,7 +135,7 @@ docker compose -f docs/devops/docker-compose.yml up -d
 | RabbitMQ Console | `http://127.0.0.1:15672` |
 | Qdrant HTTP | `http://127.0.0.1:6333` |
 
-首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。已有旧数据卷需要依次手动执行 `002-add-file-purpose.sql`、`003-add-workspace.sql` 与 `004-remove-workspace-team-type.sql`；后两者会补齐默认 Workspace，并将旧 TEAM 数据收敛为 Owner 的普通资料容器。
+首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。当前不保留旧领域模型的增量迁移脚本；已有旧数据卷需要重建后再启动本版本。
 
 ### 3. 配置模型密钥
 

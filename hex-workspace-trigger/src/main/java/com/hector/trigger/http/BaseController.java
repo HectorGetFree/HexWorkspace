@@ -1,4 +1,4 @@
-package com.hector.trigger.http.handler;
+package com.hector.trigger.http;
 
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;

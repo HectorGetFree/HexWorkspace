@@ -8,8 +8,8 @@ import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentService;
-import com.hector.domain.file.model.entity.FileEntity;
-import com.hector.domain.file.service.IFileService;
+import com.hector.domain.document.model.entity.DocumentContentEntity;
+import com.hector.domain.document.service.IDocumentContentService;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 
 /**
  * 文档领域服务实现。
- * 将上传文件转换为Workspace 内的文档聚合，并在同一事务中建立初始版本。
+ * 负责 Workspace 内文档及其版本的创建和状态维护。
  */
 @Service
 public class DocumentServiceImpl implements IDocumentService {
@@ -43,30 +43,34 @@ public class DocumentServiceImpl implements IDocumentService {
     private IDocumentVersionRepository documentVersionRepository;
 
     @Resource
-    private IFileService fileService;
+    private IDocumentContentService documentContentService;
 
     @Resource
     private IFolderService folderService;
 
     @Override
     @Transactional
-    public DocumentEntity createUploadedDocument(Long workspaceId, Long ownerUserId, Long parentId, Long sourceFileId,
-                                                 String contentHash, String fileName) {
-        log.info("文档领域服务-创建上传文档开始 workspaceId:{} ownerUserId:{} sourceFileId:{}",
-                workspaceId, ownerUserId, sourceFileId);
-        validateCreateCommand(workspaceId, ownerUserId, parentId, sourceFileId, fileName);
+    public DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
+                                         String contentType, byte[] content) {
+        log.info("文档领域服务-导入文档开始 workspaceId:{} ownerUserId:{} parentId:{} fileName:{}",
+                workspaceId, ownerUserId, parentId, fileName);
+        validateCreateCommand(workspaceId, ownerUserId, parentId, fileName);
         folderService.getActiveFolder(workspaceId, parentId);
         String normalizedFileName = normalizeFileName(fileName, false);
         assertFileNameAvailable(workspaceId, parentId, normalizedFileName, null);
 
-        // 1. 先创建聚合根，当前版本固定从 1 开始。
+        // 1. 将本地内容保存为文档的初始内容快照，导入后不再形成独立文件资源。
+        DocumentContentEntity initialContent = documentContentService.storeImportedContent(
+                workspaceId, ownerUserId, normalizedFileName, contentType, content);
+
+        // 2. 创建文档聚合根，当前版本固定从 1 开始。
         LocalDateTime now = LocalDateTime.now();
         DocumentEntity documentEntity = documentRepository.save(DocumentEntity.builder()
                 .documentCode(generateDocumentCode())
                 .workspaceId(workspaceId)
                 .parentId(parentId)
                 .ownerUserId(ownerUserId)
-                .sourceFileId(sourceFileId)
+                .initialContentId(initialContent.getId())
                 .title(resolveTitle(normalizedFileName))
                 .fileName(normalizedFileName)
                 .documentType(DocumentTypeVO.LOCAL_UPLOADED)
@@ -76,17 +80,17 @@ public class DocumentServiceImpl implements IDocumentService {
                 .updatedAt(now)
                 .build());
 
-        // 2. 初始版本只记录文件快照，解析结果由 RabbitMQ 消费者异步回写。
+        // 3. 初始版本引用内容快照；解析能力不影响文档导入结果。
         documentVersionRepository.save(DocumentVersionEntity.builder()
                 .documentId(documentEntity.getId())
                 .versionNumber(1)
-                .fileId(sourceFileId)
-                .contentHash(contentHash)
+                .contentId(initialContent.getId())
+                .contentHash(initialContent.getContentHash())
                 .parseStatus(DocumentParseStatusVO.NOT_REQUESTED)
                 .createdByUserId(ownerUserId)
                 .createdAt(now)
                 .build());
-        log.info("文档领域服务-创建上传文档完成 documentId:{} documentCode:{} workspaceId:{}",
+        log.info("文档领域服务-导入文档完成 documentId:{} documentCode:{} workspaceId:{}",
                 documentEntity.getId(), documentEntity.getDocumentCode(), documentEntity.getWorkspaceId());
         return documentEntity;
     }
@@ -105,7 +109,8 @@ public class DocumentServiceImpl implements IDocumentService {
         String normalizedContent = content == null ? "" : content;
 
         // 2. 先将 Markdown 快照保存为内部对象，再创建云文档与版本 1。
-        FileEntity file = fileService.storeDerivedFile(workspaceId, ownerUserId, normalizedFileName,
+        DocumentContentEntity initialContent = documentContentService.storeDerivedContent(
+                workspaceId, ownerUserId, normalizedFileName,
                 "text/markdown; charset=utf-8", normalizedContent.getBytes(StandardCharsets.UTF_8));
         LocalDateTime now = LocalDateTime.now();
         DocumentEntity document = documentRepository.save(DocumentEntity.builder()
@@ -113,7 +118,7 @@ public class DocumentServiceImpl implements IDocumentService {
                 .workspaceId(workspaceId)
                 .parentId(parentId)
                 .ownerUserId(ownerUserId)
-                .sourceFileId(file.getId())
+                .initialContentId(initialContent.getId())
                 .title(resolveTitle(normalizedFileName))
                 .fileName(normalizedFileName)
                 .documentType(DocumentTypeVO.PLATFORM_CREATED)
@@ -125,8 +130,8 @@ public class DocumentServiceImpl implements IDocumentService {
         documentVersionRepository.save(DocumentVersionEntity.builder()
                 .documentId(document.getId())
                 .versionNumber(1)
-                .fileId(file.getId())
-                .contentHash(file.getFileHash())
+                .contentId(initialContent.getId())
+                .contentHash(initialContent.getContentHash())
                 .parseStatus(DocumentParseStatusVO.NOT_REQUESTED)
                 .createdByUserId(ownerUserId)
                 .createdAt(now)
@@ -149,14 +154,15 @@ public class DocumentServiceImpl implements IDocumentService {
         }
         // 2. 保存新的不可变内容快照，然后原子推进当前版本指针。
         String normalizedContent = content == null ? "" : content;
-        FileEntity file = fileService.storeDerivedFile(workspaceId, operatorUserId, document.getFileName(),
+        DocumentContentEntity contentSnapshot = documentContentService.storeDerivedContent(
+                workspaceId, operatorUserId, document.getFileName(),
                 "text/markdown; charset=utf-8", normalizedContent.getBytes(StandardCharsets.UTF_8));
         int nextVersion = document.getCurrentVersion() + 1;
         documentVersionRepository.save(DocumentVersionEntity.builder()
                 .documentId(document.getId())
                 .versionNumber(nextVersion)
-                .fileId(file.getId())
-                .contentHash(file.getFileHash())
+                .contentId(contentSnapshot.getId())
+                .contentHash(contentSnapshot.getContentHash())
                 .parseStatus(DocumentParseStatusVO.NOT_REQUESTED)
                 .createdByUserId(operatorUserId)
                 .createdAt(LocalDateTime.now())
@@ -171,7 +177,7 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public byte[] readCurrentContent(Long workspaceId, String documentCode) {
         DocumentEntity document = getActiveDocument(workspaceId, documentCode);
-        return fileService.readFileContent(workspaceId, getCurrentVersion(document).getFileId());
+        return documentContentService.readContent(workspaceId, getCurrentVersion(document).getContentId());
     }
 
     @Override
@@ -266,7 +272,7 @@ public class DocumentServiceImpl implements IDocumentService {
         return documentVersionEntity;
     }
 
-    private void validateCreateCommand(Long workspaceId, Long ownerUserId, Long parentId, Long sourceFileId, String fileName) {
+    private void validateCreateCommand(Long workspaceId, Long ownerUserId, Long parentId, String fileName) {
         if (workspaceId == null || workspaceId <= 0) {
             throw new BusinessException(ResponseCode.EMPTY_WORKSPACE_ID);
         }
@@ -275,9 +281,6 @@ public class DocumentServiceImpl implements IDocumentService {
         }
         if (parentId == null || parentId <= 0) {
             throw new BusinessException(ResponseCode.FOLDER_NOT_FOUND);
-        }
-        if (sourceFileId == null || sourceFileId <= 0) {
-            throw new BusinessException(ResponseCode.FILE_NOT_FOUND);
         }
         normalizeFileName(fileName, false);
     }

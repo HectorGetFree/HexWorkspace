@@ -6,7 +6,6 @@ import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.trigger.api.dto.AiPingResponseDTO;
 import com.hector.trigger.api.dto.AiRuntimeInfoResponseDTO;
 import com.hector.trigger.api.response.Response;
-import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;

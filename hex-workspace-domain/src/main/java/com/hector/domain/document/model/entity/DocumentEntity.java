@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文档聚合根。
- * 保存文档的Workspace归属、当前状态和当前版本指针，不承载文件存储或 AI 处理细节。
+ * 保存文档的 Workspace 归属、当前状态和当前版本指针，不承载对象存储或 AI 处理细节。
  */
 @Getter
 @Builder
@@ -35,7 +35,7 @@ public class DocumentEntity {
     private Long ownerUserId;
 
     /** 文档首次创建时对应的底层内容对象 ID。 */
-    private Long sourceFileId;
+    private Long initialContentId;
 
     /** 不含文件后缀的文档展示标题。 */
     private String title;
@@ -58,18 +58,26 @@ public class DocumentEntity {
     /** 文档最后更新时间。 */
     private LocalDateTime updatedAt;
 
+    /** 将文档切换为归档状态。 */
     public void archive() {
         this.status = DocumentStatusVO.ARCHIVED;
     }
 
+    /** 将文档恢复为可用状态。 */
     public void activate() {
         this.status = DocumentStatusVO.ACTIVE;
     }
 
+    /** 将文档标记为逻辑删除状态。 */
     public void delete() {
         this.status = DocumentStatusVO.DELETED;
     }
 
+    /**
+     * 使用完整文件名重命名文档，并同步维护展示标题与更新时间。
+     *
+     * @param newFileName 新的完整文件名
+     */
     public void rename(String newFileName) {
         this.fileName = newFileName;
         this.title = newFileName.toLowerCase().endsWith(".md")
@@ -77,16 +85,27 @@ public class DocumentEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * 将文档移动到新的父目录。
+     *
+     * @param newParentId 目标父目录 ID
+     */
     public void moveTo(Long newParentId) {
         this.parentId = newParentId;
         this.updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * 将文档当前版本指针推进到指定版本。
+     *
+     * @param versionNumber 新的当前版本号
+     */
     public void switchCurrentVersion(Integer versionNumber) {
         this.currentVersion = versionNumber;
         this.updatedAt = LocalDateTime.now();
     }
 
+    /** 判断文档是否处于可用状态。 */
     public boolean isActive() {
         return DocumentStatusVO.ACTIVE == this.status;
     }

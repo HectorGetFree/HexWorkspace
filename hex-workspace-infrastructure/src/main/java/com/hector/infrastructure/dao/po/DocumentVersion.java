@@ -19,9 +19,9 @@ public class DocumentVersion {
     private Long id;
     private Long documentId;
     private Integer versionNumber;
-    private Long fileId;
+    private Long contentId;
     private String contentHash;
-    private Long extractedFileId;
+    private Long extractedContentId;
     private String parseStatus;
     private String parserVersion;
     private LocalDateTime parsedAt;

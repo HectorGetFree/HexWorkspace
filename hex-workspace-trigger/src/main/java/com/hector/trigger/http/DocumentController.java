@@ -3,8 +3,6 @@ package com.hector.trigger.http;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.service.IDocumentService;
-import com.hector.domain.file.model.entity.FileEntity;
-import com.hector.domain.file.service.IFileService;
 import com.hector.domain.workspace.service.IWorkspaceService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -15,7 +13,6 @@ import com.hector.trigger.api.dto.DocumentResponseDTO;
 import com.hector.trigger.api.dto.DocumentCommandRequestDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
-import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -54,9 +51,6 @@ public class DocumentController extends BaseController {
     private IWorkspaceService workspaceService;
 
     @Resource
-    private IFileService fileService;
-
-    @Resource
     private IDocumentService documentService;
 
     /**
@@ -73,8 +67,6 @@ public class DocumentController extends BaseController {
     public Response<DocumentCreateResponseDTO> createDocument(@PathVariable("workspaceId") Long workspaceId,
                                                                @RequestPart("file") MultipartFile file,
                                                                @RequestParam("parentId") Long parentId) {
-        FileEntity fileEntity = null;
-        boolean documentCreated = false;
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
             String currentUsername = SecurityUserUtil.getCurrentUsername();
@@ -84,13 +76,10 @@ public class DocumentController extends BaseController {
             // 1. 先确认当前用户是 Workspace Owner；协作者写入必须由资源 EDIT 权限单独放行。
             workspaceService.assertOwner(workspaceId, currentUserId);
             validateUpload(file);
-            fileEntity = fileService.uploadFile(workspaceId, currentUserId, file.getOriginalFilename(),
+            // 2. 任意格式的本地内容直接导入为云文档，平台不产生第三种可独立管理的资源。
+            DocumentEntity documentEntity = documentService.importDocument(
+                    workspaceId, currentUserId, parentId, file.getOriginalFilename(),
                     file.getContentType(), file.getBytes());
-
-            // 2. 任意格式上传后直接创建云文档与版本 1；RAG 不再决定上传是否成功。
-            DocumentEntity documentEntity = documentService.createUploadedDocument(workspaceId, currentUserId, parentId,
-                    fileEntity.getId(), fileEntity.getFileHash(), file.getOriginalFilename());
-            documentCreated = true;
             DocumentVersionEntity documentVersionEntity = documentService.getCurrentVersion(documentEntity);
             log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{} versionNumber:{}",
                     workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode(),
@@ -101,15 +90,12 @@ public class DocumentController extends BaseController {
                     .parseStatus(documentVersionEntity.getParseStatus().name())
                     .build());
         } catch (BusinessException exception) {
-            cleanupOrphanFile(workspaceId, fileEntity, documentCreated);
             log.error("创建文档业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());
         } catch (IOException exception) {
-            cleanupOrphanFile(workspaceId, fileEntity, documentCreated);
             log.error("创建文档读取上传文件异常 workspaceId:{} error:{}", workspaceId, exception.getMessage(), exception);
-            return failure(ResponseCode.FILE_UPLOAD_FAILED);
+            return failure(ResponseCode.DOCUMENT_CONTENT_STORE_FAILED);
         } catch (Exception exception) {
-            cleanupOrphanFile(workspaceId, fileEntity, documentCreated);
             log.error("创建文档系统异常 workspaceId:{}", workspaceId, exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
@@ -279,7 +265,7 @@ public class DocumentController extends BaseController {
                     .versionNumber(version.getVersionNumber())
                     .documentStatus(documentEntity.getStatus().name())
                     .parseStatus(version.getParseStatus().name())
-                    .extractedFileId(version.getExtractedFileId())
+                    .extractedContentId(version.getExtractedContentId())
                     .parserVersion(version.getParserVersion())
                     .parsedAt(version.getParsedAt())
                     .build();
@@ -313,10 +299,10 @@ public class DocumentController extends BaseController {
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
                 .currentVersion(documentEntity.getCurrentVersion())
-                .sourceFileId(documentEntity.getSourceFileId())
-                .currentVersionFileId(documentVersionEntity.getFileId())
+                .initialContentId(documentEntity.getInitialContentId())
+                .currentVersionContentId(documentVersionEntity.getContentId())
                 .parseStatus(documentVersionEntity.getParseStatus().name())
-                .extractedFileId(documentVersionEntity.getExtractedFileId())
+                .extractedContentId(documentVersionEntity.getExtractedContentId())
                 .parserVersion(documentVersionEntity.getParserVersion())
                 .parsedAt(documentVersionEntity.getParsedAt())
                 .createdAt(documentEntity.getCreatedAt())
@@ -346,19 +332,8 @@ public class DocumentController extends BaseController {
 
     private void validateUpload(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
-            throw new BusinessException(ResponseCode.EMPTY_FILE);
+            throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
         }
     }
 
-    private void cleanupOrphanFile(Long workspaceId, FileEntity fileEntity, boolean documentCreated) {
-        if (fileEntity == null || documentCreated) {
-            return;
-        }
-        try {
-            fileService.deleteFile(workspaceId, fileEntity.getId());
-        } catch (Exception exception) {
-            log.warn("创建文档失败后清理孤儿文件异常 workspaceId:{} fileId:{} error:{}",
-                    workspaceId, fileEntity.getId(), exception.getMessage(), exception);
-        }
-    }
 }

@@ -22,7 +22,7 @@ public class DocumentProcessingStatusResponseDTO implements Serializable {
     private Integer versionNumber;
     private String documentStatus;
     private String parseStatus;
-    private Long extractedFileId;
+    private Long extractedContentId;
     private String parserVersion;
     private LocalDateTime parsedAt;
 }

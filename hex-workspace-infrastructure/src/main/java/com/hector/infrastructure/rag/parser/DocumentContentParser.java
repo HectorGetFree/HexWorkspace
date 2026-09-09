@@ -33,7 +33,7 @@ public class DocumentContentParser implements IDocumentContentParser {
         log.info("文档内容解析器-解析开始 originalFilename:{} contentType:{} suffix:{} fileSize:{}",
                 originalFilename, contentType, suffix, fileContent == null ? 0 : fileContent.length);
         if (fileContent == null || fileContent.length == 0) {
-            throw new BusinessException(ResponseCode.EMPTY_FILE);
+            throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
         }
         try {
             String text = switch (suffix) {

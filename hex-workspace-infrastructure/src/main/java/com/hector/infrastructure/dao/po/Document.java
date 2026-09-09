@@ -21,7 +21,7 @@ public class Document {
     private Long workspaceId;
     private Long parentId;
     private Long ownerUserId;
-    private Long sourceFileId;
+    private Long initialContentId;
     private String title;
     private String fileName;
     private String documentType;

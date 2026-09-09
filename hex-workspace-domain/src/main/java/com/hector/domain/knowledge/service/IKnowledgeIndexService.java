@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface IKnowledgeIndexService {
 
-    void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedFileId);
+    void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedContentId);
 
     List<KnowledgeSearchHitVO> search(Long workspaceId, String question);
 }

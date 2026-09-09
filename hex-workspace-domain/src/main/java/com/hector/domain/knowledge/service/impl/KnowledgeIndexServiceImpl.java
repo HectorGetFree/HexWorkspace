@@ -3,7 +3,7 @@ package com.hector.domain.knowledge.service.impl;
 import com.hector.domain.document.event.DocumentParseRequestedEvent;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.repository.IDocumentRepository;
-import com.hector.domain.file.service.IFileService;
+import com.hector.domain.document.service.IDocumentContentService;
 import com.hector.domain.knowledge.adapter.port.IDocumentSegmenter;
 import com.hector.domain.knowledge.adapter.port.IEmbeddingModel;
 import com.hector.domain.knowledge.adapter.port.IVectorStore;
@@ -32,7 +32,7 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeIndexServiceImpl.class);
 
     @Resource
-    private IFileService fileService;
+    private IDocumentContentService documentContentService;
 
     @Resource
     private IDocumentRepository documentRepository;
@@ -44,7 +44,7 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
     private IVectorStore vectorStore;
 
     @Override
-    public void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedFileId) {
+    public void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedContentId) {
         log.info("知识索引领域服务-建立索引开始 workspaceId:{} documentId:{} versionNumber:{}", event.getWorkspaceId(), event.getDocumentId(), event.getVersionNumber());
         // 1. 解析产物是唯一文本输入；重新索引时也可从 MinIO 重放，不依赖向量库保留正文。
         DocumentEntity documentEntity = documentRepository.findById(event.getDocumentId())
@@ -52,7 +52,9 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
         if (!event.getWorkspaceId().equals(documentEntity.getWorkspaceId())) {
             throw new IllegalStateException("待索引文档Workspace不匹配");
         }
-        String content = new String(fileService.readFileContent(event.getWorkspaceId(), extractedFileId), StandardCharsets.UTF_8);
+        String content = new String(
+                documentContentService.readContent(event.getWorkspaceId(), extractedContentId),
+                StandardCharsets.UTF_8);
         List<KnowledgeSegmentVO> segments = documentSegmenter.segment(content);
         if (segments.isEmpty()) {
             throw new IllegalArgumentException("解析文本为空，无法建立知识索引");

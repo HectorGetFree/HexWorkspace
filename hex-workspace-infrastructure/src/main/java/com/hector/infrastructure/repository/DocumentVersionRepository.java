@@ -27,8 +27,9 @@ public class DocumentVersionRepository implements IDocumentVersionRepository {
 
     @Override
     public DocumentVersionEntity save(DocumentVersionEntity documentVersionEntity) {
-        log.info("文档版本仓储-保存版本开始 documentId:{} versionNumber:{} fileId:{}",
-                documentVersionEntity.getDocumentId(), documentVersionEntity.getVersionNumber(), documentVersionEntity.getFileId());
+        log.info("文档版本仓储-保存版本开始 documentId:{} versionNumber:{} contentId:{}",
+                documentVersionEntity.getDocumentId(), documentVersionEntity.getVersionNumber(),
+                documentVersionEntity.getContentId());
         DocumentVersion documentVersion = toPo(documentVersionEntity);
         documentVersionDao.insert(documentVersion);
         DocumentVersionEntity savedDocumentVersionEntity = toEntity(documentVersion);
@@ -72,9 +73,9 @@ public class DocumentVersionRepository implements IDocumentVersionRepository {
                 .id(documentVersionEntity.getId())
                 .documentId(documentVersionEntity.getDocumentId())
                 .versionNumber(documentVersionEntity.getVersionNumber())
-                .fileId(documentVersionEntity.getFileId())
+                .contentId(documentVersionEntity.getContentId())
                 .contentHash(documentVersionEntity.getContentHash())
-                .extractedFileId(documentVersionEntity.getExtractedFileId())
+                .extractedContentId(documentVersionEntity.getExtractedContentId())
                 .parseStatus(documentVersionEntity.getParseStatus().name())
                 .parserVersion(documentVersionEntity.getParserVersion())
                 .parsedAt(documentVersionEntity.getParsedAt())
@@ -89,9 +90,9 @@ public class DocumentVersionRepository implements IDocumentVersionRepository {
                 .id(documentVersion.getId())
                 .documentId(documentVersion.getDocumentId())
                 .versionNumber(documentVersion.getVersionNumber())
-                .fileId(documentVersion.getFileId())
+                .contentId(documentVersion.getContentId())
                 .contentHash(documentVersion.getContentHash())
-                .extractedFileId(documentVersion.getExtractedFileId())
+                .extractedContentId(documentVersion.getExtractedContentId())
                 .parseStatus(DocumentParseStatusVO.valueOf(documentVersion.getParseStatus()))
                 .parserVersion(documentVersion.getParserVersion())
                 .parsedAt(documentVersion.getParsedAt())

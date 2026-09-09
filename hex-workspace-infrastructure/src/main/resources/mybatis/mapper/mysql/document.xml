@@ -10,7 +10,7 @@
         <result property="workspaceId" column="workspace_id"/>
         <result property="parentId" column="parent_id"/>
         <result property="ownerUserId" column="owner_user_id"/>
-        <result property="sourceFileId" column="source_file_id"/>
+        <result property="initialContentId" column="initial_content_id"/>
         <result property="title" column="title"/>
         <result property="fileName" column="file_name"/>
         <result property="documentType" column="document_type"/>
@@ -22,10 +22,10 @@
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
-            document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+            document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
             document_type, status, current_version, created_at, updated_at
         ) VALUES (
-            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{sourceFileId}, #{title}, #{fileName},
+            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{initialContentId}, #{title}, #{fileName},
             #{documentType}, #{status}, #{currentVersion}, #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -43,7 +43,7 @@
     </update>
 
     <select id="queryById" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
@@ -51,7 +51,7 @@
     </select>
 
     <select id="queryByDocumentCode" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
@@ -59,7 +59,7 @@
     </select>
 
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
@@ -67,7 +67,7 @@
     </select>
 
     <select id="queryActiveByParentId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status = 'ACTIVE'
@@ -75,7 +75,7 @@
     </select>
 
     <select id="queryActiveByParentIdAndFileName" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, source_file_id, title, file_name,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
                document_type, status, current_version, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND file_name = #{fileName} AND status = 'ACTIVE'

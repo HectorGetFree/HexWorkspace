@@ -1,9 +1,9 @@
-package com.hector.domain.file.repository;
+package com.hector.domain.document.repository;
 
 /**
- * 文件对象存储仓储接口。
+ * 文档内容对象存储端口。
  */
-public interface IFileStorageRepository {
+public interface IDocumentObjectStorageRepository {
 
     /**
      * 获取默认桶名。
@@ -11,17 +11,17 @@ public interface IFileStorageRepository {
     String getBucketName();
 
     /**
-     * 上传文件对象。
+     * 写入文档内容对象。
      */
     void upload(String objectKey, byte[] content, String contentType);
 
     /**
-     * 读取对象内容。
+     * 读取文档内容对象。
      */
     byte[] download(String objectKey);
 
     /**
-     * 删除文件对象。
+     * 删除文档内容对象。
      */
     void delete(String objectKey);
 }

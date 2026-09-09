@@ -12,7 +12,6 @@ import com.hector.trigger.api.dto.KnowledgeAskRequestDTO;
 import com.hector.trigger.api.dto.KnowledgeAskResponseDTO;
 import com.hector.trigger.api.dto.KnowledgeSearchResponseDTO;
 import com.hector.trigger.api.response.Response;
-import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;

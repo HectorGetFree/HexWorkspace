@@ -7,7 +7,6 @@ import com.hector.hexworkspace.types.exception.BusinessException;
 import com.hector.trigger.api.dto.WorkspaceListResponseDTO;
 import com.hector.trigger.api.dto.WorkspaceResponseDTO;
 import com.hector.trigger.api.response.Response;
-import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;

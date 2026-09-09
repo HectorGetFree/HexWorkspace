@@ -8,17 +8,17 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 文件表映射对象。
+ * 文档内容快照表映射对象。
  */
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class File {
+public class DocumentContent {
 
     private Long id;
 
-    private String fileCode;
+    private String contentCode;
 
     private Long workspaceId;
 
@@ -26,15 +26,13 @@ public class File {
 
     private String purpose;
 
-    private String fileName;
-
     private String originName;
 
-    private String fileSuffix;
+    private String suffix;
 
     private String contentType;
 
-    private Long fileSize;
+    private Long contentSize;
 
     private String storageType;
 
@@ -42,7 +40,7 @@ public class File {
 
     private String storagePath;
 
-    private String fileHash;
+    private String contentHash;
 
     private String status;
 

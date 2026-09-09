@@ -4,7 +4,7 @@ import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
-import com.hector.domain.file.service.IFileService;
+import com.hector.domain.document.service.IDocumentContentService;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -29,7 +29,7 @@ class DocumentServiceImplTest {
     private IFolderService folderService;
 
     @Mock
-    private IFileService fileService;
+    private IDocumentContentService documentContentService;
 
     @InjectMocks
     private DocumentServiceImpl documentService;

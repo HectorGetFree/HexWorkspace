@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文档版本实体。
- * 每条记录代表一个不可变内容快照；解析文本以派生文件形式与该版本关联。
+ * 每条记录代表一个不可变内容快照；解析文本以派生内容形式与该版本关联。
  */
 @Getter
 @Builder
@@ -27,14 +27,14 @@ public class DocumentVersionEntity {
     /** 文档内单调递增的版本号。 */
     private Integer versionNumber;
 
-    /** 当前版本原始内容对应的底层对象 ID。 */
-    private Long fileId;
+    /** 当前版本对应的内容快照 ID。 */
+    private Long contentId;
 
     /** 当前版本内容摘要，用于完整性校验和幂等判断。 */
     private String contentHash;
 
-    /** 文档解析后生成的纯文本派生对象 ID。 */
-    private Long extractedFileId;
+    /** 文档解析后生成的纯文本派生内容快照 ID。 */
+    private Long extractedContentId;
 
     /** 当前版本的知识解析处理状态。 */
     private DocumentParseStatusVO parseStatus;
@@ -63,10 +63,10 @@ public class DocumentVersionEntity {
     }
 
     /**
-     * 记录解析成功后的派生文件与解析器信息。
+     * 记录解析成功后的派生内容与解析器信息。
      */
-    public void markParseSucceeded(Long extractedFileId, String parserVersion, LocalDateTime parsedAt) {
-        this.extractedFileId = extractedFileId;
+    public void markParseSucceeded(Long extractedContentId, String parserVersion, LocalDateTime parsedAt) {
+        this.extractedContentId = extractedContentId;
         this.parserVersion = parserVersion;
         this.parsedAt = parsedAt;
         this.parseStatus = DocumentParseStatusVO.SUCCESS;

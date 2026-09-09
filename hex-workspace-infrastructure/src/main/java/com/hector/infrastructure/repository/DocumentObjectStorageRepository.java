@@ -1,6 +1,6 @@
 package com.hector.infrastructure.repository;
 
-import com.hector.domain.file.repository.IFileStorageRepository;
+import com.hector.domain.document.repository.IDocumentObjectStorageRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -17,12 +17,12 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 
 /**
- * MinIO 文件存储仓储实现。
+ * 文档内容 MinIO 对象存储实现。
  */
 @Repository
-public class FileStorageRepository implements IFileStorageRepository {
+public class DocumentObjectStorageRepository implements IDocumentObjectStorageRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(FileStorageRepository.class);
+    private static final Logger log = LoggerFactory.getLogger(DocumentObjectStorageRepository.class);
 
     @Resource
     private MinioClient minioClient;
@@ -39,16 +39,16 @@ public class FileStorageRepository implements IFileStorageRepository {
     public void upload(String objectKey, byte[] content, String contentType) {
         try {
             ensureBucketExists();
-            log.info("文件存储仓储-MinIO上传开始 bucketName:{} objectKey:{}", bucketName, objectKey);
+            log.info("文档对象存储-MinIO写入开始 bucketName:{} objectKey:{}", bucketName, objectKey);
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(bucketName)
                     .object(objectKey)
                     .stream(new ByteArrayInputStream(content), content.length, -1)
                     .contentType(contentType)
                     .build());
-            log.info("文件存储仓储-MinIO上传完成 bucketName:{} objectKey:{}", bucketName, objectKey);
+            log.info("文档对象存储-MinIO写入完成 bucketName:{} objectKey:{}", bucketName, objectKey);
         } catch (Exception exception) {
-            log.error("文件存储仓储-MinIO上传失败 bucketName:{} objectKey:{} error:{}",
+            log.error("文档对象存储-MinIO写入异常 bucketName:{} objectKey:{} error:{}",
                     bucketName, objectKey, exception.getMessage(), exception);
             throw new RuntimeException(exception);
         }
@@ -58,14 +58,14 @@ public class FileStorageRepository implements IFileStorageRepository {
     public void delete(String objectKey) {
         try {
             ensureBucketExists();
-            log.info("文件存储仓储-MinIO删除开始 bucketName:{} objectKey:{}", bucketName, objectKey);
+            log.info("文档对象存储-MinIO删除开始 bucketName:{} objectKey:{}", bucketName, objectKey);
             minioClient.removeObject(RemoveObjectArgs.builder()
                     .bucket(bucketName)
                     .object(objectKey)
                     .build());
-            log.info("文件存储仓储-MinIO删除完成 bucketName:{} objectKey:{}", bucketName, objectKey);
+            log.info("文档对象存储-MinIO删除完成 bucketName:{} objectKey:{}", bucketName, objectKey);
         } catch (Exception exception) {
-            log.error("文件存储仓储-MinIO删除失败 bucketName:{} objectKey:{} error:{}",
+            log.error("文档对象存储-MinIO删除异常 bucketName:{} objectKey:{} error:{}",
                     bucketName, objectKey, exception.getMessage(), exception);
             throw new RuntimeException(exception);
         }
@@ -75,18 +75,18 @@ public class FileStorageRepository implements IFileStorageRepository {
     public byte[] download(String objectKey) {
         try {
             ensureBucketExists();
-            log.info("文件存储仓储-MinIO读取开始 bucketName:{} objectKey:{}", bucketName, objectKey);
+            log.info("文档对象存储-MinIO读取开始 bucketName:{} objectKey:{}", bucketName, objectKey);
             try (InputStream inputStream = minioClient.getObject(GetObjectArgs.builder()
                     .bucket(bucketName)
                     .object(objectKey)
                     .build())) {
                 byte[] content = inputStream.readAllBytes();
-                log.info("文件存储仓储-MinIO读取完成 bucketName:{} objectKey:{} fileSize:{}",
+                log.info("文档对象存储-MinIO读取完成 bucketName:{} objectKey:{} contentSize:{}",
                         bucketName, objectKey, content.length);
                 return content;
             }
         } catch (Exception exception) {
-            log.error("文件存储仓储-MinIO读取失败 bucketName:{} objectKey:{} error:{}",
+            log.error("文档对象存储-MinIO读取异常 bucketName:{} objectKey:{} error:{}",
                     bucketName, objectKey, exception.getMessage(), exception);
             throw new RuntimeException(exception);
         }

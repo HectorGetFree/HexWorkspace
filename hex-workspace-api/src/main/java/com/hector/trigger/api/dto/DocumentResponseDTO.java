@@ -29,10 +29,10 @@ public class DocumentResponseDTO implements Serializable {
     private String documentType;
     private String status;
     private Integer currentVersion;
-    private Long sourceFileId;
-    private Long currentVersionFileId;
+    private Long initialContentId;
+    private Long currentVersionContentId;
     private String parseStatus;
-    private Long extractedFileId;
+    private Long extractedContentId;
     private String parserVersion;
     private LocalDateTime parsedAt;
     private LocalDateTime createdAt;

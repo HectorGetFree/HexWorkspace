@@ -13,7 +13,6 @@ import com.hector.trigger.api.dto.FolderCommandRequestDTO;
 import com.hector.trigger.api.dto.FolderResponseDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
-import com.hector.trigger.http.handler.BaseController;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
