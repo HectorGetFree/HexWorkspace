@@ -3,7 +3,7 @@ package com.hector.domain.knowledge.service.impl;
 import com.hector.domain.document.event.DocumentParseRequestedEvent;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.repository.IDocumentRepository;
-import com.hector.domain.document.service.IDocumentContentService;
+import com.hector.domain.document.service.IDocumentContentSnapshotService;
 import com.hector.domain.knowledge.adapter.port.IDocumentSegmenter;
 import com.hector.domain.knowledge.adapter.port.IEmbeddingModel;
 import com.hector.domain.knowledge.adapter.port.IVectorStore;
@@ -32,7 +32,7 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeIndexServiceImpl.class);
 
     @Resource
-    private IDocumentContentService documentContentService;
+    private IDocumentContentSnapshotService documentContentSnapshotService;
 
     @Resource
     private IDocumentRepository documentRepository;
@@ -53,7 +53,7 @@ public class KnowledgeIndexServiceImpl implements IKnowledgeIndexService {
             throw new IllegalStateException("待索引文档Workspace不匹配");
         }
         String content = new String(
-                documentContentService.readContent(event.getWorkspaceId(), extractedContentId),
+                documentContentSnapshotService.readSnapshotContent(event.getWorkspaceId(), extractedContentId),
                 StandardCharsets.UTF_8);
         List<KnowledgeSegmentVO> segments = documentSegmenter.segment(content);
         if (segments.isEmpty()) {

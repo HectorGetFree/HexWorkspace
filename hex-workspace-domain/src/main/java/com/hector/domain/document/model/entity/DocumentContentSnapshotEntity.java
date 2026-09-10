@@ -1,7 +1,7 @@
 package com.hector.domain.document.model.entity;
 
-import com.hector.domain.document.model.valobj.DocumentContentPurposeVO;
-import com.hector.domain.document.model.valobj.DocumentContentStatusVO;
+import com.hector.domain.document.model.valobj.DocumentContentSnapshotPurposeVO;
+import com.hector.domain.document.model.valobj.DocumentContentSnapshotStatusVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentContentEntity {
+public class DocumentContentSnapshotEntity {
 
     /** 内容快照主键 ID。 */
     private Long id;
@@ -32,7 +32,7 @@ public class DocumentContentEntity {
     private Long creatorUserId;
 
     /** 内容用途，区分导入内容与系统派生内容。 */
-    private DocumentContentPurposeVO purpose;
+    private DocumentContentSnapshotPurposeVO purpose;
 
     /** 导入时的原始名称或系统生成的内容名称。 */
     private String originName;
@@ -59,7 +59,7 @@ public class DocumentContentEntity {
     private String contentHash;
 
     /** 内容快照状态。 */
-    private DocumentContentStatusVO status;
+    private DocumentContentSnapshotStatusVO status;
 
     /** 创建时间。 */
     private LocalDateTime createdAt;
@@ -67,23 +67,24 @@ public class DocumentContentEntity {
     /** 更新时间。 */
     private LocalDateTime updatedAt;
 
-    /** 标记内容对象已完成写入。 */
-    public void markUploaded() {
-        this.status = DocumentContentStatusVO.UPLOADED;
-    }
-
     /** 标记内容快照可以正常使用。 */
     public void markSuccess() {
-        this.status = DocumentContentStatusVO.SUCCESS;
+        changeStatus(DocumentContentSnapshotStatusVO.SUCCESS);
     }
 
     /** 标记内容快照保存失败。 */
     public void markFailed() {
-        this.status = DocumentContentStatusVO.FAILED;
+        changeStatus(DocumentContentSnapshotStatusVO.FAILED);
     }
 
     /** 标记内容快照已被逻辑删除。 */
     public void markDeleted() {
-        this.status = DocumentContentStatusVO.DELETED;
+        changeStatus(DocumentContentSnapshotStatusVO.DELETED);
+    }
+
+    /** 统一维护状态变更时间，避免快照状态与更新时间不一致。 */
+    private void changeStatus(DocumentContentSnapshotStatusVO targetStatus) {
+        this.status = targetStatus;
+        this.updatedAt = LocalDateTime.now();
     }
 }

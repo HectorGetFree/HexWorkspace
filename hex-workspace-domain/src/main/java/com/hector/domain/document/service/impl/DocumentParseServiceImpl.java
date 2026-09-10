@@ -3,13 +3,13 @@ package com.hector.domain.document.service.impl;
 import com.hector.domain.document.adapter.port.IDocumentContentParser;
 import com.hector.domain.document.event.DocumentParseRequestedEvent;
 import com.hector.domain.document.model.entity.DocumentEntity;
-import com.hector.domain.document.model.entity.DocumentContentEntity;
+import com.hector.domain.document.model.entity.DocumentContentSnapshotEntity;
 import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.model.valobj.DocumentParseResultVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentParseService;
-import com.hector.domain.document.service.IDocumentContentService;
+import com.hector.domain.document.service.IDocumentContentSnapshotService;
 import com.hector.domain.knowledge.service.IKnowledgeIndexService;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -35,7 +35,7 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
     private IDocumentVersionRepository documentVersionRepository;
 
     @Resource
-    private IDocumentContentService documentContentService;
+    private IDocumentContentSnapshotService documentContentSnapshotService;
 
     @Resource
     private IDocumentContentParser documentContentParser;
@@ -67,18 +67,22 @@ public class DocumentParseServiceImpl implements IDocumentParseService {
             // 2. 先落解析中状态，再读取对象内容并选择具体格式解析器。
             documentVersionEntity.markParsing();
             documentVersionRepository.updateParseResult(documentVersionEntity);
-            DocumentContentEntity sourceContent = documentContentService.getAvailableContent(
+            DocumentContentSnapshotEntity sourceContent = documentContentSnapshotService.getAvailableSnapshot(
                     event.getWorkspaceId(), documentVersionEntity.getContentId());
             DocumentParseResultVO parseResult = documentContentParser.parse(
                     sourceContent.getOriginName(), sourceContent.getContentType(),
-                    documentContentService.readContent(event.getWorkspaceId(), sourceContent.getId()));
+                    documentContentSnapshotService.readSnapshotContent(event.getWorkspaceId(), sourceContent.getId()));
 
             // 3. 解析文本作为派生内容快照保存，供后续 RAG、摘要和 Agent 能力复用。
             String parsedContentName = documentEntity.getDocumentCode() + "_v"
                     + documentVersionEntity.getVersionNumber() + "_parsed.txt";
-            DocumentContentEntity extractedContent = documentContentService.storeDerivedContent(
+            DocumentContentSnapshotEntity extractedContent = documentContentSnapshotService.prepareDerivedSnapshot(
                     event.getWorkspaceId(), event.getOperatorUserId(), parsedContentName,
                     "text/plain; charset=utf-8", parseResult.text().getBytes(StandardCharsets.UTF_8));
+            extractedContent = documentContentSnapshotService.saveSnapshotMetadata(extractedContent);
+            documentContentSnapshotService.writeSnapshotObject(
+                    extractedContent, parseResult.text().getBytes(StandardCharsets.UTF_8));
+            documentContentSnapshotService.markSnapshotSucceeded(event.getWorkspaceId(), extractedContent.getId());
             documentVersionEntity.markParseSucceeded(
                     extractedContent.getId(), parseResult.parserVersion(), LocalDateTime.now());
             documentVersionRepository.updateParseResult(documentVersionEntity);

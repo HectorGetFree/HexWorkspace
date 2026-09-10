@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.hector.infrastructure.dao.IDocumentContentDao">
+<mapper namespace="com.hector.infrastructure.dao.IDocumentContentSnapshotDao">
 
-    <resultMap id="map" type="com.hector.infrastructure.dao.po.DocumentContent">
+    <resultMap id="map" type="com.hector.infrastructure.dao.po.DocumentContentSnapshot">
         <id property="id" column="id"/>
         <result property="contentCode" column="content_code"/>
         <result property="workspaceId" column="workspace_id"/>
@@ -28,7 +28,7 @@
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO document_content (
+        INSERT INTO document_content_snapshot (
             content_code, workspace_id, creator_user_id, content_purpose, origin_name, suffix,
             content_type, content_size, storage_type, bucket_name, storage_path, content_hash,
             status, created_at, updated_at
@@ -40,20 +40,20 @@
     </insert>
 
     <update id="update">
-        UPDATE document_content
+        UPDATE document_content_snapshot
         SET status = #{status}, updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
     <select id="queryById" resultMap="map">
-        SELECT <include refid="columns"/> FROM document_content WHERE id = #{id} LIMIT 1
+        SELECT <include refid="columns"/> FROM document_content_snapshot WHERE id = #{id} LIMIT 1
     </select>
 
     <select id="queryByContentCode" resultMap="map">
-        SELECT <include refid="columns"/> FROM document_content WHERE content_code = #{contentCode} LIMIT 1
+        SELECT <include refid="columns"/> FROM document_content_snapshot WHERE content_code = #{contentCode} LIMIT 1
     </select>
 
     <select id="queryByWorkspaceId" resultMap="map">
-        SELECT <include refid="columns"/> FROM document_content WHERE workspace_id = #{workspaceId} ORDER BY id DESC
+        SELECT <include refid="columns"/> FROM document_content_snapshot WHERE workspace_id = #{workspaceId} ORDER BY id DESC
     </select>
 </mapper>

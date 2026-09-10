@@ -1,6 +1,6 @@
 package com.hector.infrastructure.repository;
 
-import com.hector.domain.document.repository.IDocumentObjectStorageRepository;
+import com.hector.domain.document.repository.IDocumentContentSnapshotStorageRepository;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -20,9 +20,9 @@ import java.io.InputStream;
  * 文档内容 MinIO 对象存储实现。
  */
 @Repository
-public class DocumentObjectStorageRepository implements IDocumentObjectStorageRepository {
+public class DocumentContentSnapshotStorageRepository implements IDocumentContentSnapshotStorageRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(DocumentObjectStorageRepository.class);
+    private static final Logger log = LoggerFactory.getLogger(DocumentContentSnapshotStorageRepository.class);
 
     @Resource
     private MinioClient minioClient;

@@ -4,7 +4,7 @@ import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
-import com.hector.domain.document.service.IDocumentContentService;
+import com.hector.domain.document.service.IDocumentContentSnapshotService;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -13,10 +13,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,13 +32,17 @@ class DocumentServiceImplTest {
     private IFolderService folderService;
 
     @Mock
-    private IDocumentContentService documentContentService;
+    private IDocumentContentSnapshotService documentContentSnapshotService;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private DocumentServiceImpl documentService;
 
     @Test
     void shouldRejectExactDuplicateFileNameInSameFolder() {
+        mockTransactionTemplate();
         when(folderService.getActiveFolder(10L, 20L)).thenReturn(FolderEntity.builder()
                 .id(20L)
                 .workspaceId(10L)
@@ -49,6 +56,7 @@ class DocumentServiceImplTest {
 
     @Test
     void shouldRejectEditingNonMarkdownDocument() {
+        mockTransactionTemplate();
         when(documentRepository.findByDocumentCode("doc_pdf"))
                 .thenReturn(Optional.of(document("方案.pdf", DocumentTypeVO.LOCAL_UPLOADED)));
 
@@ -67,5 +75,11 @@ class DocumentServiceImplTest {
                 .status(DocumentStatusVO.ACTIVE)
                 .currentVersion(1)
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void mockTransactionTemplate() {
+        when(transactionTemplate.execute(any())).thenAnswer(invocation ->
+                ((TransactionCallback<Object>) invocation.getArgument(0)).doInTransaction(null));
     }
 }

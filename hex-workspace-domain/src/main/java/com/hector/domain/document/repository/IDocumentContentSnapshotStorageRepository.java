@@ -3,7 +3,7 @@ package com.hector.domain.document.repository;
 /**
  * 文档内容对象存储端口。
  */
-public interface IDocumentObjectStorageRepository {
+public interface IDocumentContentSnapshotStorageRepository {
 
     /**
      * 获取默认桶名。

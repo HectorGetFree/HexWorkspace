@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS `folder` (
     KEY `idx_folder_parent` (`workspace_id`, `parent_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace目录树';
 
-CREATE TABLE IF NOT EXISTS `document_content` (
+CREATE TABLE IF NOT EXISTS `document_content_snapshot` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `content_code` VARCHAR(64) NOT NULL COMMENT '文档内容快照编码',
     `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace ID',
@@ -62,15 +62,15 @@ CREATE TABLE IF NOT EXISTS `document_content` (
     `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
     `storage_path` VARCHAR(512) NOT NULL COMMENT '对象存储路径',
     `content_hash` VARCHAR(128) DEFAULT NULL COMMENT '内容摘要值',
-    `status` VARCHAR(16) NOT NULL DEFAULT 'UPLOADED' COMMENT 'UPLOADED / SUCCESS / FAILED / DELETED',
+    `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / SUCCESS / FAILED / DELETED',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_document_content_code` (`content_code`),
-    KEY `idx_document_content_workspace` (`workspace_id`),
-    KEY `idx_document_content_creator` (`creator_user_id`),
-    KEY `idx_document_content_purpose` (`workspace_id`, `content_purpose`),
-    KEY `idx_document_content_status` (`status`)
+    UNIQUE KEY `uk_document_content_snapshot_code` (`content_code`),
+    KEY `idx_document_content_snapshot_workspace` (`workspace_id`),
+    KEY `idx_document_content_snapshot_creator` (`creator_user_id`),
+    KEY `idx_document_content_snapshot_purpose` (`workspace_id`, `content_purpose`),
+    KEY `idx_document_content_snapshot_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档内容快照存储元数据';
 
 CREATE TABLE IF NOT EXISTS `document` (

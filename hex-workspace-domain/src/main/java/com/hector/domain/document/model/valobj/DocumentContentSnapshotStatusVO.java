@@ -3,10 +3,10 @@ package com.hector.domain.document.model.valobj;
 /**
  * 文档内容快照状态。
  */
-public enum DocumentContentStatusVO {
+public enum DocumentContentSnapshotStatusVO {
 
-    /** 内容对象已写入。 */
-    UPLOADED,
+    /** 快照元数据已创建，等待对象存储写入。 */
+    PENDING,
 
     /** 内容快照可正常读取。 */
     SUCCESS,
