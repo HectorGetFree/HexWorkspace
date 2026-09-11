@@ -1,8 +1,11 @@
 package com.hector.trigger.http.security;
 
+import com.hector.domain.auth.model.valobj.AccessTokenClaimsVO;
+import com.hector.domain.auth.repository.ITokenRevocationRepository;
 import com.hector.domain.auth.service.ITokenService;
 import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.service.IUserService;
+import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
 import jakarta.servlet.FilterChain;
@@ -39,6 +42,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Resource
     private IUserService userService;
 
+    @Resource
+    private ITokenRevocationRepository tokenRevocationRepository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -60,8 +66,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 log.info("JWT认证过滤器-开始解析登录用户 requestUri:{}", requestUri);
-                Long userId = tokenService.parseUserId(authorization.substring(TOKEN_PREFIX.length()));
-                UserEntity userEntity = userService.getCurrentUser(userId);
+                AccessTokenClaimsVO claims = tokenService.parseToken(authorization.substring(TOKEN_PREFIX.length()));
+                if (tokenRevocationRepository.isRevoked(claims.tokenId())) {
+                    throw new BusinessException(ResponseCode.AUTH_ERROR);
+                }
+                UserEntity userEntity = userService.getCurrentUser(claims.userId());
+                if (!userEntity.isActive()) {
+                    throw new BusinessException(ResponseCode.USER_STATUS_UNAVAILABLE);
+                }
                 LoginUserPrincipal loginUserPrincipal = new LoginUserPrincipal(
                         userEntity.getId(),
                         userEntity.getUsername(),
@@ -78,6 +90,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (BusinessException exception) {
                 log.error("JWT认证过滤器-解析登录用户失败 requestUri:{} code:{} info:{}",
                         requestUri, exception.getCode(), exception.getInfo(), exception);
+                SecurityContextHolder.clearContext();
+            } catch (Exception exception) {
+                // Redis 撤销记录不可用时拒绝建立认证上下文，避免认证链路故障被错误放行。
+                log.error("JWT认证过滤器-认证状态校验异常 requestUri:{}", requestUri, exception);
                 SecurityContextHolder.clearContext();
             }
         }

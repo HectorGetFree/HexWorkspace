@@ -1,5 +1,7 @@
 package com.hector.domain.auth.service;
 
+import com.hector.domain.auth.model.valobj.AccessTokenClaimsVO;
+
 /**
  * 令牌服务接口。
  * 负责访问令牌的创建与解析，供登录流程与 Spring Security 过滤器复用。
@@ -11,8 +13,6 @@ public interface ITokenService {
      */
     String createToken(Long userId, String username);
 
-    /**
-     * 从访问令牌中解析用户ID。
-     */
-    Long parseUserId(String token);
+    /** 验证访问令牌并返回登录态校验所需声明。 */
+    AccessTokenClaimsVO parseToken(String token);
 }

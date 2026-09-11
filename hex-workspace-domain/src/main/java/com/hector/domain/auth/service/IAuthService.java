@@ -12,4 +12,7 @@ public interface IAuthService {
      * 用户登录。
      */
     AuthSessionEntity login(String username, String rawPassword);
+
+    /** 撤销当前访问令牌，使其在原有效期内不可再次认证。 */
+    void logout(String token);
 }

@@ -4,6 +4,8 @@ import com.hector.domain.auth.model.entity.AuthSessionEntity;
 import com.hector.domain.auth.service.IAuthService;
 import com.hector.domain.auth.service.IPasswordService;
 import com.hector.domain.auth.service.ITokenService;
+import com.hector.domain.auth.model.valobj.AccessTokenClaimsVO;
+import com.hector.domain.auth.repository.ITokenRevocationRepository;
 import com.hector.domain.user.model.entity.UserEntity;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.hexworkspace.types.enums.ResponseCode;
@@ -15,7 +17,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * 认证领域服务实现。
- * 当前仅负责登录校验与访问令牌签发。
+ * 负责登录校验、访问令牌签发及当前令牌撤销。
  */
 @Service
 public class AuthServiceImpl implements IAuthService {
@@ -30,6 +32,9 @@ public class AuthServiceImpl implements IAuthService {
 
     @Resource
     private ITokenService tokenService;
+
+    @Resource
+    private ITokenRevocationRepository tokenRevocationRepository;
 
     @Override
     public AuthSessionEntity login(String username, String rawPassword) {
@@ -53,6 +58,13 @@ public class AuthServiceImpl implements IAuthService {
                 .build();
         log.info("认证领域服务-用户登录完成 userId:{} username:{}", userEntity.getId(), userEntity.getUsername());
         return authSessionEntity;
+    }
+
+    @Override
+    public void logout(String token) {
+        AccessTokenClaimsVO claims = tokenService.parseToken(token);
+        tokenRevocationRepository.revoke(claims.tokenId(), claims.expiresAt());
+        log.info("认证领域服务-用户登出完成 userId:{} tokenId:{}", claims.userId(), claims.tokenId());
     }
 
     private String normalizeUsername(String username) {

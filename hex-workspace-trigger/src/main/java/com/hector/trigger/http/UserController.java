@@ -16,6 +16,7 @@ import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
 import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -124,11 +125,14 @@ public class UserController extends BaseController {
      *   -H "Authorization: Bearer 替换为实际登录令牌"
      */
     @PostMapping("/logout")
-    public Response<UserLogoutResponseDTO> logout() {
+    public Response<UserLogoutResponseDTO> logout(HttpServletRequest request) {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
             String currentUsername = SecurityUserUtil.getCurrentUsername();
             log.info("用户登出开始 userId:{} username:{}", currentUserId, currentUsername);
+            authService.logout(extractBearerToken(request));
+            // 仅清理当前 HTTP 请求上下文；后续请求是否可访问由 Redis 撤销记录决定。
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
             log.info("用户登出完成 userId:{} username:{}", currentUserId, currentUsername);
             return success(UserLogoutResponseDTO.builder()
                     .success(Boolean.TRUE)
@@ -140,6 +144,15 @@ public class UserController extends BaseController {
             log.error("用户登出系统异常", exception);
             return failure(ResponseCode.SYSTEM_ERROR);
         }
+    }
+
+    /** 从已认证请求中提取 Bearer 访问令牌，不记录令牌内容。 */
+    private String extractBearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader("Authorization");
+        if (authorization == null || !authorization.startsWith(TOKEN_TYPE + " ")) {
+            throw new BusinessException(ResponseCode.EMPTY_TOKEN);
+        }
+        return authorization.substring((TOKEN_TYPE + " ").length());
     }
 
     /**
