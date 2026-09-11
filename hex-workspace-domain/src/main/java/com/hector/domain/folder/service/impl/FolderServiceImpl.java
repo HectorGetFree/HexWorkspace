@@ -49,7 +49,7 @@ public class FolderServiceImpl implements IFolderService {
             return existing;
         }
 
-        // 2. 根目录只能依附于真实 Workspace，由数据库唯一索引提供最终并发保护。
+        // 2. 根目录只能依附于真实 Workspace；个人 Workspace 初始化由创建锁串行化。
         workspaceRepository.findById(workspaceId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.WORKSPACE_NOT_FOUND));
 

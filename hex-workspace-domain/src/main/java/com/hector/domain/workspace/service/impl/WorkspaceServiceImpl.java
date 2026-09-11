@@ -1,6 +1,7 @@
 package com.hector.domain.workspace.service.impl;
 
 import com.hector.domain.user.model.entity.UserEntity;
+import com.hector.domain.workspace.adapter.port.IWorkspaceCreationLock;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;
@@ -13,7 +14,9 @@ import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
@@ -37,6 +40,12 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
     @Resource
     private IFolderService folderService;
 
+    @Resource
+    private IWorkspaceCreationLock workspaceCreationLock;
+
+    @Resource
+    private TransactionTemplate transactionTemplate;
+
     @Override
     public WorkspaceEntity ensurePersonalWorkspace(Long ownerUserId, String ownerUsername) {
         // 1. 统一入口参数，避免后续查询和持久化使用不合法的用户身份或展示名称。
@@ -45,40 +54,19 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
         log.info("Workspace领域服务-确保个人Workspace开始 ownerUserId:{} username:{}",
                 normalizedOwnerUserId, normalizedOwnerUsername);
 
-        // 2. 先按拥有者查询默认资料库，保证注册重试不会为同一用户重复创建默认 Workspace。
-        WorkspaceEntity existingWorkspace = workspaceRepository
-                .findDefaultByOwnerUserId(normalizedOwnerUserId)
-                .orElse(null);
-        if (existingWorkspace != null) {
-            folderService.ensureRootFolder(existingWorkspace.getId());
-            return existingWorkspace;
+        // 2. 先取得用户粒度的分布式锁，并保持到当前事务完成；并发调用只会复用同一个 Workspace。
+        workspaceCreationLock.lock(normalizedOwnerUserId);
+        boolean releaseAfterTransaction = registerLockReleaseAfterTransaction(normalizedOwnerUserId);
+        try {
+            // 3. Workspace 与系统根目录必须在同一个编码式事务中创建或共同回滚。
+            WorkspaceEntity workspace = executeInTransaction(() -> ensurePersonalWorkspaceInTransaction(
+                    normalizedOwnerUserId, normalizedOwnerUsername));
+            log.info("Workspace领域服务-确保个人Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
+                    workspace.getId(), workspace.getWorkspaceCode(), normalizedOwnerUserId);
+            return workspace;
+        } finally {
+            if (!releaseAfterTransaction) workspaceCreationLock.unlock(normalizedOwnerUserId);
         }
-
-        // 3. 校验拥有者仍存在且可用，避免为无效账号创建无法管理的 Workspace。
-        UserEntity ownerUser = userRepository.findById(normalizedOwnerUserId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
-        if (!ownerUser.isActive()) {
-            throw new BusinessException(ResponseCode.USER_STATUS_UNAVAILABLE);
-        }
-
-        // 4. 构建默认资料库快照；默认标识和 ACTIVE 状态由领域规则固定。
-        LocalDateTime now = LocalDateTime.now();
-        WorkspaceEntity workspaceEntity = WorkspaceEntity.builder()
-                .workspaceCode(generateWorkspaceCode())
-                .workspaceName(normalizedOwnerUsername + " 的个人资料库")
-                .isDefault(true)
-                .status(WorkspaceStatusVO.ACTIVE)
-                .ownerUserId(normalizedOwnerUserId)
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
-
-        // 5. 持久化后返回带主键的聚合，外层注册事务负责与用户创建一起提交或回滚。
-        WorkspaceEntity savedWorkspace = workspaceRepository.save(workspaceEntity);
-        folderService.ensureRootFolder(savedWorkspace.getId());
-        log.info("Workspace领域服务-创建个人Workspace完成 workspaceId:{} workspaceCode:{} ownerUserId:{}",
-                savedWorkspace.getId(), savedWorkspace.getWorkspaceCode(), normalizedOwnerUserId);
-        return savedWorkspace;
     }
 
     @Override
@@ -146,5 +134,42 @@ public class WorkspaceServiceImpl implements IWorkspaceService {
             }
         }
         throw new BusinessException(ResponseCode.SYSTEM_ERROR);
+    }
+
+    /** 在已持有创建锁的事务内创建默认 Workspace 与其唯一系统根目录。 */
+    private WorkspaceEntity ensurePersonalWorkspaceInTransaction(Long ownerUserId, String ownerUsername) {
+        WorkspaceEntity existing = workspaceRepository.findDefaultByOwnerUserId(ownerUserId).orElse(null);
+        if (existing != null) {
+            folderService.ensureRootFolder(existing.getId());
+            return existing;
+        }
+
+        UserEntity owner = getActiveOwner(ownerUserId);
+        LocalDateTime now = LocalDateTime.now();
+        WorkspaceEntity saved = workspaceRepository.save(WorkspaceEntity.builder()
+                .workspaceCode(generateWorkspaceCode()).workspaceName(ownerUsername + " 的个人资料库")
+                .isDefault(true).status(WorkspaceStatusVO.ACTIVE).ownerUserId(owner.getId())
+                .createdAt(now).updatedAt(now).build());
+        folderService.ensureRootFolder(saved.getId());
+        return saved;
+    }
+
+    /** 使用 TransactionTemplate 显式定义 Workspace 与根目录的 MySQL 事务边界。 */
+    private WorkspaceEntity executeInTransaction(java.util.function.Supplier<WorkspaceEntity> action) {
+        WorkspaceEntity result = transactionTemplate.execute(status -> action.get());
+        if (result == null) throw new BusinessException(ResponseCode.SYSTEM_ERROR);
+        return result;
+    }
+
+    /** 若外层已有事务，锁必须延迟到提交或回滚后才释放，避免提交前被并发请求穿透。 */
+    private boolean registerLockReleaseAfterTransaction(Long ownerUserId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return false;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                workspaceCreationLock.unlock(ownerUserId);
+            }
+        });
+        return true;
     }
 }
