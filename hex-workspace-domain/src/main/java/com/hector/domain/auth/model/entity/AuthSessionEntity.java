@@ -25,4 +25,7 @@ public class AuthSessionEntity {
      * 本次签发的访问令牌。
      */
     private String token;
+
+    /** 本次登录对应的刷新令牌，仅用于换取新的访问令牌。 */
+    private String refreshToken;
 }

@@ -15,4 +15,10 @@ public interface IAuthService {
 
     /** 撤销当前访问令牌，使其在原有效期内不可再次认证。 */
     void logout(String token);
+
+    /** 使用 refreshToken 撤销会话，供 accessToken 已过期时登出。 */
+    void logoutByRefreshToken(String refreshToken);
+
+    /** 使用 refreshToken 为活跃会话换取新的 accessToken。 */
+    AuthSessionEntity refresh(String refreshToken);
 }

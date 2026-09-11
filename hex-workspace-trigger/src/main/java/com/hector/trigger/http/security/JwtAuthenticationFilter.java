@@ -1,6 +1,6 @@
 package com.hector.trigger.http.security;
 
-import com.hector.domain.auth.model.valobj.AccessTokenClaimsVO;
+import com.hector.domain.auth.model.valobj.AuthTokenClaimsVO;
 import com.hector.domain.auth.repository.ITokenRevocationRepository;
 import com.hector.domain.auth.service.ITokenService;
 import com.hector.domain.user.model.entity.UserEntity;
@@ -66,8 +66,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 log.info("JWT认证过滤器-开始解析登录用户 requestUri:{}", requestUri);
-                AccessTokenClaimsVO claims = tokenService.parseToken(authorization.substring(TOKEN_PREFIX.length()));
-                if (tokenRevocationRepository.isRevoked(claims.tokenId())) {
+                AuthTokenClaimsVO claims = tokenService.parseAccessToken(authorization.substring(TOKEN_PREFIX.length()));
+                if (tokenRevocationRepository.isSessionRevoked(claims.sessionId())) {
                     throw new BusinessException(ResponseCode.AUTH_ERROR);
                 }
                 UserEntity userEntity = userService.getCurrentUser(claims.userId());

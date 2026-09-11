@@ -4,8 +4,10 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.hector.domain.auth.model.valobj.AuthTokenClaimsVO;
+import com.hector.domain.auth.model.valobj.AuthTokenPairVO;
+import com.hector.domain.auth.model.valobj.AuthTokenTypeVO;
 import com.hector.domain.auth.service.ITokenService;
-import com.hector.domain.auth.model.valobj.AccessTokenClaimsVO;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import org.slf4j.Logger;
@@ -29,37 +31,73 @@ public class TokenServiceImpl implements ITokenService {
     @Value("${hexworkspace.jwt.secret:hex-workspace-jwt-secret-key}")
     private String secret;
 
-    @Value("${hexworkspace.jwt.expire-hours:24}")
-    private long expireHours;
+    @Value("${hexworkspace.jwt.access-expire-minutes:15}")
+    private long accessExpireMinutes;
+
+    @Value("${hexworkspace.jwt.refresh-expire-days:30}")
+    private long refreshExpireDays;
 
     @Override
-    public String createToken(Long userId, String username) {
-        log.info("令牌服务-创建Token开始 userId:{} username:{}", userId, username);
+    public AuthTokenPairVO createTokenPair(Long userId, String username) {
+        log.info("令牌服务-创建令牌对开始 userId:{} username:{}", userId, username);
         Instant now = Instant.now();
-        Instant expireAt = now.plus(expireHours, ChronoUnit.HOURS);
-        return JWT.create()
-                .withSubject(String.valueOf(userId)) // JWT 的标准主题字段，用它表示唯一身份
-                .withClaim("username", username) // 塞业务字段
-                .withJWTId(UUID.randomUUID().toString()) // 单令牌撤销使用的唯一标识
-                .withIssuedAt(Date.from(now))
-                .withExpiresAt(Date.from(expireAt))
-                .sign(Algorithm.HMAC256(secret)); // 使用相应相应算法对 token 签名
+        String sessionId = UUID.randomUUID().toString();
+        Instant sessionExpiresAt = now.plus(refreshExpireDays, ChronoUnit.DAYS);
+        return new AuthTokenPairVO(
+                createToken(userId, username, sessionId, AuthTokenTypeVO.ACCESS,
+                        now.plus(accessExpireMinutes, ChronoUnit.MINUTES), sessionExpiresAt),
+                createToken(userId, username, sessionId, AuthTokenTypeVO.REFRESH, sessionExpiresAt, sessionExpiresAt));
     }
 
     @Override
-    public AccessTokenClaimsVO parseToken(String token) {
+    public String createAccessToken(Long userId, String username, String sessionId, Instant sessionExpiresAt) {
+        Instant now = Instant.now();
+        Instant accessExpiresAt = now.plus(accessExpireMinutes, ChronoUnit.MINUTES);
+        if (accessExpiresAt.isAfter(sessionExpiresAt)) accessExpiresAt = sessionExpiresAt;
+        return createToken(userId, username, sessionId, AuthTokenTypeVO.ACCESS, accessExpiresAt, sessionExpiresAt);
+    }
+
+    private String createToken(Long userId, String username, String sessionId, AuthTokenTypeVO tokenType,
+                               Instant expiresAt, Instant sessionExpiresAt) {
+        return JWT.create()
+                .withSubject(String.valueOf(userId))
+                .withClaim("username", username)
+                .withClaim("token_type", tokenType.name())
+                .withClaim("session_id", sessionId)
+                .withClaim("session_expires_at", sessionExpiresAt.getEpochSecond())
+                .withJWTId(UUID.randomUUID().toString())
+                .withIssuedAt(Date.from(Instant.now()))
+                .withExpiresAt(Date.from(expiresAt))
+                .sign(Algorithm.HMAC256(secret));
+    }
+
+    @Override
+    public AuthTokenClaimsVO parseAccessToken(String token) {
+        return parseToken(token, AuthTokenTypeVO.ACCESS);
+    }
+
+    @Override
+    public AuthTokenClaimsVO parseRefreshToken(String token) {
+        return parseToken(token, AuthTokenTypeVO.REFRESH);
+    }
+
+    private AuthTokenClaimsVO parseToken(String token, AuthTokenTypeVO expectedType) {
         try {
             log.info("令牌服务-解析Token开始");
             DecodedJWT decodedJWT = JWT.require(Algorithm.HMAC256(secret))
                     .build()
                     .verify(token);
             String tokenId = decodedJWT.getId();
-            if (tokenId == null || tokenId.isBlank() || decodedJWT.getExpiresAt() == null) {
+            String sessionId = decodedJWT.getClaim("session_id").asString();
+            Long sessionExpiresAt = decodedJWT.getClaim("session_expires_at").asLong();
+            AuthTokenTypeVO tokenType = AuthTokenTypeVO.valueOf(decodedJWT.getClaim("token_type").asString());
+            if (tokenId == null || tokenId.isBlank() || sessionId == null || sessionId.isBlank()
+                    || sessionExpiresAt == null || tokenType != expectedType || decodedJWT.getExpiresAt() == null) {
                 throw new BusinessException(ResponseCode.AUTH_ERROR);
             }
-            return new AccessTokenClaimsVO(Long.valueOf(decodedJWT.getSubject()), tokenId,
-                    decodedJWT.getExpiresAt().toInstant());
-        } catch (JWTVerificationException | IllegalArgumentException exception) {
+            return new AuthTokenClaimsVO(Long.valueOf(decodedJWT.getSubject()), tokenId, sessionId,
+                    decodedJWT.getExpiresAt().toInstant(), Instant.ofEpochSecond(sessionExpiresAt), tokenType);
+        } catch (JWTVerificationException | IllegalArgumentException | NullPointerException exception) {
             log.error("令牌服务-解析Token异常", exception);
             throw new BusinessException(ResponseCode.AUTH_ERROR);
         }

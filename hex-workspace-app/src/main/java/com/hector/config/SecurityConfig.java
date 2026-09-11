@@ -45,6 +45,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/users/register",
                                 "/api/v1/users/login",
+                                "/api/v1/users/refresh",
+                                "/api/v1/users/logout",
                                 "/error") // 这些接口允许匿名访问
                         .permitAll()
                         .anyRequest()
