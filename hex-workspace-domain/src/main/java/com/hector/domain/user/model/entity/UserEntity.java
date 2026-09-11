@@ -37,14 +37,6 @@ public class UserEntity {
     private LocalDateTime updatedAt;
 
     /**
-     * 锁定账号。
-     * 适用于账号存在风险或需要人工冻结的场景。
-     */
-    public void lock() {
-        this.status = UserStatusVO.LOCKED;
-    }
-
-    /**
      * 禁用账号。
      * 禁用后用户不再允许继续登录系统。
      */
@@ -54,7 +46,7 @@ public class UserEntity {
 
     /**
      * 激活账号。
-     * 用于恢复锁定或禁用后的账号可用性。
+     * 用于恢复禁用后的账号可用性。
      */
     public void activate() {
         this.status = UserStatusVO.ACTIVE;

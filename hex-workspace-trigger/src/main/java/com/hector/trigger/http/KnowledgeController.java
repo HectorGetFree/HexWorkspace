@@ -97,7 +97,7 @@ public class KnowledgeController extends BaseController {
     }
 
     private KnowledgeSearchHitResponseDTO toHit(KnowledgeSearchHitVO hit) {
-        return KnowledgeSearchHitResponseDTO.builder().documentId(hit.documentId()).documentCode(hit.documentCode()).versionNumber(hit.versionNumber())
+        return KnowledgeSearchHitResponseDTO.builder().documentId(hit.documentId()).documentCode(hit.documentCode())
                 .chunkNo(hit.chunkNo()).heading(hit.heading()).content(hit.content()).score(hit.score()).build();
     }
 }

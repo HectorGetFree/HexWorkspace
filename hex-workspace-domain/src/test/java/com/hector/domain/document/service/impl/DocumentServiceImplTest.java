@@ -4,7 +4,7 @@ import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
-import com.hector.domain.document.service.IDocumentContentSnapshotService;
+import com.hector.domain.document.repository.IDocumentStorageRepository;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -32,7 +32,7 @@ class DocumentServiceImplTest {
     private IFolderService folderService;
 
     @Mock
-    private IDocumentContentSnapshotService documentContentSnapshotService;
+    private IDocumentStorageRepository documentStorageRepository;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -73,7 +73,6 @@ class DocumentServiceImplTest {
                 .fileName(fileName)
                 .documentType(type)
                 .status(DocumentStatusVO.ACTIVE)
-                .currentVersion(1)
                 .build();
     }
 

@@ -203,7 +203,6 @@ Authorization: Bearer <JWT>
 | 文档重命名 | PATCH | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/name` |
 | 移动文档 | PATCH | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/parent` |
 | 删除文档 | DELETE | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}` |
-| 文档处理状态 | GET | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/processing-status` |
 | 知识检索 | GET | `/api/v1/workspaces/{workspaceId}/knowledge/search?question=...` |
 | 知识问答 | POST | `/api/v1/workspaces/{workspaceId}/knowledge/ask` |
 | AI 运行信息 | GET | `/api/v1/ai/runtime-info` |

@@ -18,7 +18,7 @@ public class Workspace {
     private String workspaceCode;
     private String workspaceName;
     private Boolean isDefault;
-    private String status;
+    private Integer status;
     private Long ownerUserId;
     private String description;
     private LocalDateTime createdAt;

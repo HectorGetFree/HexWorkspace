@@ -32,7 +32,7 @@ python3 rag-eval/scripts/run_baseline_v1.py \
   --document-map rag-eval/runs/baseline-v1-<timestamp>/document-map.json
 ```
 
-接口 `GET /api/v1/workspaces/{workspaceId}/documents/{documentCode}/processing-status`
+当前 RAG 领域未接入文档主链路；此评测基线处于停用状态，待后续显式知识索引任务接入后重启。
 提供当前版本的 `parseStatus`，脚本据此轮询 `PENDING`、`PROCESSING`、`SUCCESS` 与 `FAILED`。
 当前索引在解析消费者内同步执行；脚本在所有版本解析成功后默认等待 5 秒再开始正式评测，用于避开解析状态已更新但尾部索引仍在提交的短暂竞态。它不会要求每份文档都进入 Search Top 6：这属于待评估的检索结果，而不是索引成功的充分条件。
 

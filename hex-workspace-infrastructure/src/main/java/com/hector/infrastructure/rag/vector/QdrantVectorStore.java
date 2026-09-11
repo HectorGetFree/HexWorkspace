@@ -22,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Qdrant REST 适配器。
- * Qdrant 仅保存可再生的向量索引；Workspace、文档版本与解析产物仍由 MySQL/MinIO 管理。
+ * Qdrant 仅保存可再生的向量索引；Workspace 与文档正文仍由 MySQL/MinIO 管理。
  */
 @Component
 public class QdrantVectorStore implements IVectorStore {
@@ -34,17 +34,15 @@ public class QdrantVectorStore implements IVectorStore {
     private String collection;
 
     @Override
-    public void replaceDocumentVersion(Long workspaceId, Long documentId, Integer versionNumber,
-                                       List<KnowledgeVectorPointVO> points) {
+    public void replaceDocument(Long workspaceId, Long documentId, List<KnowledgeVectorPointVO> points) {
         if (points.isEmpty()) return;
         ensureCollection(points.get(0).vector().size());
 
-        // 1. 仅替换指定Workspace、文档、版本的索引点，保留该文档其他版本以支持版本追溯。
+        // 1. 仅替换指定 Workspace 与文档的索引点；知识索引不保存编辑历史。
         JSONObject filter = new JSONObject();
         filter.put("must", List.of(
                 buildMatchCondition("workspace_id", workspaceId),
-                buildMatchCondition("document_id", documentId),
-                buildMatchCondition("version_number", versionNumber)
+                buildMatchCondition("document_id", documentId)
         ));
         JSONObject deleteBody = new JSONObject();
         deleteBody.put("filter", filter);
@@ -54,7 +52,7 @@ public class QdrantVectorStore implements IVectorStore {
         JSONArray qdrantPoints = new JSONArray();
         for (KnowledgeVectorPointVO pointValue : points) {
             JSONObject payload = new JSONObject();
-            payload.put("workspace_id", workspaceId); payload.put("document_id", documentId); payload.put("version_number", versionNumber);
+            payload.put("workspace_id", workspaceId); payload.put("document_id", documentId);
             payload.put("document_code", pointValue.documentCode()); payload.put("chunk_no", pointValue.chunkNo());
             payload.put("heading", pointValue.heading()); payload.put("content", pointValue.content());
             JSONObject point = new JSONObject();
@@ -79,7 +77,7 @@ public class QdrantVectorStore implements IVectorStore {
         for (Object item : points) {
             JSONObject point = (JSONObject) item;
             JSONObject payload = point.getJSONObject("payload");
-            hits.add(new KnowledgeSearchHitVO(payload.getLong("document_id"), payload.getString("document_code"), payload.getInteger("version_number"),
+            hits.add(new KnowledgeSearchHitVO(payload.getLong("document_id"), payload.getString("document_code"),
                     payload.getInteger("chunk_no"), payload.getString("heading"), payload.getString("content"), point.getDouble("score")));
         }
         return hits;

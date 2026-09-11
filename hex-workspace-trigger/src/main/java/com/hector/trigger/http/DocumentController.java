@@ -1,14 +1,12 @@
 package com.hector.trigger.http;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
-import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.service.IDocumentService;
 import com.hector.domain.workspace.service.IWorkspaceService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import com.hector.trigger.api.dto.DocumentCreateResponseDTO;
 import com.hector.trigger.api.dto.DocumentListResponseDTO;
-import com.hector.trigger.api.dto.DocumentProcessingStatusResponseDTO;
 import com.hector.trigger.api.dto.DocumentResponseDTO;
 import com.hector.trigger.api.dto.DocumentCommandRequestDTO;
 import com.hector.trigger.api.request.Request;
@@ -39,7 +37,7 @@ import java.util.stream.Collectors;
 
 /**
  * 文档接口控制器。
- * MVP 只提供创建、列表与详情能力；Controller 负责 Workspace Owner 校验、文件保存、文档创建和解析事件发布的顺序编排。
+ * Controller 负责 Workspace Owner 校验与文档基础操作编排。
  */
 @RestController
 @RequestMapping("/api/v1/workspaces/{workspaceId}/documents")
@@ -55,7 +53,7 @@ public class DocumentController extends BaseController {
 
     /**
      * 上传文件并创建文档。
-     * 创建成功即返回 PENDING；PDF、DOCX、TXT、MD 的内容解析由 RabbitMQ 消费者异步完成。
+     * 创建成功即返回可读取的云文档；本接口不触发解析或知识索引。
      *
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/documents" \
@@ -80,14 +78,10 @@ public class DocumentController extends BaseController {
             DocumentEntity documentEntity = documentService.importDocument(
                     workspaceId, currentUserId, parentId, file.getOriginalFilename(),
                     file.getContentType(), file.getBytes());
-            DocumentVersionEntity documentVersionEntity = documentService.getCurrentVersion(documentEntity);
-            log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{} versionNumber:{}",
-                    workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode(),
-                    documentVersionEntity.getVersionNumber());
+            log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{}",
+                    workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode());
             return success(DocumentCreateResponseDTO.builder()
                     .documentCode(documentEntity.getDocumentCode())
-                    .versionNumber(documentVersionEntity.getVersionNumber())
-                    .parseStatus(documentVersionEntity.getParseStatus().name())
                     .build());
         } catch (BusinessException exception) {
             log.error("创建文档业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
@@ -120,7 +114,7 @@ public class DocumentController extends BaseController {
     }
 
     /**
-     * 编辑 Markdown 文档正文并生成新版本。
+     * 编辑 Markdown 文档正文并替换当前内容。
      * curl -X PUT "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/content" -H "Content-Type: application/json" -d '{"data":{"content":"更新后的内容"}}'
      */
     @PutMapping("/{documentCode}/content")
@@ -132,8 +126,7 @@ public class DocumentController extends BaseController {
             workspaceService.assertOwner(workspaceId, userId);
             DocumentEntity document = documentService.editMarkdownDocument(
                     workspaceId, documentCode, userId, requireData(request).getContent());
-            log.info("编辑Markdown文档完成 workspaceId:{} documentCode:{} versionNumber:{}",
-                    workspaceId, documentCode, document.getCurrentVersion());
+            log.info("编辑Markdown文档完成 workspaceId:{} documentCode:{}", workspaceId, documentCode);
             return success(toResponse(document, true));
         });
     }
@@ -217,7 +210,7 @@ public class DocumentController extends BaseController {
     }
 
     /**
-     * 查询文档详情及当前版本解析状态。
+     * 查询文档详情与 Markdown 当前正文。
      *
      * curl 示例：
      * curl -X GET "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx" \
@@ -243,50 +236,11 @@ public class DocumentController extends BaseController {
         }
     }
 
-    /**
-     * 查询当前版本的异步解析状态，供上传客户端和评测执行器轮询。
-     *
-     * curl 示例：
-     * curl -X GET "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/processing-status" \\
-     *   -H "Authorization: Bearer 替换为实际登录令牌"
-     */
-    @GetMapping("/{documentCode}/processing-status")
-    public Response<DocumentProcessingStatusResponseDTO> getProcessingStatus(
-            @PathVariable("workspaceId") Long workspaceId,
-            @PathVariable("documentCode") String documentCode) {
-        try {
-            Long currentUserId = SecurityUserUtil.getCurrentUserId();
-            log.info("查询文档处理状态开始 workspaceId:{} userId:{} documentCode:{}", workspaceId, currentUserId, documentCode);
-            workspaceService.assertOwner(workspaceId, currentUserId);
-            DocumentEntity documentEntity = documentService.getActiveDocument(workspaceId, documentCode);
-            DocumentVersionEntity version = documentService.getCurrentVersion(documentEntity);
-            DocumentProcessingStatusResponseDTO response = DocumentProcessingStatusResponseDTO.builder()
-                    .documentCode(documentEntity.getDocumentCode())
-                    .versionNumber(version.getVersionNumber())
-                    .documentStatus(documentEntity.getStatus().name())
-                    .parseStatus(version.getParseStatus().name())
-                    .extractedContentId(version.getExtractedContentId())
-                    .parserVersion(version.getParserVersion())
-                    .parsedAt(version.getParsedAt())
-                    .build();
-            log.info("查询文档处理状态完成 workspaceId:{} userId:{} documentCode:{} parseStatus:{}",
-                    workspaceId, currentUserId, documentCode, response.getParseStatus());
-            return success(response);
-        } catch (BusinessException exception) {
-            log.error("查询文档处理状态业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
-            return failure(exception.getCode(), exception.getInfo());
-        } catch (Exception exception) {
-            log.error("查询文档处理状态系统异常 workspaceId:{} documentCode:{}", workspaceId, documentCode, exception);
-            return failure(ResponseCode.SYSTEM_ERROR);
-        }
-    }
-
     private DocumentResponseDTO toResponse(DocumentEntity documentEntity) {
         return toResponse(documentEntity, false);
     }
 
     private DocumentResponseDTO toResponse(DocumentEntity documentEntity, boolean includeContent) {
-        DocumentVersionEntity documentVersionEntity = documentService.getCurrentVersion(documentEntity);
         DocumentResponseDTO response = DocumentResponseDTO.builder()
                 .documentId(documentEntity.getId())
                 .documentCode(documentEntity.getDocumentCode())
@@ -298,13 +252,6 @@ public class DocumentController extends BaseController {
                 .source(documentEntity.getDocumentType().name())
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
-                .currentVersion(documentEntity.getCurrentVersion())
-                .initialContentId(documentEntity.getInitialContentId())
-                .currentVersionContentId(documentVersionEntity.getContentId())
-                .parseStatus(documentVersionEntity.getParseStatus().name())
-                .extractedContentId(documentVersionEntity.getExtractedContentId())
-                .parserVersion(documentVersionEntity.getParserVersion())
-                .parsedAt(documentVersionEntity.getParsedAt())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();

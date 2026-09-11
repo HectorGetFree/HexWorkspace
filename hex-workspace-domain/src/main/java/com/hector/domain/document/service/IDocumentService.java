@@ -1,17 +1,16 @@
 package com.hector.domain.document.service;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
-import com.hector.domain.document.model.entity.DocumentVersionEntity;
 
 import java.util.List;
 
 /**
  * 文档领域服务。
- * 负责文档聚合及其初始版本的创建、查询和状态约束。
+ * 负责文档聚合、内容存储编排和状态约束。
  */
 public interface IDocumentService {
 
-    /** 将本地内容导入为云文档，并创建初始版本。 */
+    /** 将本地内容导入为云文档。 */
     DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
                                   String contentType, byte[] content);
 
@@ -19,10 +18,10 @@ public interface IDocumentService {
     DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
                                           String fileName, String content);
 
-    /** 编辑 Markdown 正文并创建新的不可变版本。 */
+    /** 编辑 Markdown 正文并替换当前内容。 */
     DocumentEntity editMarkdownDocument(Long workspaceId, String documentCode, Long operatorUserId, String content);
 
-    /** 读取文档当前版本的原始内容。 */
+    /** 读取文档当前原始内容。 */
     byte[] readCurrentContent(Long workspaceId, String documentCode);
 
     /** 修改文档完整名称，并执行同级目录重名校验。 */
@@ -43,6 +42,4 @@ public interface IDocumentService {
     /** 查询并校验属于指定 Workspace 的可用文档。 */
     DocumentEntity getActiveDocument(Long workspaceId, String documentCode);
 
-    /** 根据文档当前版本指针查询对应的版本实体。 */
-    DocumentVersionEntity getCurrentVersion(DocumentEntity documentEntity);
 }

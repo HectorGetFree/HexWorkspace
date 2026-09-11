@@ -2,6 +2,7 @@ package com.hector.infrastructure.repository;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
+import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.infrastructure.dao.IDocumentDao;
@@ -40,8 +41,8 @@ public class DocumentRepository implements IDocumentRepository {
 
     @Override
     public void update(DocumentEntity documentEntity) {
-        log.info("文档仓储-更新文档开始 documentId:{} documentCode:{} status:{} currentVersion:{}",
-                documentEntity.getId(), documentEntity.getDocumentCode(), documentEntity.getStatus(), documentEntity.getCurrentVersion());
+        log.info("文档仓储-更新文档开始 documentId:{} documentCode:{} status:{}",
+                documentEntity.getId(), documentEntity.getDocumentCode(), documentEntity.getStatus());
         documentDao.update(toPo(documentEntity));
         log.info("文档仓储-更新文档完成 documentId:{} documentCode:{}",
                 documentEntity.getId(), documentEntity.getDocumentCode());
@@ -92,12 +93,16 @@ public class DocumentRepository implements IDocumentRepository {
                 .workspaceId(documentEntity.getWorkspaceId())
                 .parentId(documentEntity.getParentId())
                 .ownerUserId(documentEntity.getOwnerUserId())
-                .initialContentId(documentEntity.getInitialContentId())
                 .title(documentEntity.getTitle())
                 .fileName(documentEntity.getFileName())
-                .documentType(documentEntity.getDocumentType().name())
-                .status(documentEntity.getStatus().name())
-                .currentVersion(documentEntity.getCurrentVersion())
+                .documentType(documentEntity.getDocumentType().getCode())
+                .status(documentEntity.getStatus().getCode())
+                .storageType(documentEntity.getStorageType().getCode())
+                .bucketName(documentEntity.getBucketName())
+                .storagePath(documentEntity.getStoragePath())
+                .contentType(documentEntity.getContentType())
+                .contentSize(documentEntity.getContentSize())
+                .contentHash(documentEntity.getContentHash())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();
@@ -110,12 +115,16 @@ public class DocumentRepository implements IDocumentRepository {
                 .workspaceId(document.getWorkspaceId())
                 .parentId(document.getParentId())
                 .ownerUserId(document.getOwnerUserId())
-                .initialContentId(document.getInitialContentId())
                 .title(document.getTitle())
                 .fileName(document.getFileName())
-                .documentType(DocumentTypeVO.valueOf(document.getDocumentType()))
-                .status(DocumentStatusVO.valueOf(document.getStatus()))
-                .currentVersion(document.getCurrentVersion())
+                .documentType(DocumentTypeVO.fromCode(document.getDocumentType()))
+                .status(DocumentStatusVO.fromCode(document.getStatus()))
+                .storageType(DocumentStorageTypeVO.fromCode(document.getStorageType()))
+                .bucketName(document.getBucketName())
+                .storagePath(document.getStoragePath())
+                .contentType(document.getContentType())
+                .contentSize(document.getContentSize())
+                .contentHash(document.getContentHash())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
                 .build();

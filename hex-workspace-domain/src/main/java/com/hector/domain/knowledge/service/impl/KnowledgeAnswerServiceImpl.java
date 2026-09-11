@@ -50,7 +50,7 @@ public class KnowledgeAnswerServiceImpl implements IKnowledgeAnswerService {
     private String buildUserPrompt(String question, List<KnowledgeSearchHitVO> sources) {
         StringBuilder context = new StringBuilder();
         for (KnowledgeSearchHitVO source : sources) {
-            String section = "[来源 documentCode=" + source.documentCode() + ", version=" + source.versionNumber()
+            String section = "[来源 documentCode=" + source.documentCode()
                     + ", chunk=" + source.chunkNo() + "]\n标题：" + (source.heading() == null ? "未命名章节" : source.heading())
                     + "\n正文：" + source.content() + "\n\n";
             if (context.length() + section.length() > MAX_CONTEXT_CHARACTERS) {

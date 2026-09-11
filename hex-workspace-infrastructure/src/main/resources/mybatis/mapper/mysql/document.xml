@@ -10,23 +10,27 @@
         <result property="workspaceId" column="workspace_id"/>
         <result property="parentId" column="parent_id"/>
         <result property="ownerUserId" column="owner_user_id"/>
-        <result property="initialContentId" column="initial_content_id"/>
         <result property="title" column="title"/>
         <result property="fileName" column="file_name"/>
         <result property="documentType" column="document_type"/>
         <result property="status" column="status"/>
-        <result property="currentVersion" column="current_version"/>
+        <result property="storageType" column="storage_type"/>
+        <result property="bucketName" column="bucket_name"/>
+        <result property="storagePath" column="storage_path"/>
+        <result property="contentType" column="content_type"/>
+        <result property="contentSize" column="content_size"/>
+        <result property="contentHash" column="content_hash"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
-            document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
-            document_type, status, current_version, created_at, updated_at
+            document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+            storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
         ) VALUES (
-            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{initialContentId}, #{title}, #{fileName},
-            #{documentType}, #{status}, #{currentVersion}, #{createdAt}, #{updatedAt}
+            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{title}, #{fileName}, #{documentType}, #{status},
+            #{storageType}, #{bucketName}, #{storagePath}, #{contentType}, #{contentSize}, #{contentHash}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -37,48 +41,53 @@
             title = #{title},
             file_name = #{fileName},
             status = #{status},
-            current_version = #{currentVersion},
+            storage_type = #{storageType},
+            bucket_name = #{bucketName},
+            storage_path = #{storagePath},
+            content_type = #{contentType},
+            content_size = #{contentSize},
+            content_hash = #{contentHash},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
     <select id="queryById" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
-               document_type, status, current_version, created_at, updated_at
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
         LIMIT 1
     </select>
 
     <select id="queryByDocumentCode" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
-               document_type, status, current_version, created_at, updated_at
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
         LIMIT 1
     </select>
 
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
-               document_type, status, current_version, created_at, updated_at
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
         ORDER BY updated_at DESC, id DESC
     </select>
 
     <select id="queryActiveByParentId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
-               document_type, status, current_version, created_at, updated_at
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
         FROM `document`
-        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status = 'ACTIVE'
+        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status = 2
         ORDER BY file_name ASC, id ASC
     </select>
 
     <select id="queryActiveByParentIdAndFileName" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, initial_content_id, title, file_name,
-               document_type, status, current_version, created_at, updated_at
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
         FROM `document`
-        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND file_name = #{fileName} AND status = 'ACTIVE'
+        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND file_name = #{fileName} AND status != 3
         LIMIT 1
     </select>
 

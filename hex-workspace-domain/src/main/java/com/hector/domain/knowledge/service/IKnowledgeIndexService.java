@@ -1,6 +1,5 @@
 package com.hector.domain.knowledge.service;
 
-import com.hector.domain.document.event.DocumentParseRequestedEvent;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
 
 import java.util.List;
@@ -10,7 +9,11 @@ import java.util.List;
  */
 public interface IKnowledgeIndexService {
 
-    void indexParsedDocument(DocumentParseRequestedEvent event, Long extractedContentId);
+    /**
+     * 对已获得的纯文本建立索引。
+     * 当前不由文档创建、上传或编辑流程调用，等待后续知识索引任务接入。
+     */
+    void indexDocument(Long workspaceId, Long documentId, String documentCode, String content);
 
     List<KnowledgeSearchHitVO> search(Long workspaceId, String question);
 }

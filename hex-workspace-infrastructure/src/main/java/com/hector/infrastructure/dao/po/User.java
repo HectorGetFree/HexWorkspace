@@ -22,7 +22,7 @@ public class User {
 
     private String passwordHash;
 
-    private String status;
+    private Integer status;
 
     private LocalDateTime createdAt;
 

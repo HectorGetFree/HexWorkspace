@@ -17,6 +17,4 @@ import java.io.Serializable;
 public class DocumentCreateResponseDTO implements Serializable {
 
     private String documentCode;
-    private Integer versionNumber;
-    private String parseStatus;
 }

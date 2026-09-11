@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `user` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `username` VARCHAR(64) NOT NULL COMMENT '用户名',
     `password_hash` VARCHAR(255) NOT NULL COMMENT '密码哈希',
-    `status` VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / LOCKED / DISABLED',
+    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=ACTIVE / 1=DISABLED',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS `workspace` (
     `workspace_code` VARCHAR(64) NOT NULL COMMENT 'Workspace编码',
     `workspace_name` VARCHAR(128) NOT NULL COMMENT 'Workspace名称',
     `is_default` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为注册自动创建的默认资料库',
-    `status` VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / ARCHIVED / DELETED',
+    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=ACTIVE / 1=ARCHIVED / 2=DELETED',
     `owner_user_id` BIGINT NOT NULL COMMENT 'Workspace拥有者用户ID',
     `description` VARCHAR(255) DEFAULT NULL COMMENT 'Workspace描述',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -38,40 +38,13 @@ CREATE TABLE IF NOT EXISTS `folder` (
     `parent_id` BIGINT DEFAULT NULL COMMENT '父文件夹ID，根目录为空',
     `name` VARCHAR(255) NOT NULL COMMENT '文件夹名称',
     `is_root` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为根目录',
-    `root_workspace_id` BIGINT GENERATED ALWAYS AS (CASE WHEN `is_root` = 1 THEN `workspace_id` ELSE NULL END) STORED,
-    `status` VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / DELETED',
+    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=ACTIVE / 1=DELETED',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_folder_code` (`folder_code`),
-    UNIQUE KEY `uk_folder_root_workspace` (`root_workspace_id`),
     KEY `idx_folder_parent` (`workspace_id`, `parent_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace目录树';
-
-CREATE TABLE IF NOT EXISTS `document_content_snapshot` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `content_code` VARCHAR(64) NOT NULL COMMENT '文档内容快照编码',
-    `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace ID',
-    `creator_user_id` BIGINT NOT NULL COMMENT '创建者用户ID',
-    `content_purpose` VARCHAR(16) NOT NULL DEFAULT 'ORIGINAL' COMMENT 'ORIGINAL 导入内容 / DERIVED 系统派生内容',
-    `origin_name` VARCHAR(255) NOT NULL COMMENT '导入原始名称或派生内容名称',
-    `suffix` VARCHAR(32) DEFAULT NULL COMMENT '内容名称后缀',
-    `content_type` VARCHAR(128) DEFAULT NULL COMMENT 'MIME内容类型',
-    `content_size` BIGINT NOT NULL DEFAULT 0 COMMENT '内容大小，单位字节',
-    `storage_type` VARCHAR(32) NOT NULL COMMENT '对象存储类型',
-    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
-    `storage_path` VARCHAR(512) NOT NULL COMMENT '对象存储路径',
-    `content_hash` VARCHAR(128) DEFAULT NULL COMMENT '内容摘要值',
-    `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / SUCCESS / FAILED / DELETED',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_document_content_snapshot_code` (`content_code`),
-    KEY `idx_document_content_snapshot_workspace` (`workspace_id`),
-    KEY `idx_document_content_snapshot_creator` (`creator_user_id`),
-    KEY `idx_document_content_snapshot_purpose` (`workspace_id`, `content_purpose`),
-    KEY `idx_document_content_snapshot_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档内容快照存储元数据';
 
 CREATE TABLE IF NOT EXISTS `document` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -79,41 +52,24 @@ CREATE TABLE IF NOT EXISTS `document` (
     `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace ID',
     `parent_id` BIGINT NOT NULL COMMENT '所属文件夹ID',
     `owner_user_id` BIGINT NOT NULL COMMENT '文档拥有者用户ID',
-    `initial_content_id` BIGINT NOT NULL COMMENT '初始内容快照ID',
     `title` VARCHAR(255) NOT NULL COMMENT '文档标题',
     `file_name` VARCHAR(255) NOT NULL COMMENT '包含后缀的完整文件名',
-    `document_type` VARCHAR(32) NOT NULL COMMENT 'PLATFORM_CREATED / LOCAL_UPLOADED',
-    `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE / ARCHIVED / DELETED',
-    `current_version` INT NOT NULL DEFAULT 1 COMMENT '当前版本号',
+    `document_type` TINYINT UNSIGNED NOT NULL COMMENT '0=LOCAL_UPLOADED / 1=PLATFORM_CREATED',
+    `status` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=CREATING / 1=WRITING / 2=ACTIVE / 3=DELETED',
+    `storage_type` TINYINT UNSIGNED NOT NULL COMMENT '0=MINIO',
+    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
+    `storage_path` VARCHAR(512) NOT NULL COMMENT '对象存储路径',
+    `content_type` VARCHAR(128) NOT NULL COMMENT 'MIME 内容类型',
+    `content_size` BIGINT NOT NULL DEFAULT 0 COMMENT '内容大小，单位字节',
+    `content_hash` VARCHAR(128) NOT NULL COMMENT '内容 SHA-256 摘要',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_document_code` (`document_code`),
     KEY `idx_document_workspace_status_updated_at` (`workspace_id`, `status`, `updated_at`),
     KEY `idx_document_parent` (`workspace_id`, `parent_id`, `status`),
-    KEY `idx_document_owner_user_id` (`owner_user_id`),
-    KEY `idx_document_initial_content` (`initial_content_id`)
+    KEY `idx_document_owner_user_id` (`owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档聚合当前状态表';
-
-CREATE TABLE IF NOT EXISTS `document_version` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `document_id` BIGINT NOT NULL COMMENT '所属文档ID',
-    `version_number` INT NOT NULL COMMENT '版本号',
-    `content_id` BIGINT NOT NULL COMMENT '版本内容快照ID',
-    `content_hash` VARCHAR(128) DEFAULT NULL COMMENT '版本内容摘要，用于幂等与索引去重',
-    `extracted_content_id` BIGINT DEFAULT NULL COMMENT '解析文本内容快照ID',
-    `parse_status` VARCHAR(32) NOT NULL DEFAULT 'NOT_REQUESTED' COMMENT 'NOT_REQUESTED / PENDING / PROCESSING / SUCCESS / FAILED',
-    `parser_version` VARCHAR(64) DEFAULT NULL COMMENT '解析器版本',
-    `parsed_at` DATETIME DEFAULT NULL COMMENT '解析完成时间',
-    `change_summary` VARCHAR(500) DEFAULT NULL COMMENT '变更说明',
-    `created_by_user_id` BIGINT NOT NULL COMMENT '创建版本的用户ID',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_document_version` (`document_id`, `version_number`),
-    KEY `idx_document_version_content` (`content_id`),
-    KEY `idx_document_version_extracted_content` (`extracted_content_id`),
-    KEY `idx_document_version_parse_status` (`parse_status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档不可变版本快照表';
 
 -- 业务约束：
 -- 1. 不使用数据库外键，交由应用层保证 user_id / workspace_id / owner_user_id 的引用一致性。

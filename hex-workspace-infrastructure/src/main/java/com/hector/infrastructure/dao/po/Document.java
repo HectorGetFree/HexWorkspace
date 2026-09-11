@@ -21,12 +21,16 @@ public class Document {
     private Long workspaceId;
     private Long parentId;
     private Long ownerUserId;
-    private Long initialContentId;
     private String title;
     private String fileName;
-    private String documentType;
-    private String status;
-    private Integer currentVersion;
+    private Integer documentType;
+    private Integer status;
+    private Integer storageType;
+    private String bucketName;
+    private String storagePath;
+    private String contentType;
+    private Long contentSize;
+    private String contentHash;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

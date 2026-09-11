@@ -15,7 +15,7 @@ retrieval:
   vectorStore: qdrant
   distance: cosine
   initialTopK: 8
-  maxHitsPerDocumentVersion: 2
+  maxHitsPerDocument: 2
   finalTopK: 6
 
 generation:

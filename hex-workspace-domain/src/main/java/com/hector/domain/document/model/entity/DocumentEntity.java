@@ -1,6 +1,7 @@
 package com.hector.domain.document.model.entity;
 
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
+import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文档聚合根。
- * 保存文档的 Workspace 归属、当前状态和当前版本指针，不承载对象存储或 AI 处理细节。
+ * 保存文档的 Workspace 归属、当前内容元数据和生命周期状态。
  */
 @Getter
 @Builder
@@ -34,9 +35,6 @@ public class DocumentEntity {
     /** 文档所有者用户 ID；当前阶段等同于 Workspace Owner。 */
     private Long ownerUserId;
 
-    /** 文档首次创建时对应的底层内容对象 ID。 */
-    private Long initialContentId;
-
     /** 不含文件后缀的文档展示标题。 */
     private String title;
 
@@ -46,11 +44,26 @@ public class DocumentEntity {
     /** 文档来源类型，区分平台创建和本地上传。 */
     private DocumentTypeVO documentType;
 
-    /** 文档当前生命周期状态。 */
+    /** 文档当前生命周期状态；只有 ACTIVE 状态可对外读取。 */
     private DocumentStatusVO status;
 
-    /** 当前生效的文档版本号。 */
-    private Integer currentVersion;
+    /** 内容在 MinIO 中的存储类型。 */
+    private DocumentStorageTypeVO storageType;
+
+    /** 内容所在的 MinIO Bucket 名称。 */
+    private String bucketName;
+
+    /** 内容在 MinIO 中的对象路径。 */
+    private String storagePath;
+
+    /** 内容 MIME 类型。 */
+    private String contentType;
+
+    /** 内容字节大小。 */
+    private Long contentSize;
+
+    /** 内容 SHA-256 摘要，用于校验和幂等判断。 */
+    private String contentHash;
 
     /** 文档创建时间。 */
     private LocalDateTime createdAt;
@@ -58,19 +71,10 @@ public class DocumentEntity {
     /** 文档最后更新时间。 */
     private LocalDateTime updatedAt;
 
-    /** 将文档切换为归档状态。 */
-    public void archive() {
-        this.status = DocumentStatusVO.ARCHIVED;
-    }
-
-    /** 将文档恢复为可用状态。 */
-    public void activate() {
-        this.status = DocumentStatusVO.ACTIVE;
-    }
-
     /** 将文档标记为逻辑删除状态。 */
     public void delete() {
         this.status = DocumentStatusVO.DELETED;
+        this.updatedAt = LocalDateTime.now();
     }
 
     /**
@@ -95,13 +99,9 @@ public class DocumentEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
-    /**
-     * 将文档当前版本指针推进到指定版本。
-     *
-     * @param versionNumber 新的当前版本号
-     */
-    public void switchCurrentVersion(Integer versionNumber) {
-        this.currentVersion = versionNumber;
+    /** 将已写入 MinIO 的文档切换为可用状态。 */
+    public void activate() {
+        this.status = DocumentStatusVO.ACTIVE;
         this.updatedAt = LocalDateTime.now();
     }
 

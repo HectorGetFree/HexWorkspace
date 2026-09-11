@@ -30,7 +30,7 @@ public class UserRepository implements IUserRepository {
         User user = User.builder()
                 .username(userEntity.getUsername())
                 .passwordHash(userEntity.getPasswordHash())
-                .status(userEntity.getStatus().name())
+                .status(userEntity.getStatus().getCode())
                 .createdAt(userEntity.getCreatedAt())
                 .updatedAt(userEntity.getUpdatedAt())
                 .build();
@@ -72,7 +72,7 @@ public class UserRepository implements IUserRepository {
                 .id(user.getId())
                 .username(user.getUsername())
                 .passwordHash(user.getPasswordHash())
-                .status(UserStatusVO.valueOf(user.getStatus()))
+                .status(UserStatusVO.fromCode(user.getStatus()))
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

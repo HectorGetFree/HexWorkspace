@@ -28,13 +28,6 @@ public class DocumentResponseDTO implements Serializable {
     private String content;
     private String documentType;
     private String status;
-    private Integer currentVersion;
-    private Long initialContentId;
-    private Long currentVersionContentId;
-    private String parseStatus;
-    private Long extractedContentId;
-    private String parserVersion;
-    private LocalDateTime parsedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

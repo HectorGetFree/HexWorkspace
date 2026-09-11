@@ -74,7 +74,7 @@ public class FolderRepository implements IFolderRepository {
                 .parentId(folderEntity.getParentId())
                 .name(folderEntity.getName())
                 .root(folderEntity.isRoot())
-                .status(folderEntity.getStatus().name())
+                .status(folderEntity.getStatus().getCode())
                 .createdAt(folderEntity.getCreatedAt())
                 .updatedAt(folderEntity.getUpdatedAt())
                 .build();
@@ -88,7 +88,7 @@ public class FolderRepository implements IFolderRepository {
                 .parentId(folder.getParentId())
                 .name(folder.getName())
                 .root(folder.getRoot())
-                .status(FolderStatusVO.valueOf(folder.getStatus()))
+                .status(FolderStatusVO.fromCode(folder.getStatus()))
                 .createdAt(folder.getCreatedAt())
                 .updatedAt(folder.getUpdatedAt())
                 .build();

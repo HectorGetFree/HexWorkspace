@@ -33,7 +33,7 @@ public class Folder {
     private Boolean root;
 
     /** 文件夹状态。 */
-    private String status;
+    private Integer status;
 
     /** 创建时间。 */
     private LocalDateTime createdAt;

@@ -170,7 +170,7 @@ Agent 生成的 Markdown 草稿、摘要或报告先作为 Workspace 内的新�
 User
   └─ Workspace
        ├─ Space / Folder ── PermissionGrant / AccessRequest
-       │    └─ Document ── DocumentVersion ── PermissionGrant / AccessRequest
+       │    └─ Document ── PermissionGrant / AccessRequest
        ├─ KnowledgeIndex
        ├─ Task ── AgentRun ── Artifact
        ├─ Comment / Review
@@ -182,9 +182,9 @@ User
 
 产品一级资料容器，承载资料、任务、Agent 配置和审计；不承担文档目录、任务或 Agent 配置的全部权限规则。
 
-### Document 与 DocumentVersion
+### Document
 
-Document 是稳定身份和权限主体；DocumentVersion 是不可变内容快照。任何解析、索引、引用和 Agent 输入都必须绑定具体版本，避免异步任务或后续编辑覆盖历史事实。
+Document 是稳定身份、权限主体和当前内容元数据主体。当前阶段不维护版本、快照或编辑回溯；文档写入采用 `CREATING / WRITING → ACTIVE` 状态机，保证 MinIO 对象写入前已有可追踪的数据库元数据。
 
 ### Task、AgentRun、Artifact
 
@@ -278,7 +278,7 @@ Agent 对文档的编辑应先生成草稿或新版本，展示差异和引用�
   → 用户创建一个有资料范围的 Task
   → hexgent 生成带引用的 Artifact
   → 用户查看差异并确认
-  → 产生新 DocumentVersion
+  → 替换 Document 当前内容
   → 可回看 Run、来源、授权和审计记录
 ```
 

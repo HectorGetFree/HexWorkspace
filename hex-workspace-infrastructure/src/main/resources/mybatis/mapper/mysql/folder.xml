@@ -55,7 +55,7 @@
         WHERE workspace_id = #{workspaceId}
           AND parent_id = #{parentId}
           AND name = #{name}
-          AND status = 'ACTIVE'
+          AND status = 0
         LIMIT 1
     </select>
 
@@ -64,7 +64,7 @@
         FROM folder
         WHERE workspace_id = #{workspaceId}
           AND parent_id = #{parentId}
-          AND status = 'ACTIVE'
+          AND status = 0
         ORDER BY name, id
     </select>
 </mapper>
