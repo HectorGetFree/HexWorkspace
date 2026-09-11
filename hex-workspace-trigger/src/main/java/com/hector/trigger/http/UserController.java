@@ -132,6 +132,10 @@ public class UserController extends BaseController {
     /**
      * 使用 HttpOnly refreshToken 换取新的短期 accessToken。
      * 前端在 accessToken 失效时以携带 Cookie 的方式调用该接口，再重试原请求。
+     *
+     * curl 示例：
+     * curl -X POST "http://127.0.0.1:8098/api/v1/users/refresh" \
+     *   --cookie "hex_workspace_refresh_token=替换为浏览器保存的Cookie值"
      */
     @PostMapping("/refresh")
     public Response<UserLoginResponseDTO> refresh(HttpServletRequest request) {
@@ -150,11 +154,11 @@ public class UserController extends BaseController {
 
     /**
      * 用户登出接口。
-     * 用于基于当前令牌执行登出确认。
+     * 用于基于 refreshToken Cookie 撤销当前登录会话。
      *
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/users/logout" \
-     *   -H "Authorization: Bearer 替换为实际登录令牌"
+     *   --cookie "hex_workspace_refresh_token=替换为浏览器保存的Cookie值"
      */
     @PostMapping("/logout")
     public Response<UserLogoutResponseDTO> logout(HttpServletRequest request, HttpServletResponse response) {
