@@ -1,4 +1,4 @@
-package com.hector.domain.workspace.adapter.port;
+package com.hector.domain.workspace.service;
 
 /**
  * 个人 Workspace 创建锁端口。

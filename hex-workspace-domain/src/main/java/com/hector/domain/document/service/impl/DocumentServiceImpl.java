@@ -1,11 +1,17 @@
 package com.hector.domain.document.service.impl;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
+import com.hector.domain.document.model.entity.DocumentUploadOutboxEventEntity;
+import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
+import com.hector.domain.document.model.valobj.DocumentUploadOutboxStatusVO;
+import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
+import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepository;
+import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
 import com.hector.domain.document.service.IDocumentService;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
@@ -29,10 +35,23 @@ import java.util.stream.Collectors;
 public class DocumentServiceImpl implements IDocumentService {
     private static final String DOCUMENT_CODE_PREFIX = "doc_";
 
-    @Resource private IDocumentRepository documentRepository;
-    @Resource private IDocumentStorageRepository documentStorageRepository;
-    @Resource private TransactionTemplate transactionTemplate;
-    @Resource private IFolderService folderService;
+    @Resource
+    private IDocumentRepository documentRepository;
+
+    @Resource
+    private IDocumentStorageRepository documentStorageRepository;
+
+    @Resource
+    private TransactionTemplate transactionTemplate;
+
+    @Resource
+    private IFolderService folderService;
+
+    @Resource
+    private IDocumentUploadTaskRepository documentUploadTaskRepository;
+
+    @Resource
+    private IDocumentUploadOutboxEventRepository documentUploadOutboxEventRepository;
 
     @Override
     public DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
@@ -135,24 +154,72 @@ public class DocumentServiceImpl implements IDocumentService {
         return document;
     }
 
-    /** 创建流程：先登记 CREATING 元数据，再写对象，最后切换为 ACTIVE。 */
+    /** 创建流程：先写临时对象，再原子登记文档、上传任务和 Outbox 事件。 */
     private DocumentEntity createDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
                                           DocumentTypeVO type, String contentType, byte[] content) {
         if (content == null) throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
-        DocumentEntity creating = executeInTransaction(() -> {
-            folderService.getActiveFolder(workspaceId, parentId);
-            assertFileNameAvailable(workspaceId, parentId, fileName, null);
-            String code = generateDocumentCode();
-            LocalDateTime now = LocalDateTime.now();
-            return documentRepository.save(DocumentEntity.builder()
-                    .documentCode(code).workspaceId(workspaceId).parentId(parentId).ownerUserId(ownerUserId)
-                    .title(resolveTitle(fileName)).fileName(fileName).documentType(type).status(DocumentStatusVO.CREATING)
-                    .storageType(DocumentStorageTypeVO.MINIO).bucketName(documentStorageRepository.getBucketName())
-                    .storagePath(newStoragePath(workspaceId, code)).contentType(normalizeContentType(contentType))
-                    .contentSize((long) content.length).contentHash(hash(content)).createdAt(now).updatedAt(now).build());
-        });
-        writeObjectAndActivate(creating, content);
-        return getActiveDocument(workspaceId, creating.getDocumentCode());
+        String documentCode = generateDocumentCode();
+        String stagingPath = newStagingPath(documentCode);
+        String targetPath = newStoragePath(workspaceId, documentCode);
+        String normalizedContentType = normalizeContentType(contentType);
+
+        // 1. 请求线程仅写入临时对象；正式对象由 MQ 任务异步转正。
+        documentStorageRepository.upload(stagingPath, content, normalizedContentType);
+        try {
+            // 2. 文档、任务和 Outbox 事件必须在同一个 MySQL 事务中提交。
+            return executeInTransaction(() -> {
+                folderService.getActiveFolder(workspaceId, parentId);
+                assertFileNameAvailable(workspaceId, parentId, fileName, null);
+
+                LocalDateTime now = LocalDateTime.now();
+                DocumentEntity document = documentRepository.save(DocumentEntity.builder()
+                        .documentCode(documentCode)
+                        .workspaceId(workspaceId)
+                        .parentId(parentId)
+                        .ownerUserId(ownerUserId)
+                        .title(resolveTitle(fileName))
+                        .fileName(fileName)
+                        .documentType(type)
+                        .status(DocumentStatusVO.CREATING)
+                        .storageType(DocumentStorageTypeVO.MINIO)
+                        .bucketName(documentStorageRepository.getBucketName())
+                        .storagePath(targetPath)
+                        .contentType(normalizedContentType)
+                        .contentSize((long) content.length)
+                        .contentHash(hash(content))
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build());
+
+                String taskCode = newTaskCode();
+                documentUploadTaskRepository.save(DocumentUploadTaskEntity.builder()
+                        .taskCode(taskCode)
+                        .documentId(document.getId())
+                        .stagingPath(stagingPath)
+                        .targetPath(targetPath)
+                        .status(DocumentUploadTaskStatusVO.PENDING)
+                        .retryCount(0)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build());
+                documentUploadOutboxEventRepository.save(DocumentUploadOutboxEventEntity.builder()
+                        .eventCode(newEventCode())
+                        .taskCode(taskCode)
+                        .status(DocumentUploadOutboxStatusVO.PENDING)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build());
+                return document;
+            });
+        } catch (RuntimeException exception) {
+            // 3. 本地事务未提交时立即清理本次临时对象；进程中断遗留对象由后续清理任务处理。
+            try {
+                documentStorageRepository.delete(stagingPath);
+            } catch (Exception ignored) {
+                // 本次异常优先按原始事务失败返回；残留对象由独立清理任务处理。
+            }
+            throw exception;
+        }
     }
 
     /** 写入成功才提交 ACTIVE；失败不伪造成功，保留中间状态给恢复任务处理。 */
@@ -217,6 +284,18 @@ public class DocumentServiceImpl implements IDocumentService {
 
     private String newStoragePath(Long workspaceId, String documentCode) {
         return "workspace/" + workspaceId + "/documents/" + documentCode + "/" + UUID.randomUUID();
+    }
+
+    private String newStagingPath(String documentCode) {
+        return "staging/documents/" + documentCode + "/" + UUID.randomUUID();
+    }
+
+    private String newTaskCode() {
+        return "upload_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private String newEventCode() {
+        return "outbox_" + UUID.randomUUID().toString().replace("-", "");
     }
 
     private String normalizeContentType(String contentType) {

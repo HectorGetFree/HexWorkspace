@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IDocumentUploadTaskDao">
+
+    <resultMap id="documentUploadTaskResultMap" type="com.hector.infrastructure.dao.po.DocumentUploadTask">
+        <id property="id" column="id"/>
+        <result property="taskCode" column="task_code"/>
+        <result property="documentId" column="document_id"/>
+        <result property="stagingPath" column="staging_path"/>
+        <result property="targetPath" column="target_path"/>
+        <result property="status" column="status"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryAt" column="next_retry_at"/>
+        <result property="failureReason" column="failure_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="documentUploadTaskColumns">
+        id, task_code, document_id, staging_path, target_path, status,
+        retry_count, next_retry_at, failure_reason, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.DocumentUploadTask"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO document_upload_task (
+            task_code, document_id, staging_path, target_path, status,
+            retry_count, next_retry_at, failure_reason, created_at, updated_at
+        ) VALUES (
+            #{taskCode}, #{documentId}, #{stagingPath}, #{targetPath}, #{status},
+            #{retryCount}, #{nextRetryAt}, #{failureReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="queryByTaskCode" resultMap="documentUploadTaskResultMap">
+        SELECT <include refid="documentUploadTaskColumns"/>
+        FROM document_upload_task
+        WHERE task_code = #{taskCode}
+        LIMIT 1
+    </select>
+
+    <update id="claimForRunning">
+        UPDATE document_upload_task
+        SET status = 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE task_code = #{taskCode}
+          AND status IN (0, 3)
+    </update>
+
+    <update id="update" parameterType="com.hector.infrastructure.dao.po.DocumentUploadTask">
+        UPDATE document_upload_task
+        SET status = #{status},
+            retry_count = #{retryCount},
+            next_retry_at = #{nextRetryAt},
+            failure_reason = #{failureReason},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="queryRetryDue" resultMap="documentUploadTaskResultMap">
+        SELECT <include refid="documentUploadTaskColumns"/>
+        FROM document_upload_task
+        WHERE status = 3
+          AND next_retry_at &lt;= #{now}
+        ORDER BY next_retry_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimRetryForDispatch">
+        UPDATE document_upload_task
+        SET status = 0,
+            next_retry_at = NULL,
+            updated_at = #{now}
+        WHERE task_code = #{taskCode}
+          AND status = 3
+          AND next_retry_at &lt;= #{now}
+    </update>
+
+</mapper>

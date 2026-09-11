@@ -1,7 +1,7 @@
 package com.hector.domain.workspace.service.impl;
 
 import com.hector.domain.user.model.entity.UserEntity;
-import com.hector.domain.workspace.adapter.port.IWorkspaceCreationLock;
+import com.hector.domain.workspace.service.IWorkspaceCreationLock;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.domain.user.repository.IUserRepository;
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;

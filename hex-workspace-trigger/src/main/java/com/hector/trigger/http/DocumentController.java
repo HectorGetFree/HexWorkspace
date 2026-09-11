@@ -53,7 +53,7 @@ public class DocumentController extends BaseController {
 
     /**
      * 上传文件并创建文档。
-     * 创建成功即返回可读取的云文档；本接口不触发解析或知识索引。
+     * 创建成功即返回文档编码；对象转正前文档处于 CREATING 状态，不可读取。
      *
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/documents" \
@@ -109,7 +109,7 @@ public class DocumentController extends BaseController {
             DocumentEntity document = documentService.createMarkdownDocument(
                     workspaceId, userId, data.getParentId(), data.getFileName(), data.getContent());
             log.info("新建Markdown文档完成 workspaceId:{} documentCode:{}", workspaceId, document.getDocumentCode());
-            return success(toResponse(document, true));
+            return success(toResponse(document));
         });
     }
 

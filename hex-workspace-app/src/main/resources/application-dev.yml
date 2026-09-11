@@ -17,6 +17,13 @@ app:
     # 跨域，开发阶段可以设置为 * 不限制
     cross-origin: '*'
 
+hexworkspace:
+  mq:
+    document-upload:
+      exchange: hex.workspace.document.exchange
+      queue: hex.workspace.document.upload.queue
+      routing-key: document.upload.requested
+
 
 # 线程池配置
 thread:
@@ -40,6 +47,10 @@ spring:
     port: 5672
     username: guest
     password: guest
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
     listener:
       simple:
         acknowledge-mode: auto

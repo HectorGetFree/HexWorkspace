@@ -8,31 +8,36 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
- * RabbitMQ 文档解析消息配置。
- * 文档创建完成后仅发布业务标识，消费者异步读取文件并更新对应版本的解析状态。
+ * RabbitMQ 文档上传任务消息配置。
  */
 @Configuration
 public class RabbitMqConfig {
 
-    public static final String DOCUMENT_EXCHANGE = "hex.doc.document.exchange";
-    public static final String DOCUMENT_PARSE_QUEUE = "hex.doc.document.parse.queue";
-    public static final String DOCUMENT_PARSE_ROUTING_KEY = "document.parse.requested";
+    @Value("${hexworkspace.mq.document-upload.exchange}")
+    private String documentUploadExchange;
+
+    @Value("${hexworkspace.mq.document-upload.queue}")
+    private String documentUploadQueue;
+
+    @Value("${hexworkspace.mq.document-upload.routing-key}")
+    private String documentUploadRoutingKey;
 
     @Bean
     public TopicExchange documentExchange() {
-        return new TopicExchange(DOCUMENT_EXCHANGE, true, false);
+        return new TopicExchange(documentUploadExchange, true, false);
     }
 
     @Bean
-    public Queue documentParseQueue() {
-        return new Queue(DOCUMENT_PARSE_QUEUE, true);
+    public Queue documentUploadQueue() {
+        return new Queue(documentUploadQueue, true);
     }
 
     @Bean
-    public Binding documentParseBinding(Queue documentParseQueue, TopicExchange documentExchange) {
-        return BindingBuilder.bind(documentParseQueue).to(documentExchange).with(DOCUMENT_PARSE_ROUTING_KEY);
+    public Binding documentUploadBinding(Queue documentUploadQueue, TopicExchange documentExchange) {
+        return BindingBuilder.bind(documentUploadQueue).to(documentExchange).with(documentUploadRoutingKey);
     }
 
     @Bean

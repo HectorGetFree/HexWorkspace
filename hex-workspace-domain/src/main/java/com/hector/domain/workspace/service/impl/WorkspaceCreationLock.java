@@ -1,6 +1,6 @@
-package com.hector.infrastructure.repository;
+package com.hector.domain.workspace.service.impl;
 
-import com.hector.domain.workspace.adapter.port.IWorkspaceCreationLock;
+import com.hector.domain.workspace.service.IWorkspaceCreationLock;
 import jakarta.annotation.Resource;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Repository;

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IDocumentUploadOutboxEventDao">
+
+    <resultMap id="documentUploadOutboxEventResultMap"
+               type="com.hector.infrastructure.dao.po.DocumentUploadOutboxEvent">
+        <id property="id" column="id"/>
+        <result property="eventCode" column="event_code"/>
+        <result property="taskCode" column="task_code"/>
+        <result property="status" column="status"/>
+        <result property="failureReason" column="failure_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.DocumentUploadOutboxEvent"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO document_upload_outbox_event (
+            event_code, task_code, status, failure_reason, created_at, updated_at
+        ) VALUES (
+            #{eventCode}, #{taskCode}, #{status}, #{failureReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="queryPending" resultMap="documentUploadOutboxEventResultMap">
+        SELECT id, event_code, task_code, status, failure_reason, created_at, updated_at
+        FROM document_upload_outbox_event
+        WHERE status = 0
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="update" parameterType="com.hector.infrastructure.dao.po.DocumentUploadOutboxEvent">
+        UPDATE document_upload_outbox_event
+        SET status = #{status},
+            failure_reason = #{failureReason},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

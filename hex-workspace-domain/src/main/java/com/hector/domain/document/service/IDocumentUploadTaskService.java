@@ -1,0 +1,11 @@
+package com.hector.domain.document.service;
+
+/** 文档上传异步任务服务。 */
+public interface IDocumentUploadTaskService {
+
+    /** 消费 MQ 消息并执行一次幂等的正式对象写入。 */
+    void execute(String taskCode);
+
+    /** 将到达重试时间的失败任务重新登记为待投递事件。 */
+    void enqueueRetryTasks();
+}
