@@ -12,8 +12,14 @@ import java.util.List;
 public interface IDocumentUploadTaskDao {
     int insert(DocumentUploadTask task);
     DocumentUploadTask queryByTaskCode(@Param("taskCode") String taskCode);
-    int claimForRunning(@Param("taskCode") String taskCode);
-    int update(DocumentUploadTask task);
+    int claimForRunning(@Param("taskCode") String taskCode, @Param("executionToken") String executionToken,
+                        @Param("runningLeaseUntil") LocalDateTime runningLeaseUntil);
+    int completeIfOwned(@Param("taskCode") String taskCode, @Param("executionToken") String executionToken);
+    int markRetryIfOwned(@Param("taskCode") String taskCode, @Param("executionToken") String executionToken,
+                         @Param("failureReason") String failureReason, @Param("nextRetryAt") LocalDateTime nextRetryAt);
     List<DocumentUploadTask> queryRetryDue(@Param("now") LocalDateTime now, @Param("limit") int limit);
     int claimRetryForDispatch(@Param("taskCode") String taskCode, @Param("now") LocalDateTime now);
+    List<DocumentUploadTask> queryExpiredRunning(@Param("now") LocalDateTime now, @Param("limit") int limit);
+    int recoverExpiredRunning(@Param("taskCode") String taskCode, @Param("now") LocalDateTime now,
+                              @Param("nextRetryAt") LocalDateTime nextRetryAt, @Param("failureReason") String failureReason);
 }

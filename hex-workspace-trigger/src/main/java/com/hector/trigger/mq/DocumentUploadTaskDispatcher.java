@@ -38,6 +38,7 @@ public class DocumentUploadTaskDispatcher {
     @Scheduled(fixedDelay = 5000)
     public void dispatch() {
         // 1. 先把到期失败任务转为新的 Outbox 事件，再统一发布所有待投递事件。
+        uploadTaskService.recoverExpiredRunningTasks();
         uploadTaskService.enqueueRetryTasks();
         for (DocumentUploadOutboxEventEntity event : outboxRepository.listPending(100)) {
             try {

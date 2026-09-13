@@ -8,4 +8,7 @@ public interface IDocumentUploadTaskService {
 
     /** 将到达重试时间的失败任务重新登记为待投递事件。 */
     void enqueueRetryTasks();
+
+    /** 回收执行器崩溃后超过租约的 RUNNING 任务。 */
+    void recoverExpiredRunningTasks();
 }

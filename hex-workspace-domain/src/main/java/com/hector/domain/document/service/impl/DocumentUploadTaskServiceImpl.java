@@ -27,6 +27,7 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
     private static final Logger log = LoggerFactory.getLogger(DocumentUploadTaskServiceImpl.class);
     private static final int RETRY_DELAY_MINUTES = 1;
     private static final int BATCH_SIZE = 100;
+    private static final int RUNNING_LEASE_MINUTES = 10;
 
     @Resource
     private IDocumentUploadTaskRepository taskRepository;
@@ -46,7 +47,10 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
     @Override
     public void execute(String taskCode) {
         // 1. 使用条件更新抢占任务，MQ 至少一次投递不会导致同一任务并发执行。
-        boolean claimed = executeInTransaction(() -> taskRepository.claimForRunning(taskCode));
+        String executionToken = UUID.randomUUID().toString();
+        LocalDateTime runningLeaseUntil = LocalDateTime.now().plusMinutes(RUNNING_LEASE_MINUTES);
+        boolean claimed = executeInTransaction(() -> taskRepository.claimForRunning(
+                taskCode, executionToken, runningLeaseUntil));
         if (!claimed) {
             return;
         }
@@ -57,19 +61,18 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
             byte[] content = storageRepository.download(task.getStagingPath());
             storageRepository.upload(task.getTargetPath(), content, "application/octet-stream");
             // 3. 正式对象成功后，在一个 MySQL 事务中同时完成任务和文档状态切换。
-            executeInTransaction(() -> {
-                complete(task);
-                return true;
-            });
-            try {
-                storageRepository.delete(task.getStagingPath());
-            } catch (Exception exception) {
-                log.warn("文档上传任务-清理临时对象失败 taskCode:{}", taskCode, exception);
+            boolean completed = executeInTransaction(() -> complete(task, executionToken));
+            if (completed) {
+                try {
+                    storageRepository.delete(task.getStagingPath());
+                } catch (Exception exception) {
+                    log.warn("文档上传任务-清理临时对象失败 taskCode:{}", taskCode, exception);
+                }
             }
         } catch (Exception exception) {
             log.error("文档上传任务-执行失败 taskCode:{} error:{}", taskCode, exception.getMessage(), exception);
             executeInTransaction(() -> {
-                fail(taskCode, exception);
+                fail(taskCode, executionToken, exception);
                 return true;
             });
         }
@@ -98,22 +101,29 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         }
     }
 
-    private void complete(DocumentUploadTaskEntity task) {
-        DocumentUploadTaskEntity currentTask = taskRepository.findByTaskCode(task.getTaskCode())
-                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-        DocumentEntity document = documentRepository.findById(currentTask.getDocumentId())
-                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-        document.activate();
-        currentTask.succeed();
-        documentRepository.update(document);
-        taskRepository.update(currentTask);
+    @Override
+    public void recoverExpiredRunningTasks() {
+        for (DocumentUploadTaskEntity task : taskRepository.listExpiredRunning(LocalDateTime.now(), BATCH_SIZE)) {
+            LocalDateTime now = LocalDateTime.now();
+            taskRepository.recoverExpiredRunning(task.getTaskCode(), now, now,
+                    "文档上传任务执行租约超时");
+        }
     }
 
-    private void fail(String taskCode, Exception exception) {
-        taskRepository.findByTaskCode(taskCode).ifPresent(task -> {
-            task.waitForRetry(exception.getMessage(), LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES));
-            taskRepository.update(task);
-        });
+    private boolean complete(DocumentUploadTaskEntity task, String executionToken) {
+        if (!taskRepository.completeIfOwned(task.getTaskCode(), executionToken)) {
+            return false;
+        }
+        DocumentEntity document = documentRepository.findById(task.getDocumentId())
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        document.activate();
+        documentRepository.update(document);
+        return true;
+    }
+
+    private void fail(String taskCode, String executionToken, Exception exception) {
+        taskRepository.markRetryIfOwned(taskCode, executionToken, exception.getMessage(),
+                LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES));
     }
 
     private <T> T executeInTransaction(java.util.function.Supplier<T> action) {

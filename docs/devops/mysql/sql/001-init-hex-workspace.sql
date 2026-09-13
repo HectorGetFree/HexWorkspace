@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS `document_upload_task` (
     `staging_path` VARCHAR(512) NOT NULL COMMENT 'MinIO临时对象路径',
     `target_path` VARCHAR(512) NOT NULL COMMENT 'MinIO正式对象路径',
     `status` TINYINT UNSIGNED NOT NULL COMMENT '0=PENDING / 1=RUNNING / 2=SUCCEEDED / 3=RETRY_WAIT',
+    `execution_token` VARCHAR(64) DEFAULT NULL COMMENT '当前消费者执行令牌',
+    `running_lease_until` DATETIME DEFAULT NULL COMMENT '当前消费者执行租约截止时间',
     `retry_count` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '失败重试次数',
     `next_retry_at` DATETIME DEFAULT NULL COMMENT '下次重试时间',
     `failure_reason` VARCHAR(512) DEFAULT NULL COMMENT '最近失败原因',
@@ -89,6 +91,7 @@ CREATE TABLE IF NOT EXISTS `document_upload_task` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_document_upload_task_code` (`task_code`),
     KEY `idx_document_upload_task_retry` (`status`, `next_retry_at`),
+    KEY `idx_document_upload_task_running_lease` (`status`, `running_lease_until`),
     KEY `idx_document_upload_task_document` (`document_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档上传异步任务表';
 

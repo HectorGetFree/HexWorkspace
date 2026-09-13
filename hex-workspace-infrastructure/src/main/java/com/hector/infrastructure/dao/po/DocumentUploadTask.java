@@ -19,6 +19,8 @@ public class DocumentUploadTask {
     private String stagingPath;
     private String targetPath;
     private Integer status;
+    private String executionToken;
+    private LocalDateTime runningLeaseUntil;
     private Integer retryCount;
     private LocalDateTime nextRetryAt;
     private String failureReason;

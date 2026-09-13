@@ -32,13 +32,18 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
     }
 
     @Override
-    public boolean claimForRunning(String taskCode) {
-        return documentUploadTaskDao.claimForRunning(taskCode) == 1;
+    public boolean claimForRunning(String taskCode, String executionToken, LocalDateTime runningLeaseUntil) {
+        return documentUploadTaskDao.claimForRunning(taskCode, executionToken, runningLeaseUntil) == 1;
     }
 
     @Override
-    public void update(DocumentUploadTaskEntity task) {
-        documentUploadTaskDao.update(toDocumentUploadTaskPo(task));
+    public boolean completeIfOwned(String taskCode, String executionToken) {
+        return documentUploadTaskDao.completeIfOwned(taskCode, executionToken) == 1;
+    }
+
+    @Override
+    public boolean markRetryIfOwned(String taskCode, String executionToken, String failureReason, LocalDateTime nextRetryAt) {
+        return documentUploadTaskDao.markRetryIfOwned(taskCode, executionToken, failureReason, nextRetryAt) == 1;
     }
 
     @Override
@@ -51,6 +56,16 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
         return documentUploadTaskDao.claimRetryForDispatch(taskCode, now) == 1;
     }
 
+    @Override
+    public List<DocumentUploadTaskEntity> listExpiredRunning(LocalDateTime now, int limit) {
+        return documentUploadTaskDao.queryExpiredRunning(now, limit).stream().map(this::toDocumentUploadTaskEntity).toList();
+    }
+
+    @Override
+    public boolean recoverExpiredRunning(String taskCode, LocalDateTime now, LocalDateTime nextRetryAt, String failureReason) {
+        return documentUploadTaskDao.recoverExpiredRunning(taskCode, now, nextRetryAt, failureReason) == 1;
+    }
+
     private DocumentUploadTask toDocumentUploadTaskPo(DocumentUploadTaskEntity entity) {
         return DocumentUploadTask.builder()
                 .id(entity.getId())
@@ -59,6 +74,8 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
                 .stagingPath(entity.getStagingPath())
                 .targetPath(entity.getTargetPath())
                 .status(entity.getStatus().getCode())
+                .executionToken(entity.getExecutionToken())
+                .runningLeaseUntil(entity.getRunningLeaseUntil())
                 .retryCount(entity.getRetryCount())
                 .nextRetryAt(entity.getNextRetryAt())
                 .failureReason(entity.getFailureReason())
@@ -75,6 +92,8 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
                 .stagingPath(po.getStagingPath())
                 .targetPath(po.getTargetPath())
                 .status(DocumentUploadTaskStatusVO.fromCode(po.getStatus()))
+                .executionToken(po.getExecutionToken())
+                .runningLeaseUntil(po.getRunningLeaseUntil())
                 .retryCount(po.getRetryCount())
                 .nextRetryAt(po.getNextRetryAt())
                 .failureReason(po.getFailureReason())
