@@ -6,6 +6,8 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 
 本设计覆盖本地文件导入与平台新建 Markdown 的首次内容写入；RAG 不参与该主链路。
 
+本地文件导入必须携带 `Idempotency-Key` 请求头。幂等信息直接保存在 `document`：以 `workspace_id + owner_user_id + idempotency_key` 建立唯一索引。命中既有文档时，比较目录、完整文件名、内容哈希、内容类型和来源类型；相同请求复用首次创建的文档，使用同一个键提交不同内容会被拒绝。
+
 ## 2. 正常链路
 
 ```text

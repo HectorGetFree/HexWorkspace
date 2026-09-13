@@ -31,6 +31,8 @@ public class Document {
     private String contentType;
     private Long contentSize;
     private String contentHash;
+    private String idempotencyKey;
+    private String stagingPath;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

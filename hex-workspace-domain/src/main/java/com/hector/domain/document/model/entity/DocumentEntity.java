@@ -65,6 +65,12 @@ public class DocumentEntity {
     /** 内容 SHA-256 摘要，用于校验和幂等判断。 */
     private String contentHash;
 
+    /** 本地上传请求的客户端幂等键；平台新建文档为空。 */
+    private String idempotencyKey;
+
+    /** 本地上传时 MinIO 临时对象路径；转正完成后保留用于异常排查。 */
+    private String stagingPath;
+
     /** 文档创建时间。 */
     private LocalDateTime createdAt;
 

@@ -22,6 +22,9 @@ public interface IDocumentRepository {
     /** 按对外业务编码查询文档。 */
     Optional<DocumentEntity> findByDocumentCode(String documentCode);
 
+    /** 按本地上传幂等键查询首次创建的文档。 */
+    Optional<DocumentEntity> findByUploadIdempotencyKey(Long workspaceId, Long ownerUserId, String idempotencyKey);
+
     /** 查询 Workspace 下的全部文档，由调用方决定是否过滤状态。 */
     List<DocumentEntity> listByWorkspaceId(Long workspaceId);
 

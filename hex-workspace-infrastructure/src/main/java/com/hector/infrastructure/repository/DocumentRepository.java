@@ -65,6 +65,12 @@ public class DocumentRepository implements IDocumentRepository {
     }
 
     @Override
+    public Optional<DocumentEntity> findByUploadIdempotencyKey(Long workspaceId, Long ownerUserId, String idempotencyKey) {
+        Document document = documentDao.queryByUploadIdempotencyKey(workspaceId, ownerUserId, idempotencyKey);
+        return document == null ? Optional.empty() : Optional.of(toEntity(document));
+    }
+
+    @Override
     public List<DocumentEntity> listByWorkspaceId(Long workspaceId) {
         log.info("文档仓储-按Workspace查询列表开始 workspaceId:{}", workspaceId);
         List<DocumentEntity> documentEntities = documentDao.queryByWorkspaceId(workspaceId).stream()
@@ -103,6 +109,8 @@ public class DocumentRepository implements IDocumentRepository {
                 .contentType(documentEntity.getContentType())
                 .contentSize(documentEntity.getContentSize())
                 .contentHash(documentEntity.getContentHash())
+                .idempotencyKey(documentEntity.getIdempotencyKey())
+                .stagingPath(documentEntity.getStagingPath())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();
@@ -125,6 +133,8 @@ public class DocumentRepository implements IDocumentRepository {
                 .contentType(document.getContentType())
                 .contentSize(document.getContentSize())
                 .contentHash(document.getContentHash())
+                .idempotencyKey(document.getIdempotencyKey())
+                .stagingPath(document.getStagingPath())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
                 .build();

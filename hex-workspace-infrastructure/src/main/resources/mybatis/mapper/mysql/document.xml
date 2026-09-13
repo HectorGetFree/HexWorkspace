@@ -20,6 +20,8 @@
         <result property="contentType" column="content_type"/>
         <result property="contentSize" column="content_size"/>
         <result property="contentHash" column="content_hash"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="stagingPath" column="staging_path"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
@@ -27,10 +29,12 @@
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
             document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
-            storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
+            storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
+            idempotency_key, staging_path, created_at, updated_at
         ) VALUES (
             #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{title}, #{fileName}, #{documentType}, #{status},
-            #{storageType}, #{bucketName}, #{storagePath}, #{contentType}, #{contentSize}, #{contentHash}, #{createdAt}, #{updatedAt}
+            #{storageType}, #{bucketName}, #{storagePath}, #{contentType}, #{contentSize}, #{contentHash},
+            #{idempotencyKey}, #{stagingPath}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -47,21 +51,36 @@
             content_type = #{contentType},
             content_size = #{contentSize},
             content_hash = #{contentHash},
+            idempotency_key = #{idempotencyKey},
+            staging_path = #{stagingPath},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
     <select id="queryById" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
-               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
+               idempotency_key, staging_path, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
         LIMIT 1
     </select>
 
+    <select id="queryByUploadIdempotencyKey" resultMap="documentResultMap">
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
+               idempotency_key, staging_path, created_at, updated_at
+        FROM `document`
+        WHERE workspace_id = #{workspaceId}
+          AND owner_user_id = #{ownerUserId}
+          AND idempotency_key = #{idempotencyKey}
+        LIMIT 1
+    </select>
+
     <select id="queryByDocumentCode" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
-               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
+               idempotency_key, staging_path, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
         LIMIT 1
@@ -69,7 +88,8 @@
 
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
-               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
+               idempotency_key, staging_path, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
         ORDER BY updated_at DESC, id DESC
@@ -77,7 +97,8 @@
 
     <select id="queryActiveByParentId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
-               storage_type, bucket_name, storage_path, content_type, content_size, content_hash, created_at, updated_at
+               storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
+               idempotency_key, staging_path, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status = 2
         ORDER BY file_name ASC, id ASC

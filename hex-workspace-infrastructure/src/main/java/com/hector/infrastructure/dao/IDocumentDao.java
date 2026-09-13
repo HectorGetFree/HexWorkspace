@@ -20,6 +20,10 @@ public interface IDocumentDao {
 
     Document queryByDocumentCode(@Param("documentCode") String documentCode);
 
+    Document queryByUploadIdempotencyKey(@Param("workspaceId") Long workspaceId,
+                                         @Param("ownerUserId") Long ownerUserId,
+                                         @Param("idempotencyKey") String idempotencyKey);
+
     List<Document> queryByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     List<Document> queryActiveByParentId(@Param("workspaceId") Long workspaceId, @Param("parentId") Long parentId);

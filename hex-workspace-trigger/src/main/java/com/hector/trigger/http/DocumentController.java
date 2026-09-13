@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -58,13 +59,15 @@ public class DocumentController extends BaseController {
      * curl 示例：
      * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/documents" \
      *   -H "Authorization: Bearer 替换为实际登录令牌" \
+     *   -H "Idempotency-Key: 替换为本次上传唯一UUID" \
      *   -F "file=@./demo.pdf" \
      *   -F "title=演示文档"
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Response<DocumentCreateResponseDTO> createDocument(@PathVariable("workspaceId") Long workspaceId,
                                                                @RequestPart("file") MultipartFile file,
-                                                               @RequestParam("parentId") Long parentId) {
+                                                               @RequestParam("parentId") Long parentId,
+                                                               @RequestHeader("Idempotency-Key") String idempotencyKey) {
         try {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
             String currentUsername = SecurityUserUtil.getCurrentUsername();
@@ -77,7 +80,7 @@ public class DocumentController extends BaseController {
             // 2. 任意格式的本地内容直接导入为云文档，平台不产生第三种可独立管理的资源。
             DocumentEntity documentEntity = documentService.importDocument(
                     workspaceId, currentUserId, parentId, file.getOriginalFilename(),
-                    file.getContentType(), file.getBytes());
+                    file.getContentType(), file.getBytes(), idempotencyKey);
             log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{}",
                     workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode());
             return success(DocumentCreateResponseDTO.builder()

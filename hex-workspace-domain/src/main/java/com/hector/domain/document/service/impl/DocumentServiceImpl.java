@@ -55,10 +55,35 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Override
     public DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
-                                         String contentType, byte[] content) {
+                                         String contentType, byte[] content, String idempotencyKey) {
         validateCreateCommand(workspaceId, ownerUserId, parentId, fileName);
-        return createDocument(workspaceId, ownerUserId, parentId, normalizeFileName(fileName, false),
-                DocumentTypeVO.LOCAL_UPLOADED, contentType, content);
+        if (content == null) {
+            throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
+        }
+        String normalizedFileName = normalizeFileName(fileName, false);
+        String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+        String normalizedContentType = normalizeContentType(contentType);
+        String contentHash = hash(content);
+
+        DocumentEntity existing = documentRepository.findByUploadIdempotencyKey(workspaceId, ownerUserId, normalizedKey)
+                .orElse(null);
+
+        if (existing != null) {
+            return assertAndReuseUploadDocument(existing, parentId, normalizedFileName, normalizedContentType, contentHash);
+        }
+
+        try {
+            return createDocument(workspaceId, ownerUserId, parentId, normalizedFileName,
+                    DocumentTypeVO.LOCAL_UPLOADED, normalizedContentType, content, normalizedKey);
+        } catch (RuntimeException exception) {
+            DocumentEntity duplicate = documentRepository.findByUploadIdempotencyKey(workspaceId, ownerUserId, normalizedKey)
+                    .orElse(null);
+            if (duplicate != null) {
+                return assertAndReuseUploadDocument(duplicate, parentId, normalizedFileName, normalizedContentType, contentHash);
+            }
+            throw exception;
+        }
+
     }
 
     @Override
@@ -66,7 +91,7 @@ public class DocumentServiceImpl implements IDocumentService {
                                                  String fileName, String content) {
         String normalized = normalizeFileName(fileName, true);
         return createDocument(workspaceId, ownerUserId, parentId, normalized, DocumentTypeVO.PLATFORM_CREATED,
-                "text/markdown; charset=utf-8", (content == null ? "" : content).getBytes(StandardCharsets.UTF_8));
+                "text/markdown; charset=utf-8", (content == null ? "" : content).getBytes(StandardCharsets.UTF_8), null);
     }
 
     @Override
@@ -156,7 +181,8 @@ public class DocumentServiceImpl implements IDocumentService {
 
     /** 创建流程：先写临时对象，再原子登记文档、上传任务和 Outbox 事件。 */
     private DocumentEntity createDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
-                                          DocumentTypeVO type, String contentType, byte[] content) {
+                                          DocumentTypeVO type, String contentType, byte[] content,
+                                          String idempotencyKey) {
         if (content == null) throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
         String documentCode = generateDocumentCode();
         String stagingPath = newStagingPath(documentCode);
@@ -187,6 +213,8 @@ public class DocumentServiceImpl implements IDocumentService {
                         .contentType(normalizedContentType)
                         .contentSize((long) content.length)
                         .contentHash(hash(content))
+                        .idempotencyKey(idempotencyKey)
+                        .stagingPath(stagingPath)
                         .createdAt(now)
                         .updatedAt(now)
                         .build());
@@ -300,6 +328,26 @@ public class DocumentServiceImpl implements IDocumentService {
 
     private String normalizeContentType(String contentType) {
         return contentType == null || contentType.isBlank() ? "application/octet-stream" : contentType;
+    }
+
+    private String normalizeIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 128) {
+            throw new BusinessException(ResponseCode.ILLEGAL_PARAMETER);
+        }
+        return idempotencyKey.trim();
+    }
+
+    private DocumentEntity assertAndReuseUploadDocument(DocumentEntity document, Long parentId, String fileName,
+                                                         String contentType, String contentHash) {
+        boolean sameRequest = parentId.equals(document.getParentId())
+                && fileName.equals(document.getFileName())
+                && contentType.equals(document.getContentType())
+                && contentHash.equals(document.getContentHash())
+                && DocumentTypeVO.LOCAL_UPLOADED == document.getDocumentType();
+        if (!sameRequest) {
+            throw new BusinessException(ResponseCode.ILLEGAL_PARAMETER);
+        }
+        return document;
     }
 
     private String hash(byte[] content) {
