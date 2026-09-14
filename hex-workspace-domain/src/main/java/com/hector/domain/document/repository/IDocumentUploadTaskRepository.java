@@ -15,6 +15,9 @@ public interface IDocumentUploadTaskRepository {
     /** 按任务编码查询。 */
     Optional<DocumentUploadTaskEntity> findByTaskCode(String taskCode);
 
+    /** 判断是否仍存在引用指定临时对象路径的上传任务。 */
+    boolean existsByStagingPath(String stagingPath);
+
     /** 仅当任务仍为 PENDING 或 RETRY_WAIT 时原子抢占执行权。 */
     boolean claimForRunning(String taskCode, String executionToken, LocalDateTime runningLeaseUntil);
 

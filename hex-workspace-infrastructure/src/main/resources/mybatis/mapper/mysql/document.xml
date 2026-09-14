@@ -21,7 +21,6 @@
         <result property="contentSize" column="content_size"/>
         <result property="contentHash" column="content_hash"/>
         <result property="idempotencyKey" column="idempotency_key"/>
-        <result property="stagingPath" column="staging_path"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
@@ -30,11 +29,11 @@
         INSERT INTO `document` (
             document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
             storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
-            idempotency_key, staging_path, created_at, updated_at
+            idempotency_key, created_at, updated_at
         ) VALUES (
             #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{title}, #{fileName}, #{documentType}, #{status},
             #{storageType}, #{bucketName}, #{storagePath}, #{contentType}, #{contentSize}, #{contentHash},
-            #{idempotencyKey}, #{stagingPath}, #{createdAt}, #{updatedAt}
+            #{idempotencyKey}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -52,7 +51,6 @@
             content_size = #{contentSize},
             content_hash = #{contentHash},
             idempotency_key = #{idempotencyKey},
-            staging_path = #{stagingPath},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
@@ -60,7 +58,7 @@
     <select id="queryById" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
                storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
-               idempotency_key, staging_path, created_at, updated_at
+               idempotency_key, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
         LIMIT 1
@@ -69,7 +67,7 @@
     <select id="queryByUploadIdempotencyKey" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
                storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
-               idempotency_key, staging_path, created_at, updated_at
+               idempotency_key, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
           AND owner_user_id = #{ownerUserId}
@@ -80,7 +78,7 @@
     <select id="queryByDocumentCode" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
                storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
-               idempotency_key, staging_path, created_at, updated_at
+               idempotency_key, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
         LIMIT 1
@@ -89,7 +87,7 @@
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
                storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
-               idempotency_key, staging_path, created_at, updated_at
+               idempotency_key, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
         ORDER BY updated_at DESC, id DESC
@@ -98,7 +96,7 @@
     <select id="queryVisibleByParentId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
                storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
-               idempotency_key, staging_path, created_at, updated_at
+               idempotency_key, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status IN (2, 4)
         ORDER BY file_name ASC, id ASC

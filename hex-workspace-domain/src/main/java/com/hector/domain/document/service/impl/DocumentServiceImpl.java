@@ -214,7 +214,6 @@ public class DocumentServiceImpl implements IDocumentService {
                         .contentSize((long) content.length)
                         .contentHash(hash(content))
                         .idempotencyKey(idempotencyKey)
-                        .stagingPath(stagingPath)
                         .createdAt(now)
                         .updatedAt(now)
                         .build());

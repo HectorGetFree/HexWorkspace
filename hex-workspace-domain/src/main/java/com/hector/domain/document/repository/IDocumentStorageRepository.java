@@ -1,5 +1,9 @@
 package com.hector.domain.document.repository;
 
+import com.hector.domain.document.model.valobj.DocumentStorageObjectVO;
+
+import java.util.List;
+
 /**
  * 文档内容对象存储端口。
  * 当前由 MinIO 实现；领域层只依赖对象读写能力。
@@ -17,4 +21,7 @@ public interface IDocumentStorageRepository {
 
     /** 删除文档内容对象。 */
     void delete(String objectKey);
+
+    /** 查询指定前缀下的对象元数据。 */
+    List<DocumentStorageObjectVO> listByPrefix(String prefix);
 }

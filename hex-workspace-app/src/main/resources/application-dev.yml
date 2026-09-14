@@ -20,6 +20,8 @@ app:
 hexworkspace:
   document-upload:
     max-retry-count: 3
+    staging-orphan-retention-hours: 24
+    staging-cleanup-fixed-delay-ms: 3600000
   mq:
     document-upload:
       exchange: hex.workspace.document.exchange

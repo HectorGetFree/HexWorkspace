@@ -32,6 +32,11 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
     }
 
     @Override
+    public boolean existsByStagingPath(String stagingPath) {
+        return documentUploadTaskDao.countByStagingPath(stagingPath) > 0;
+    }
+
+    @Override
     public boolean claimForRunning(String taskCode, String executionToken, LocalDateTime runningLeaseUntil) {
         return documentUploadTaskDao.claimForRunning(taskCode, executionToken, runningLeaseUntil) == 1;
     }

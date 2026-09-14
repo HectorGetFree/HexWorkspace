@@ -110,7 +110,6 @@ public class DocumentRepository implements IDocumentRepository {
                 .contentSize(documentEntity.getContentSize())
                 .contentHash(documentEntity.getContentHash())
                 .idempotencyKey(documentEntity.getIdempotencyKey())
-                .stagingPath(documentEntity.getStagingPath())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();
@@ -134,7 +133,6 @@ public class DocumentRepository implements IDocumentRepository {
                 .contentSize(document.getContentSize())
                 .contentHash(document.getContentHash())
                 .idempotencyKey(document.getIdempotencyKey())
-                .stagingPath(document.getStagingPath())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
                 .build();

@@ -43,6 +43,12 @@
         LIMIT 1
     </select>
 
+    <select id="countByStagingPath" resultType="int">
+        SELECT COUNT(1)
+        FROM document_upload_task
+        WHERE staging_path = #{stagingPath}
+    </select>
+
     <update id="claimForRunning">
         UPDATE document_upload_task
         SET status = 1,

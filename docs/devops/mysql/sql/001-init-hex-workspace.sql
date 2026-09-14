@@ -63,7 +63,6 @@ CREATE TABLE IF NOT EXISTS `document` (
     `content_size` BIGINT NOT NULL DEFAULT 0 COMMENT '内容大小，单位字节',
     `content_hash` VARCHAR(128) NOT NULL COMMENT '内容 SHA-256 摘要',
     `idempotency_key` VARCHAR(128) DEFAULT NULL COMMENT '本地上传客户端幂等键',
-    `staging_path` VARCHAR(512) DEFAULT NULL COMMENT '本地上传MinIO临时对象路径',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
