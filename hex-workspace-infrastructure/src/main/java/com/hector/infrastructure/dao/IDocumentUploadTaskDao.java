@@ -13,6 +13,9 @@ public interface IDocumentUploadTaskDao {
     int insert(DocumentUploadTask task);
     DocumentUploadTask queryByTaskCode(@Param("taskCode") String taskCode);
     int countByStagingPath(@Param("stagingPath") String stagingPath);
+    List<DocumentUploadTask> queryExpiredTerminalTasksWithStagingPath(@Param("expiredBefore") LocalDateTime expiredBefore,
+                                                                       @Param("limit") int limit);
+    int clearStagingPathIfTerminal(@Param("taskCode") String taskCode, @Param("stagingPath") String stagingPath);
     int claimForRunning(@Param("taskCode") String taskCode, @Param("executionToken") String executionToken,
                         @Param("runningLeaseUntil") LocalDateTime runningLeaseUntil);
     int completeIfOwned(@Param("taskCode") String taskCode, @Param("executionToken") String executionToken);

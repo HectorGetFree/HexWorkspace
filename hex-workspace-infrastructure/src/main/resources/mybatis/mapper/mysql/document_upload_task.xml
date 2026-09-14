@@ -50,6 +50,25 @@
         WHERE staging_path = #{stagingPath}
     </select>
 
+    <select id="queryExpiredTerminalTasksWithStagingPath" resultMap="documentUploadTaskResultMap">
+        SELECT <include refid="documentUploadTaskColumns"/>
+        FROM document_upload_task
+        WHERE status IN (2, 4)
+          AND staging_path IS NOT NULL
+          AND updated_at &lt;= #{expiredBefore}
+        ORDER BY updated_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="clearStagingPathIfTerminal">
+        UPDATE document_upload_task
+        SET staging_path = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE task_code = #{taskCode}
+          AND staging_path = #{stagingPath}
+          AND status IN (2, 4)
+    </update>
+
     <update id="claimForRunning">
         UPDATE document_upload_task
         SET status = 1,

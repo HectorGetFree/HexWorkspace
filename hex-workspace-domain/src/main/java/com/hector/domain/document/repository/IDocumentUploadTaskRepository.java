@@ -18,6 +18,16 @@ public interface IDocumentUploadTaskRepository {
     /** 判断是否仍存在引用指定临时对象路径的上传任务。 */
     boolean existsByStagingPath(String stagingPath);
 
+    /** 查询保留期已过、仍持有临时对象路径的终态任务。 */
+    List<DocumentUploadTaskEntity> listExpiredTerminalTasksWithStagingPath(LocalDateTime expiredBefore, int limit);
+
+    /**
+     * 清理终态任务的临时对象路径引用。
+     *
+     * <p>仅允许清理成功或最终失败的任务，避免旧任务视图误清理仍可能被重试使用的临时对象。</p>
+     */
+    boolean clearStagingPathIfTerminal(String taskCode, String stagingPath);
+
     /** 仅当任务仍为 PENDING 或 RETRY_WAIT 时原子抢占执行权。 */
     boolean claimForRunning(String taskCode, String executionToken, LocalDateTime runningLeaseUntil);
 

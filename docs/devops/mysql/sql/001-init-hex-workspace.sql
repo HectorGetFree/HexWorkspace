@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS `document_upload_task` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `task_code` VARCHAR(64) NOT NULL COMMENT '上传任务编码',
     `document_id` BIGINT NOT NULL COMMENT '关联文档ID',
-    `staging_path` VARCHAR(512) NOT NULL COMMENT 'MinIO临时对象路径',
+    `staging_path` VARCHAR(512) DEFAULT NULL COMMENT 'MinIO临时对象路径；终态任务清理后为空',
     `target_path` VARCHAR(512) NOT NULL COMMENT 'MinIO正式对象路径',
     `content_type` VARCHAR(128) NOT NULL COMMENT '正式对象MIME类型',
     `status` TINYINT UNSIGNED NOT NULL COMMENT '0=PENDING / 1=RUNNING / 2=SUCCEEDED / 3=RETRY_WAIT / 4=FAILED',

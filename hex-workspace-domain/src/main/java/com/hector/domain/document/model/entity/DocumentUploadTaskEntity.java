@@ -21,7 +21,7 @@ public class DocumentUploadTaskEntity {
     private String taskCode;
     /** 对应文档主键 ID。 */
     private Long documentId;
-    /** MinIO 临时对象路径。 */
+    /** MinIO 临时对象路径；终态任务的对象清理完成后为空。 */
     private String stagingPath;
     /** MinIO 正式对象路径。 */
     private String targetPath;

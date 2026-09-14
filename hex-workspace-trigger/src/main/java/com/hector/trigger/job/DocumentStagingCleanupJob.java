@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
-/** 定时清理未被上传任务引用的过期 staging 对象。 */
+/** 定时清理孤儿对象及终态上传任务遗留的 staging 对象。 */
 @Component
 public class DocumentStagingCleanupJob {
 
@@ -26,8 +26,12 @@ public class DocumentStagingCleanupJob {
     public void cleanExpiredOrphans() {
         LocalDateTime expiredBefore = LocalDateTime.now().minusHours(stagingOrphanRetentionHours);
         try {
-            int deletedCount = stagingCleanupService.cleanExpiredOrphans(expiredBefore);
-            log.info("文档staging定时清理完成 expiredBefore:{} deletedCount:{}", expiredBefore, deletedCount);
+            // 1. 先清理无任务引用的崩溃孤儿对象。
+            int orphanDeletedCount = stagingCleanupService.cleanExpiredOrphans(expiredBefore);
+            // 2. 再清理终态任务的残留对象，并移除其任务路径引用。
+            int terminalTaskDeletedCount = stagingCleanupService.cleanExpiredTerminalTaskObjects(expiredBefore);
+            log.info("文档staging定时清理完成 expiredBefore:{} orphanDeletedCount:{} terminalTaskDeletedCount:{}",
+                    expiredBefore, orphanDeletedCount, terminalTaskDeletedCount);
         } catch (Exception exception) {
             log.error("文档staging定时清理异常 expiredBefore:{}", expiredBefore, exception);
         }

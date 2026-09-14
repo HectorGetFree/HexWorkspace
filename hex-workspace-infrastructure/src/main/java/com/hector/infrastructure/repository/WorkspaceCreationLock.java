@@ -1,11 +1,16 @@
-package com.hector.domain.workspace.service.impl;
+package com.hector.infrastructure.repository;
 
 import com.hector.domain.workspace.service.IWorkspaceCreationLock;
 import jakarta.annotation.Resource;
+import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Repository;
 
-/** Redisson 个人 Workspace 创建锁实现。 */
+/**
+ * 个人 Workspace 创建锁的 Redis 实现。
+ *
+ * <p>领域层仅定义创建锁的业务抽象；本实现负责封装 Redisson 的锁操作，避免技术依赖反向进入领域层。</p>
+ */
 @Repository
 public class WorkspaceCreationLock implements IWorkspaceCreationLock {
 
@@ -21,7 +26,9 @@ public class WorkspaceCreationLock implements IWorkspaceCreationLock {
 
     @Override
     public void unlock(Long ownerUserId) {
-        org.redisson.api.RLock lock = redissonClient.getLock(KEY_PREFIX + ownerUserId);
-        if (lock.isHeldByCurrentThread()) lock.unlock();
+        RLock lock = redissonClient.getLock(KEY_PREFIX + ownerUserId);
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
     }
 }

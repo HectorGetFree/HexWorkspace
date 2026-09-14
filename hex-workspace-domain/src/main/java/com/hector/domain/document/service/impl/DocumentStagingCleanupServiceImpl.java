@@ -1,5 +1,6 @@
 package com.hector.domain.document.service.impl;
 
+import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
 import com.hector.domain.document.model.valobj.DocumentStorageObjectVO;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
@@ -17,6 +18,7 @@ public class DocumentStagingCleanupServiceImpl implements IDocumentStagingCleanu
 
     private static final Logger log = LoggerFactory.getLogger(DocumentStagingCleanupServiceImpl.class);
     private static final String STAGING_PREFIX = "staging/";
+    private static final int TERMINAL_TASK_BATCH_SIZE = 100;
 
     @Resource
     private IDocumentStorageRepository storageRepository;
@@ -45,6 +47,32 @@ public class DocumentStagingCleanupServiceImpl implements IDocumentStagingCleanu
             log.info("文档staging对象清理完成 objectKey:{}", object.getObjectKey());
         }
         log.info("文档staging对象清理结束 expiredBefore:{} deletedCount:{}", expiredBefore, deletedCount);
+        return deletedCount;
+    }
+
+    @Override
+    public int cleanExpiredTerminalTaskObjects(LocalDateTime expiredBefore) {
+        log.info("终态文档上传任务staging清理开始 expiredBefore:{}", expiredBefore);
+        int deletedCount = 0;
+        for (DocumentUploadTaskEntity task : taskRepository
+                .listExpiredTerminalTasksWithStagingPath(expiredBefore, TERMINAL_TASK_BATCH_SIZE)) {
+            try {
+                // 1. 仅终态任务会进入本流程，其临时对象不再参与上传或重试。
+                storageRepository.delete(task.getStagingPath());
+
+                // 2. 删除成功后用状态和原路径做条件更新，防止并发清理误覆盖新状态。
+                if (taskRepository.clearStagingPathIfTerminal(task.getTaskCode(), task.getStagingPath())) {
+                    deletedCount++;
+                    log.info("终态文档上传任务staging清理完成 taskCode:{} stagingPath:{}",
+                            task.getTaskCode(), task.getStagingPath());
+                }
+            } catch (Exception exception) {
+                // 3. 清理失败保留路径引用，下一轮可继续补偿，不影响已完成的文档主链路。
+                log.error("终态文档上传任务staging清理异常 taskCode:{} stagingPath:{}",
+                        task.getTaskCode(), task.getStagingPath(), exception);
+            }
+        }
+        log.info("终态文档上传任务staging清理结束 expiredBefore:{} deletedCount:{}", expiredBefore, deletedCount);
         return deletedCount;
     }
 }

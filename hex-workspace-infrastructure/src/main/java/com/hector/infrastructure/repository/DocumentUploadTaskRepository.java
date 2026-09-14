@@ -37,6 +37,18 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
     }
 
     @Override
+    public List<DocumentUploadTaskEntity> listExpiredTerminalTasksWithStagingPath(LocalDateTime expiredBefore, int limit) {
+        return documentUploadTaskDao.queryExpiredTerminalTasksWithStagingPath(expiredBefore, limit).stream()
+                .map(this::toDocumentUploadTaskEntity)
+                .toList();
+    }
+
+    @Override
+    public boolean clearStagingPathIfTerminal(String taskCode, String stagingPath) {
+        return documentUploadTaskDao.clearStagingPathIfTerminal(taskCode, stagingPath) == 1;
+    }
+
+    @Override
     public boolean claimForRunning(String taskCode, String executionToken, LocalDateTime runningLeaseUntil) {
         return documentUploadTaskDao.claimForRunning(taskCode, executionToken, runningLeaseUntil) == 1;
     }
