@@ -17,6 +17,8 @@ public class DocumentUploadOutboxEvent {
     private String eventCode;
     private String taskCode;
     private Integer status;
+    private String publishingToken;
+    private LocalDateTime publishingLeaseUntil;
     private String failureReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

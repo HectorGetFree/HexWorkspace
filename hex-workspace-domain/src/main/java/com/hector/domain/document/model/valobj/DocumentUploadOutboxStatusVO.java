@@ -5,7 +5,9 @@ public enum DocumentUploadOutboxStatusVO {
     /** 尚未成功投递到 MQ。 */
     PENDING(0),
     /** MQ 已确认接收。 */
-    SENT(1);
+    SENT(1),
+    /** 已被一个发布器实例抢占，正在等待 MQ 确认。 */
+    PUBLISHING(2);
 
     private final int code;
     DocumentUploadOutboxStatusVO(int code) { this.code = code; }

@@ -24,7 +24,8 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 
 ## 3. 失败与幂等规则
 
-- Outbox 事件只有在 MQ 调用成功返回后标记为 `SENT`；未标记的事件会被后续扫描再次投递。
+- Outbox 事件先由发布器通过 `PENDING → PUBLISHING` 条件更新抢占发布权，并记录唯一发布令牌与租约；仅抢占成功的实例可发送 MQ。
+- Outbox 事件只有在 RabbitMQ broker 确认后、且发布令牌仍匹配时才标记为 `SENT`；发布失败或租约超时会回到 `PENDING`。确认结果未知时允许再次投递，由 UploadTask 的执行抢占保证业务幂等。
 - 消费者通过 `PENDING / RETRY_WAIT → RUNNING` 条件更新抢占任务，并写入唯一 `executionToken` 与 10 分钟执行租约；重复消息不会并发处理同一任务。
 - 消费者完成或失败时必须携带同一个 `executionToken` 做条件更新。租约到期仍为 `RUNNING` 的任务由调度器以条件更新回收为 `RETRY_WAIT` 并重新投递；已过期消费者即使继续运行，也不能再激活文档、覆盖任务状态或删除临时对象。
 - 正式对象使用任务固定的 `targetPath`。若 MinIO 写入成功但 MySQL 激活失败，重试会覆盖同一对象，并再次尝试激活，结果保持幂等。
@@ -42,4 +43,5 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 | UploadTask | `SUCCEEDED` | 文档已激活 |
 | UploadTask | `RETRY_WAIT` | 本次失败，等待下一轮投递 |
 | OutboxEvent | `PENDING` | 尚未成功发往 MQ |
-| OutboxEvent | `SENT` | 已成功调用 MQ 发送 |
+| OutboxEvent | `PUBLISHING` | 已被一个发布器实例抢占，等待 MQ 确认 |
+| OutboxEvent | `SENT` | RabbitMQ 已确认接收 |

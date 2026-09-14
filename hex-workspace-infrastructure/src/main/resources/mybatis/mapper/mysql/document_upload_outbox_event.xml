@@ -10,6 +10,8 @@
         <result property="eventCode" column="event_code"/>
         <result property="taskCode" column="task_code"/>
         <result property="status" column="status"/>
+        <result property="publishingToken" column="publishing_token"/>
+        <result property="publishingLeaseUntil" column="publishing_lease_until"/>
         <result property="failureReason" column="failure_reason"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -18,26 +20,73 @@
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.DocumentUploadOutboxEvent"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO document_upload_outbox_event (
-            event_code, task_code, status, failure_reason, created_at, updated_at
+            event_code, task_code, status, publishing_token, publishing_lease_until, failure_reason, created_at, updated_at
         ) VALUES (
-            #{eventCode}, #{taskCode}, #{status}, #{failureReason}, #{createdAt}, #{updatedAt}
+            #{eventCode}, #{taskCode}, #{status}, #{publishingToken}, #{publishingLeaseUntil}, #{failureReason}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
     <select id="queryPending" resultMap="documentUploadOutboxEventResultMap">
-        SELECT id, event_code, task_code, status, failure_reason, created_at, updated_at
+        SELECT id, event_code, task_code, status, publishing_token, publishing_lease_until, failure_reason, created_at, updated_at
         FROM document_upload_outbox_event
         WHERE status = 0
         ORDER BY id ASC
         LIMIT #{limit}
     </select>
 
-    <update id="update" parameterType="com.hector.infrastructure.dao.po.DocumentUploadOutboxEvent">
+    <update id="claimForPublishing">
         UPDATE document_upload_outbox_event
-        SET status = #{status},
+        SET status = 2,
+            publishing_token = #{publishingToken},
+            publishing_lease_until = #{publishingLeaseUntil},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE event_code = #{eventCode}
+          AND status = 0
+    </update>
+
+    <update id="markSentIfOwned">
+        UPDATE document_upload_outbox_event
+        SET status = 1,
+            publishing_token = NULL,
+            publishing_lease_until = NULL,
+            failure_reason = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE event_code = #{eventCode}
+          AND status = 2
+          AND publishing_token = #{publishingToken}
+    </update>
+
+    <update id="releaseIfOwned">
+        UPDATE document_upload_outbox_event
+        SET status = 0,
+            publishing_token = NULL,
+            publishing_lease_until = NULL,
             failure_reason = #{failureReason},
-            updated_at = #{updatedAt}
-        WHERE id = #{id}
+            updated_at = CURRENT_TIMESTAMP
+        WHERE event_code = #{eventCode}
+          AND status = 2
+          AND publishing_token = #{publishingToken}
+    </update>
+
+    <select id="queryExpiredPublishing" resultMap="documentUploadOutboxEventResultMap">
+        SELECT id, event_code, task_code, status, publishing_token, publishing_lease_until, failure_reason, created_at, updated_at
+        FROM document_upload_outbox_event
+        WHERE status = 2
+          AND publishing_lease_until &lt;= #{now}
+        ORDER BY publishing_lease_until ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="recoverExpiredPublishing">
+        UPDATE document_upload_outbox_event
+        SET status = 0,
+            publishing_token = NULL,
+            publishing_lease_until = NULL,
+            failure_reason = #{failureReason},
+            updated_at = #{now}
+        WHERE event_code = #{eventCode}
+          AND status = 2
+          AND publishing_lease_until &lt;= #{now}
     </update>
 
 </mapper>

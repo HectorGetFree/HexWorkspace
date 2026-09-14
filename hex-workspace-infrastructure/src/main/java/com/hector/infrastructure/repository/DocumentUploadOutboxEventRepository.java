@@ -8,6 +8,7 @@ import com.hector.infrastructure.dao.po.DocumentUploadOutboxEvent;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /** 文档上传 Outbox 事件仓储实现。 */
@@ -29,8 +30,28 @@ public class DocumentUploadOutboxEventRepository implements IDocumentUploadOutbo
     }
 
     @Override
-    public void update(DocumentUploadOutboxEventEntity event) {
-        dao.update(toDocumentUploadOutboxEventPo(event));
+    public boolean claimForPublishing(String eventCode, String publishingToken, LocalDateTime publishingLeaseUntil) {
+        return dao.claimForPublishing(eventCode, publishingToken, publishingLeaseUntil) == 1;
+    }
+
+    @Override
+    public boolean markSentIfOwned(String eventCode, String publishingToken) {
+        return dao.markSentIfOwned(eventCode, publishingToken) == 1;
+    }
+
+    @Override
+    public boolean releaseIfOwned(String eventCode, String publishingToken, String failureReason) {
+        return dao.releaseIfOwned(eventCode, publishingToken, failureReason) == 1;
+    }
+
+    @Override
+    public List<DocumentUploadOutboxEventEntity> listExpiredPublishing(LocalDateTime now, int limit) {
+        return dao.queryExpiredPublishing(now, limit).stream().map(this::toDocumentUploadOutboxEventEntity).toList();
+    }
+
+    @Override
+    public boolean recoverExpiredPublishing(String eventCode, LocalDateTime now, String failureReason) {
+        return dao.recoverExpiredPublishing(eventCode, now, failureReason) == 1;
     }
 
     private DocumentUploadOutboxEvent toDocumentUploadOutboxEventPo(DocumentUploadOutboxEventEntity entity) {
@@ -39,6 +60,8 @@ public class DocumentUploadOutboxEventRepository implements IDocumentUploadOutbo
                 .eventCode(entity.getEventCode())
                 .taskCode(entity.getTaskCode())
                 .status(entity.getStatus().getCode())
+                .publishingToken(entity.getPublishingToken())
+                .publishingLeaseUntil(entity.getPublishingLeaseUntil())
                 .failureReason(entity.getFailureReason())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -51,6 +74,8 @@ public class DocumentUploadOutboxEventRepository implements IDocumentUploadOutbo
                 .eventCode(po.getEventCode())
                 .taskCode(po.getTaskCode())
                 .status(DocumentUploadOutboxStatusVO.fromCode(po.getStatus()))
+                .publishingToken(po.getPublishingToken())
+                .publishingLeaseUntil(po.getPublishingLeaseUntil())
                 .failureReason(po.getFailureReason())
                 .createdAt(po.getCreatedAt())
                 .updatedAt(po.getUpdatedAt())

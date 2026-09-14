@@ -23,6 +23,10 @@ public class DocumentUploadOutboxEventEntity {
     private String taskCode;
     /** 事件投递状态。 */
     private DocumentUploadOutboxStatusVO status;
+    /** 当前发布器实例持有的发布令牌。 */
+    private String publishingToken;
+    /** 当前发布令牌的有效截止时间。 */
+    private LocalDateTime publishingLeaseUntil;
     /** 最近一次投递失败原因。 */
     private String failureReason;
     /** 创建时间。 */
@@ -30,17 +34,4 @@ public class DocumentUploadOutboxEventEntity {
     /** 最后更新时间。 */
     private LocalDateTime updatedAt;
 
-    /** MQ 已确认接收后标记事件已投递。 */
-    public void markSent() {
-        this.status = DocumentUploadOutboxStatusVO.SENT;
-        this.failureReason = null;
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    /** MQ 投递失败时保留待投递状态。 */
-    public void markPending(String reason) {
-        this.status = DocumentUploadOutboxStatusVO.PENDING;
-        this.failureReason = reason;
-        this.updatedAt = LocalDateTime.now();
-    }
 }

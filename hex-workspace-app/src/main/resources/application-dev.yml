@@ -23,6 +23,7 @@ hexworkspace:
       exchange: hex.workspace.document.exchange
       queue: hex.workspace.document.upload.queue
       routing-key: document.upload.requested
+      outbox-publish-lease-seconds: 30
 
 
 # 线程池配置
