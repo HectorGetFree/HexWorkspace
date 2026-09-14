@@ -2,6 +2,7 @@ package com.hector.domain.document.repository;
 
 import com.hector.domain.document.model.valobj.DocumentStorageObjectVO;
 
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -15,6 +16,12 @@ public interface IDocumentStorageRepository {
 
     /** 写入文档内容对象。 */
     void upload(String objectKey, byte[] content, String contentType);
+
+    /** 以流式方式写入文档内容对象。 */
+    void upload(String objectKey, InputStream content, long contentSize, String contentType);
+
+    /** 在对象存储服务端复制对象，并写入指定 MIME 类型。 */
+    void copy(String sourceObjectKey, String targetObjectKey, String contentType);
 
     /** 读取文档内容对象。 */
     byte[] download(String objectKey);

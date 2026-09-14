@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Supplier;
@@ -78,14 +79,16 @@ public class DocumentController extends BaseController {
             workspaceService.assertOwner(workspaceId, currentUserId);
             validateUpload(file);
             // 2. 任意格式的本地内容直接导入为云文档，平台不产生第三种可独立管理的资源。
-            DocumentEntity documentEntity = documentService.importDocument(
-                    workspaceId, currentUserId, parentId, file.getOriginalFilename(),
-                    file.getContentType(), file.getBytes(), idempotencyKey);
-            log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{}",
-                    workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode());
-            return success(DocumentCreateResponseDTO.builder()
-                    .documentCode(documentEntity.getDocumentCode())
-                    .build());
+            try (InputStream inputStream = file.getInputStream()) {
+                DocumentEntity documentEntity = documentService.importDocument(
+                        workspaceId, currentUserId, parentId, file.getOriginalFilename(),
+                        file.getContentType(), inputStream, file.getSize(), idempotencyKey);
+                log.info("创建文档完成 workspaceId:{} userId:{} documentId:{} documentCode:{}",
+                        workspaceId, currentUserId, documentEntity.getId(), documentEntity.getDocumentCode());
+                return success(DocumentCreateResponseDTO.builder()
+                        .documentCode(documentEntity.getDocumentCode())
+                        .build());
+            }
         } catch (BusinessException exception) {
             log.error("创建文档业务异常 code:{} info:{}", exception.getCode(), exception.getInfo(), exception);
             return failure(exception.getCode(), exception.getInfo());

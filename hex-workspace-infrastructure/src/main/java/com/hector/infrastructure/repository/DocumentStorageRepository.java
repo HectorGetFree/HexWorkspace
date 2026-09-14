@@ -3,6 +3,9 @@ package com.hector.infrastructure.repository;
 import com.hector.domain.document.model.valobj.DocumentStorageObjectVO;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
 import io.minio.BucketExistsArgs;
+import io.minio.CopyObjectArgs;
+import io.minio.CopySource;
+import io.minio.Directive;
 import io.minio.GetObjectArgs;
 import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
@@ -20,6 +23,7 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /** MinIO 文档对象存储实现。 */
 @Repository
@@ -37,16 +41,37 @@ public class DocumentStorageRepository implements IDocumentStorageRepository {
 
     @Override
     public void upload(String objectKey, byte[] content, String contentType) {
+        upload(objectKey, new ByteArrayInputStream(content), content.length, contentType);
+    }
+
+    @Override
+    public void upload(String objectKey, InputStream content, long contentSize, String contentType) {
         try {
             ensureBucketExists();
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(bucketName)
                     .object(objectKey)
-                    .stream(new ByteArrayInputStream(content), content.length, -1)
+                    .stream(content, contentSize, -1)
                     .contentType(contentType)
                     .build());
         } catch (Exception exception) {
             throw new IllegalStateException("MinIO 文档写入失败", exception);
+        }
+    }
+
+    @Override
+    public void copy(String sourceObjectKey, String targetObjectKey, String contentType) {
+        try {
+            ensureBucketExists();
+            minioClient.copyObject(CopyObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(targetObjectKey)
+                    .source(CopySource.builder().bucket(bucketName).object(sourceObjectKey).build())
+                    .metadataDirective(Directive.REPLACE)
+                    .headers(Map.of("Content-Type", contentType))
+                    .build());
+        } catch (Exception exception) {
+            throw new IllegalStateException("MinIO 文档对象复制失败", exception);
         }
     }
 

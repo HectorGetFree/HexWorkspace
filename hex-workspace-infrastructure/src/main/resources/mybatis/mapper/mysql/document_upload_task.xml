@@ -10,6 +10,7 @@
         <result property="documentId" column="document_id"/>
         <result property="stagingPath" column="staging_path"/>
         <result property="targetPath" column="target_path"/>
+        <result property="contentType" column="content_type"/>
         <result property="status" column="status"/>
         <result property="executionToken" column="execution_token"/>
         <result property="runningLeaseUntil" column="running_lease_until"/>
@@ -21,17 +22,17 @@
     </resultMap>
 
     <sql id="documentUploadTaskColumns">
-        id, task_code, document_id, staging_path, target_path, status, execution_token, running_lease_until,
+        id, task_code, document_id, staging_path, target_path, content_type, status, execution_token, running_lease_until,
         retry_count, next_retry_at, failure_reason, created_at, updated_at
     </sql>
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.DocumentUploadTask"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO document_upload_task (
-            task_code, document_id, staging_path, target_path, status, execution_token, running_lease_until,
+            task_code, document_id, staging_path, target_path, content_type, status, execution_token, running_lease_until,
             retry_count, next_retry_at, failure_reason, created_at, updated_at
         ) VALUES (
-            #{taskCode}, #{documentId}, #{stagingPath}, #{targetPath}, #{status}, #{executionToken}, #{runningLeaseUntil},
+            #{taskCode}, #{documentId}, #{stagingPath}, #{targetPath}, #{contentType}, #{status}, #{executionToken}, #{runningLeaseUntil},
             #{retryCount}, #{nextRetryAt}, #{failureReason}, #{createdAt}, #{updatedAt}
         )
     </insert>

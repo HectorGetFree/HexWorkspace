@@ -25,6 +25,8 @@ public class DocumentUploadTaskEntity {
     private String stagingPath;
     /** MinIO 正式对象路径。 */
     private String targetPath;
+    /** 正式对象应保存的 MIME 类型。 */
+    private String contentType;
     /** 任务当前执行状态。 */
     private DocumentUploadTaskStatusVO status;
     /** 当前消费者持有的执行令牌，用于拒绝过期消费者的状态回写。 */

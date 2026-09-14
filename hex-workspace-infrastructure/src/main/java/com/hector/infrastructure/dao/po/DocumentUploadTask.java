@@ -18,6 +18,7 @@ public class DocumentUploadTask {
     private Long documentId;
     private String stagingPath;
     private String targetPath;
+    private String contentType;
     private Integer status;
     private String executionToken;
     private LocalDateTime runningLeaseUntil;

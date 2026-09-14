@@ -20,10 +20,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,7 +71,6 @@ class DocumentUploadTaskServiceImplTest {
         when(taskRepository.claimForRunning(eq("task_001"), anyString(), any(LocalDateTime.class)))
                 .thenReturn(true);
         when(taskRepository.findByTaskCode("task_001")).thenReturn(Optional.of(task));
-        when(storageRepository.download("staging/task_001")).thenReturn(new byte[]{1});
         when(taskRepository.completeIfOwned(eq("task_001"), anyString())).thenReturn(false);
 
         uploadTaskService.execute("task_001");
@@ -89,7 +89,9 @@ class DocumentUploadTaskServiceImplTest {
         when(taskRepository.claimForRunning(eq("task_001"), anyString(), any(LocalDateTime.class)))
                 .thenReturn(true);
         when(taskRepository.findByTaskCode("task_001")).thenReturn(Optional.of(task));
-        when(storageRepository.download("staging/task_001")).thenThrow(new IllegalStateException("MinIO 拒绝访问"));
+        doThrow(new IllegalStateException("MinIO 拒绝访问"))
+                .when(storageRepository)
+                .copy("staging/task_001", "document/task_001", "application/pdf");
         when(taskRepository.markFailedIfOwned(eq("task_001"), anyString(), eq("MinIO 拒绝访问")))
                 .thenReturn(true);
         when(documentRepository.findById(10L)).thenReturn(Optional.of(document));
@@ -110,6 +112,7 @@ class DocumentUploadTaskServiceImplTest {
                 .documentId(10L)
                 .stagingPath("staging/" + taskCode)
                 .targetPath("document/" + taskCode)
+                .contentType("application/pdf")
                 .status(DocumentUploadTaskStatusVO.RUNNING)
                 .retryCount(retryCount)
                 .build();

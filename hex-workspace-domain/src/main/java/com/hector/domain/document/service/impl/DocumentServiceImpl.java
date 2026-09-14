@@ -20,7 +20,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
@@ -55,43 +58,25 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Override
     public DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
-                                         String contentType, byte[] content, String idempotencyKey) {
+                                         String contentType, InputStream content, long contentSize, String idempotencyKey) {
         validateCreateCommand(workspaceId, ownerUserId, parentId, fileName);
-        if (content == null) {
+        if (content == null || contentSize <= 0) {
             throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
         }
         String normalizedFileName = normalizeFileName(fileName, false);
         String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
         String normalizedContentType = normalizeContentType(contentType);
-        String contentHash = hash(content);
-
-        DocumentEntity existing = documentRepository.findByUploadIdempotencyKey(workspaceId, ownerUserId, normalizedKey)
-                .orElse(null);
-
-        if (existing != null) {
-            return assertAndReuseUploadDocument(existing, parentId, normalizedFileName, normalizedContentType, contentHash);
-        }
-
-        try {
-            return createDocument(workspaceId, ownerUserId, parentId, normalizedFileName,
-                    DocumentTypeVO.LOCAL_UPLOADED, normalizedContentType, content, normalizedKey);
-        } catch (RuntimeException exception) {
-            DocumentEntity duplicate = documentRepository.findByUploadIdempotencyKey(workspaceId, ownerUserId, normalizedKey)
-                    .orElse(null);
-            if (duplicate != null) {
-                return assertAndReuseUploadDocument(duplicate, parentId, normalizedFileName, normalizedContentType, contentHash);
-            }
-            throw exception;
-        }
-
+        return createDocument(workspaceId, ownerUserId, parentId, normalizedFileName,
+                DocumentTypeVO.LOCAL_UPLOADED, normalizedContentType, content, contentSize, normalizedKey);
     }
 
     @Override
     public DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
                                                  String fileName, String content) {
         String normalized = normalizeFileName(fileName, true);
+        byte[] contentBytes = (content == null ? "" : content).getBytes(StandardCharsets.UTF_8);
         return createDocument(workspaceId, ownerUserId, parentId, normalized, DocumentTypeVO.PLATFORM_CREATED,
-                "text/markdown; charset=utf-8", (content == null ? "" : content).getBytes(StandardCharsets.UTF_8), null);
+                "text/markdown; charset=utf-8", new ByteArrayInputStream(contentBytes), contentBytes.length, null);
     }
 
     @Override
@@ -179,73 +164,120 @@ public class DocumentServiceImpl implements IDocumentService {
         return document;
     }
 
-    /** 创建流程：先写临时对象，再原子登记文档、上传任务和 Outbox 事件。 */
+    /** 创建流程：流式写临时对象并计算摘要，再原子登记文档、上传任务和 Outbox 事件。 */
     private DocumentEntity createDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
-                                          DocumentTypeVO type, String contentType, byte[] content,
+                                          DocumentTypeVO type, String contentType, InputStream content, long contentSize,
                                           String idempotencyKey) {
-        if (content == null) throw new BusinessException(ResponseCode.EMPTY_DOCUMENT_CONTENT);
         String documentCode = generateDocumentCode();
         String stagingPath = newStagingPath(documentCode);
         String targetPath = newStoragePath(workspaceId, documentCode);
         String normalizedContentType = normalizeContentType(contentType);
+        boolean documentRegistered = false;
+        String contentHash = null;
 
-        // 1. 请求线程仅写入临时对象；正式对象由 MQ 任务异步转正。
-        documentStorageRepository.upload(stagingPath, content, normalizedContentType);
         try {
-            // 2. 文档、任务和 Outbox 事件必须在同一个 MySQL 事务中提交。
-            return executeInTransaction(() -> {
-                folderService.getActiveFolder(workspaceId, parentId);
-                assertFileNameAvailable(workspaceId, parentId, fileName, null);
+            // 1. 请求内容以流方式写入临时对象，同时计算摘要，不将完整文件读入 JVM 内存。
+            contentHash = uploadStagingContent(stagingPath, content, contentSize, normalizedContentType);
 
-                LocalDateTime now = LocalDateTime.now();
-                DocumentEntity document = documentRepository.save(DocumentEntity.builder()
-                        .documentCode(documentCode)
-                        .workspaceId(workspaceId)
-                        .parentId(parentId)
-                        .ownerUserId(ownerUserId)
-                        .title(resolveTitle(fileName))
-                        .fileName(fileName)
-                        .documentType(type)
-                        .status(DocumentStatusVO.CREATING)
-                        .storageType(DocumentStorageTypeVO.MINIO)
-                        .bucketName(documentStorageRepository.getBucketName())
-                        .storagePath(targetPath)
-                        .contentType(normalizedContentType)
-                        .contentSize((long) content.length)
-                        .contentHash(hash(content))
-                        .idempotencyKey(idempotencyKey)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build());
+            // 2. 已存在同一幂等请求时复用既有文档，并在 finally 中删除本次重复写入的临时对象。
+            if (idempotencyKey != null) {
+                DocumentEntity existing = documentRepository.findByUploadIdempotencyKey(
+                        workspaceId, ownerUserId, idempotencyKey).orElse(null);
+                if (existing != null) {
+                    return assertAndReuseUploadDocument(
+                            existing, parentId, fileName, normalizedContentType, contentHash);
+                }
+            }
 
-                String taskCode = newTaskCode();
-                documentUploadTaskRepository.save(DocumentUploadTaskEntity.builder()
-                        .taskCode(taskCode)
-                        .documentId(document.getId())
-                        .stagingPath(stagingPath)
-                        .targetPath(targetPath)
-                        .status(DocumentUploadTaskStatusVO.PENDING)
-                        .retryCount(0)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build());
-                documentUploadOutboxEventRepository.save(DocumentUploadOutboxEventEntity.builder()
-                        .eventCode(newEventCode())
-                        .taskCode(taskCode)
-                        .status(DocumentUploadOutboxStatusVO.PENDING)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build());
-                return document;
-            });
+            // 3. 文档、任务和 Outbox 事件必须在同一个 MySQL 事务中提交。
+            DocumentEntity document = registerDocument(workspaceId, ownerUserId, parentId, fileName, type,
+                    normalizedContentType, contentSize, contentHash, idempotencyKey, documentCode, stagingPath, targetPath);
+            documentRegistered = true;
+            return document;
         } catch (RuntimeException exception) {
-            // 3. 本地事务未提交时立即清理本次临时对象；进程中断遗留对象由后续清理任务处理。
-            try {
-                documentStorageRepository.delete(stagingPath);
-            } catch (Exception ignored) {
-                // 本次异常优先按原始事务失败返回；残留对象由独立清理任务处理。
+            if (idempotencyKey != null && contentHash != null) {
+                DocumentEntity duplicate = documentRepository.findByUploadIdempotencyKey(
+                        workspaceId, ownerUserId, idempotencyKey).orElse(null);
+                if (duplicate != null) {
+                    return assertAndReuseUploadDocument(duplicate, parentId, fileName,
+                            normalizedContentType, contentHash);
+                }
             }
             throw exception;
+        } finally {
+            if (!documentRegistered) {
+                deleteStagingObjectQuietly(stagingPath);
+            }
+        }
+    }
+
+    private DocumentEntity registerDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
+                                            DocumentTypeVO type, String contentType, long contentSize, String contentHash,
+                                            String idempotencyKey, String documentCode, String stagingPath, String targetPath) {
+        return executeInTransaction(() -> {
+            folderService.getActiveFolder(workspaceId, parentId);
+            assertFileNameAvailable(workspaceId, parentId, fileName, null);
+
+            LocalDateTime now = LocalDateTime.now();
+            DocumentEntity document = documentRepository.save(DocumentEntity.builder()
+                    .documentCode(documentCode)
+                    .workspaceId(workspaceId)
+                    .parentId(parentId)
+                    .ownerUserId(ownerUserId)
+                    .title(resolveTitle(fileName))
+                    .fileName(fileName)
+                    .documentType(type)
+                    .status(DocumentStatusVO.CREATING)
+                    .storageType(DocumentStorageTypeVO.MINIO)
+                    .bucketName(documentStorageRepository.getBucketName())
+                    .storagePath(targetPath)
+                    .contentType(contentType)
+                    .contentSize(contentSize)
+                    .contentHash(contentHash)
+                    .idempotencyKey(idempotencyKey)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build());
+
+            String taskCode = newTaskCode();
+            documentUploadTaskRepository.save(DocumentUploadTaskEntity.builder()
+                    .taskCode(taskCode)
+                    .documentId(document.getId())
+                    .stagingPath(stagingPath)
+                    .targetPath(targetPath)
+                    .contentType(contentType)
+                    .status(DocumentUploadTaskStatusVO.PENDING)
+                    .retryCount(0)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build());
+            documentUploadOutboxEventRepository.save(DocumentUploadOutboxEventEntity.builder()
+                    .eventCode(newEventCode())
+                    .taskCode(taskCode)
+                    .status(DocumentUploadOutboxStatusVO.PENDING)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build());
+            return document;
+        });
+    }
+
+    private String uploadStagingContent(String stagingPath, InputStream content, long contentSize, String contentType) {
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            DigestInputStream digestInputStream = new DigestInputStream(content, messageDigest);
+            documentStorageRepository.upload(stagingPath, digestInputStream, contentSize, contentType);
+            return HexFormat.of().formatHex(messageDigest.digest());
+        } catch (Exception exception) {
+            throw new BusinessException(ResponseCode.DOCUMENT_CONTENT_STORE_FAILED);
+        }
+    }
+
+    private void deleteStagingObjectQuietly(String stagingPath) {
+        try {
+            documentStorageRepository.delete(stagingPath);
+        } catch (Exception ignored) {
+            // 当前异常优先按原始失败返回；残留对象由 staging 孤儿清理任务处理。
         }
     }
 

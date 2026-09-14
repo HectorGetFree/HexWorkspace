@@ -61,9 +61,8 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         DocumentUploadTaskEntity task = taskRepository.findByTaskCode(taskCode)
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
         try {
-            // 2. 临时对象复制到固定正式路径；重复写入同一路径是幂等操作。
-            byte[] content = storageRepository.download(task.getStagingPath());
-            storageRepository.upload(task.getTargetPath(), content, "application/octet-stream");
+            // 2. 由 MinIO 服务端复制临时对象到固定正式路径，避免文件内容经过消费者 JVM。
+            storageRepository.copy(task.getStagingPath(), task.getTargetPath(), task.getContentType());
             // 3. 正式对象成功后，在一个 MySQL 事务中同时完成任务和文档状态切换。
             boolean completed = executeInTransaction(() -> complete(task, executionToken));
             if (completed) {

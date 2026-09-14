@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS `document_upload_task` (
     `document_id` BIGINT NOT NULL COMMENT '关联文档ID',
     `staging_path` VARCHAR(512) NOT NULL COMMENT 'MinIO临时对象路径',
     `target_path` VARCHAR(512) NOT NULL COMMENT 'MinIO正式对象路径',
+    `content_type` VARCHAR(128) NOT NULL COMMENT '正式对象MIME类型',
     `status` TINYINT UNSIGNED NOT NULL COMMENT '0=PENDING / 1=RUNNING / 2=SUCCEEDED / 3=RETRY_WAIT / 4=FAILED',
     `execution_token` VARCHAR(64) DEFAULT NULL COMMENT '当前消费者执行令牌',
     `running_lease_until` DATETIME DEFAULT NULL COMMENT '当前消费者执行租约截止时间',

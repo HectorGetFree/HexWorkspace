@@ -15,7 +15,7 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
   → MinIO staging/{documentCode}/... 临时对象
   → MySQL 同一事务：Document(CREATING) + UploadTask(PENDING) + OutboxEvent(PENDING)
   → 定时 Outbox 发布器投递 taskCode 至 RabbitMQ
-  → 消费者读取临时对象并写入固定正式 objectKey
+  → 消费者通过 MinIO 服务端复制临时对象至固定正式 objectKey
   → MySQL 同一事务：UploadTask(SUCCEEDED) + Document(ACTIVE)
   → 删除临时对象
 ```
@@ -29,10 +29,13 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 - 消费者通过 `PENDING / RETRY_WAIT → RUNNING` 条件更新抢占任务，并写入唯一 `executionToken` 与 10 分钟执行租约；重复消息不会并发处理同一任务。
 - 消费者完成或失败时必须携带同一个 `executionToken` 做条件更新。租约到期仍为 `RUNNING` 的任务由调度器以条件更新回收为 `RETRY_WAIT` 并重新投递；已过期消费者即使继续运行，也不能再激活文档、覆盖任务状态或删除临时对象。
 - 正式对象使用任务固定的 `targetPath`。若 MinIO 写入成功但 MySQL 激活失败，重试会覆盖同一对象，并再次尝试激活，结果保持幂等。
+- UploadTask 保存 `contentType`；MinIO 服务端复制正式对象时使用该类型写入对象元数据，避免正式对象退化为 `application/octet-stream`。
+- 本地文件从 HTTP 输入流直接写入 staging，并在写入过程中计算 SHA-256；正式对象转正使用 MinIO 服务端复制，文件内容不再在请求线程和消费者线程分别完整读入 JVM 内存。
 - 消费失败或执行租约超时后，未耗尽 `max-retry-count` 的任务进入 `RETRY_WAIT`，记录原因和下次重试时间；定时任务重新创建 Outbox 事件，而不依赖消息中间件的内存重试。
 - `max-retry-count` 默认值为 3，表示首次执行失败后最多再次投递 3 次。重试额度耗尽后，UploadTask 与 Document 在同一 MySQL 事务中进入 `FAILED`，任务不再被扫描投递。
 - 临时对象写入成功但本地事务提交失败时，请求线程会尽力删除临时对象。进程在该窗口异常退出时，可能留下无任务引用的临时对象；定时清理任务按 `staging/` 前缀扫描，保留 24 小时后仅删除没有 UploadTask 引用的对象。
 - staging 路径仅由 UploadTask 保存；Document 不保存该技术中间态，也不承担无任务 `CREATING` 文档的恢复职责。
+- 并发首次上传使用相同幂等键时，数据库唯一索引仍会保证只有一个 Document、Task 与 Outbox；为保持“无任务 CREATING 文档不需要恢复”的边界，当前仍可能短暂产生重复 staging 写入，后续需配合上传预留或无任务 CREATING 恢复机制后再优化。
 
 ## 4. 状态
 

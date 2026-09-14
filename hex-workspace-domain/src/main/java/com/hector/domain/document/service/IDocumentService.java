@@ -2,6 +2,7 @@ package com.hector.domain.document.service;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
 
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -12,7 +13,7 @@ public interface IDocumentService {
 
     /** 将本地内容导入为云文档。 */
     DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
-                                  String contentType, byte[] content, String idempotencyKey);
+                                  String contentType, InputStream content, long contentSize, String idempotencyKey);
 
     /** 在指定目录中新建 Markdown 云文档。 */
     DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
