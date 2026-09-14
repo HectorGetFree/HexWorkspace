@@ -111,8 +111,19 @@ public class DocumentEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /** 将首次内容写入失败且无法继续重试的文档标记为失败。 */
+    public void failUpload() {
+        this.status = DocumentStatusVO.FAILED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     /** 判断文档是否处于可用状态。 */
     public boolean isActive() {
         return DocumentStatusVO.ACTIVE == this.status;
+    }
+
+    /** 判断文档是否应展示在资料库列表中。 */
+    public boolean isVisibleInWorkspace() {
+        return DocumentStatusVO.ACTIVE == this.status || DocumentStatusVO.FAILED == this.status;
     }
 }

@@ -33,11 +33,11 @@ public interface IDocumentService {
     /** 将文档标记为逻辑删除状态。 */
     DocumentEntity deleteDocument(Long workspaceId, String documentCode);
 
-    /** 查询父目录下处于可用状态的直属文档。 */
-    List<DocumentEntity> listActiveDocumentsByParentId(Long workspaceId, Long parentId);
+    /** 查询父目录下可展示的直属文档。 */
+    List<DocumentEntity> listVisibleDocumentsByParentId(Long workspaceId, Long parentId);
 
-    /** 查询 Workspace 下全部处于可用状态的文档。 */
-    List<DocumentEntity> listActiveDocuments(Long workspaceId);
+    /** 查询 Workspace 下全部可展示的文档。 */
+    List<DocumentEntity> listVisibleDocuments(Long workspaceId);
 
     /** 查询并校验属于指定 Workspace 的可用文档。 */
     DocumentEntity getActiveDocument(Long workspaceId, String documentCode);

@@ -79,6 +79,19 @@
           AND execution_token = #{executionToken}
     </update>
 
+    <update id="markFailedIfOwned">
+        UPDATE document_upload_task
+        SET status = 4,
+            execution_token = NULL,
+            running_lease_until = NULL,
+            next_retry_at = NULL,
+            failure_reason = #{failureReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE task_code = #{taskCode}
+          AND status = 1
+          AND execution_token = #{executionToken}
+    </update>
+
     <select id="queryRetryDue" resultMap="documentUploadTaskResultMap">
         SELECT <include refid="documentUploadTaskColumns"/>
         FROM document_upload_task
@@ -114,6 +127,19 @@
             running_lease_until = NULL,
             retry_count = retry_count + 1,
             next_retry_at = #{nextRetryAt},
+            failure_reason = #{failureReason},
+            updated_at = #{now}
+        WHERE task_code = #{taskCode}
+          AND status = 1
+          AND running_lease_until &lt;= #{now}
+    </update>
+
+    <update id="markExpiredRunningFailed">
+        UPDATE document_upload_task
+        SET status = 4,
+            execution_token = NULL,
+            running_lease_until = NULL,
+            next_retry_at = NULL,
             failure_reason = #{failureReason},
             updated_at = #{now}
         WHERE task_code = #{taskCode}

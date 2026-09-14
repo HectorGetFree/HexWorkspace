@@ -26,7 +26,7 @@ public interface IDocumentDao {
 
     List<Document> queryByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    List<Document> queryActiveByParentId(@Param("workspaceId") Long workspaceId, @Param("parentId") Long parentId);
+    List<Document> queryVisibleByParentId(@Param("workspaceId") Long workspaceId, @Param("parentId") Long parentId);
 
     Document queryActiveByParentIdAndFileName(@Param("workspaceId") Long workspaceId,
                                               @Param("parentId") Long parentId,

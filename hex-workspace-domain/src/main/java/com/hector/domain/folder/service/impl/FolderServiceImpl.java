@@ -166,7 +166,7 @@ public class FolderServiceImpl implements IFolderService {
         }
 
         // 2. 将当前目录的云文档一并逻辑删除，底层版本对象保留以支持未来恢复。
-        for (DocumentEntity document : documentRepository.listActiveByParentId(workspaceId, root.getId())) {
+        for (DocumentEntity document : documentRepository.listVisibleByParentId(workspaceId, root.getId())) {
             document.delete();
             documentRepository.update(document);
         }

@@ -14,6 +14,7 @@ import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,6 +29,9 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
     private static final int RETRY_DELAY_MINUTES = 1;
     private static final int BATCH_SIZE = 100;
     private static final int RUNNING_LEASE_MINUTES = 10;
+
+    @Value("${hexworkspace.document-upload.max-retry-count:3}")
+    private int maxRetryCount = 3;
 
     @Resource
     private IDocumentUploadTaskRepository taskRepository;
@@ -72,7 +76,7 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         } catch (Exception exception) {
             log.error("文档上传任务-执行失败 taskCode:{} error:{}", taskCode, exception.getMessage(), exception);
             executeInTransaction(() -> {
-                fail(taskCode, executionToken, exception);
+                fail(task, executionToken, exception);
                 return true;
             });
         }
@@ -104,9 +108,17 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
     @Override
     public void recoverExpiredRunningTasks() {
         for (DocumentUploadTaskEntity task : taskRepository.listExpiredRunning(LocalDateTime.now(), BATCH_SIZE)) {
-            LocalDateTime now = LocalDateTime.now();
-            taskRepository.recoverExpiredRunning(task.getTaskCode(), now, now,
-                    "文档上传任务执行租约超时");
+            executeInTransaction(() -> {
+                LocalDateTime now = LocalDateTime.now();
+                String failureReason = "文档上传任务执行租约超时";
+                if (hasRetriesRemaining(task)) {
+                    taskRepository.recoverExpiredRunning(task.getTaskCode(), now, now, failureReason);
+                    return true;
+                }
+
+                markDocumentFailedWhenExpired(task, now, failureReason);
+                return true;
+            });
         }
     }
 
@@ -121,9 +133,42 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         return true;
     }
 
-    private void fail(String taskCode, String executionToken, Exception exception) {
-        taskRepository.markRetryIfOwned(taskCode, executionToken, exception.getMessage(),
-                LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES));
+    private void fail(DocumentUploadTaskEntity task, String executionToken, Exception exception) {
+        if (hasRetriesRemaining(task)) {
+            taskRepository.markRetryIfOwned(task.getTaskCode(), executionToken, exception.getMessage(),
+                    LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES));
+            return;
+        }
+
+        markDocumentFailedIfOwned(task, executionToken, exception.getMessage());
+    }
+
+    private void markDocumentFailedIfOwned(DocumentUploadTaskEntity task, String executionToken, String failureReason) {
+        if (!taskRepository.markFailedIfOwned(task.getTaskCode(), executionToken, failureReason)) {
+            return;
+        }
+        markDocumentFailed(task, failureReason);
+    }
+
+    private void markDocumentFailedWhenExpired(DocumentUploadTaskEntity task, LocalDateTime now, String failureReason) {
+        if (!taskRepository.markExpiredRunningFailed(task.getTaskCode(), now, failureReason)) {
+            return;
+        }
+        markDocumentFailed(task, failureReason);
+    }
+
+    private void markDocumentFailed(DocumentUploadTaskEntity task, String failureReason) {
+        DocumentEntity document = documentRepository.findById(task.getDocumentId())
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        document.failUpload();
+        documentRepository.update(document);
+        log.error("文档上传任务-重试次数耗尽 taskCode:{} documentId:{} failureReason:{}",
+                task.getTaskCode(), task.getDocumentId(), failureReason);
+    }
+
+    private boolean hasRetriesRemaining(DocumentUploadTaskEntity task) {
+        int retryCount = task.getRetryCount() == null ? 0 : task.getRetryCount();
+        return retryCount < maxRetryCount;
     }
 
     private <T> T executeInTransaction(java.util.function.Supplier<T> action) {

@@ -16,8 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -62,6 +64,30 @@ class DocumentServiceImplTest {
 
         assertThrows(BusinessException.class,
                 () -> documentService.editMarkdownDocument(10L, "doc_pdf", 1L, "内容"));
+    }
+
+    @Test
+    void shouldExposeFailedDocumentInWorkspaceList() {
+        when(documentRepository.listByWorkspaceId(10L)).thenReturn(List.of(
+                document("已完成.md", DocumentTypeVO.PLATFORM_CREATED),
+                DocumentEntity.builder()
+                        .id(31L)
+                        .documentCode("doc_failed")
+                        .workspaceId(10L)
+                        .fileName("失败.pdf")
+                        .documentType(DocumentTypeVO.LOCAL_UPLOADED)
+                        .status(DocumentStatusVO.FAILED)
+                        .build(),
+                DocumentEntity.builder()
+                        .id(32L)
+                        .documentCode("doc_creating")
+                        .workspaceId(10L)
+                        .fileName("上传中.pdf")
+                        .documentType(DocumentTypeVO.LOCAL_UPLOADED)
+                        .status(DocumentStatusVO.CREATING)
+                        .build()));
+
+        assertEquals(2, documentService.listVisibleDocuments(10L).size());
     }
 
     private DocumentEntity document(String fileName, DocumentTypeVO type) {

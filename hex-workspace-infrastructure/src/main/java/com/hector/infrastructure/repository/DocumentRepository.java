@@ -81,8 +81,8 @@ public class DocumentRepository implements IDocumentRepository {
     }
 
     @Override
-    public List<DocumentEntity> listActiveByParentId(Long workspaceId, Long parentId) {
-        return documentDao.queryActiveByParentId(workspaceId, parentId).stream()
+    public List<DocumentEntity> listVisibleByParentId(Long workspaceId, Long parentId) {
+        return documentDao.queryVisibleByParentId(workspaceId, parentId).stream()
                 .map(this::toEntity).collect(Collectors.toList());
     }
 

@@ -29,7 +29,8 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 - 消费者通过 `PENDING / RETRY_WAIT → RUNNING` 条件更新抢占任务，并写入唯一 `executionToken` 与 10 分钟执行租约；重复消息不会并发处理同一任务。
 - 消费者完成或失败时必须携带同一个 `executionToken` 做条件更新。租约到期仍为 `RUNNING` 的任务由调度器以条件更新回收为 `RETRY_WAIT` 并重新投递；已过期消费者即使继续运行，也不能再激活文档、覆盖任务状态或删除临时对象。
 - 正式对象使用任务固定的 `targetPath`。若 MinIO 写入成功但 MySQL 激活失败，重试会覆盖同一对象，并再次尝试激活，结果保持幂等。
-- 消费失败后任务进入 `RETRY_WAIT`，记录原因和下次重试时间；定时任务重新创建 Outbox 事件，而不依赖消息中间件的内存重试。
+- 消费失败或执行租约超时后，未耗尽 `max-retry-count` 的任务进入 `RETRY_WAIT`，记录原因和下次重试时间；定时任务重新创建 Outbox 事件，而不依赖消息中间件的内存重试。
+- `max-retry-count` 默认值为 3，表示首次执行失败后最多再次投递 3 次。重试额度耗尽后，UploadTask 与 Document 在同一 MySQL 事务中进入 `FAILED`，任务不再被扫描投递。
 - 临时对象写入成功但本地事务提交失败时，请求线程会尽力删除临时对象。进程在该窗口异常退出时，可能留下无任务引用的临时对象；这是对象存储侧残留，后续应按 `staging/` 前缀和保留期增加独立清理任务。
 
 ## 4. 状态
@@ -38,10 +39,12 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 | --- | --- | --- |
 | Document | `CREATING` | 已登记上传任务，尚不可读 |
 | Document | `ACTIVE` | 正式 MinIO 对象已写入，可读 |
+| Document | `FAILED` | 首次内容写入失败且重试额度耗尽 |
 | UploadTask | `PENDING` | 等待 Outbox 投递 |
 | UploadTask | `RUNNING` | 消费者已抢占 |
 | UploadTask | `SUCCEEDED` | 文档已激活 |
 | UploadTask | `RETRY_WAIT` | 本次失败，等待下一轮投递 |
+| UploadTask | `FAILED` | 重试额度耗尽，已终止，不再投递 |
 | OutboxEvent | `PENDING` | 尚未成功发往 MQ |
 | OutboxEvent | `PUBLISHING` | 已被一个发布器实例抢占，等待 MQ 确认 |
 | OutboxEvent | `SENT` | RabbitMQ 已确认接收 |

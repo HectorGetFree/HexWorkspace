@@ -95,12 +95,12 @@
         ORDER BY updated_at DESC, id DESC
     </select>
 
-    <select id="queryActiveByParentId" resultMap="documentResultMap">
+    <select id="queryVisibleByParentId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status,
                storage_type, bucket_name, storage_path, content_type, content_size, content_hash,
                idempotency_key, staging_path, created_at, updated_at
         FROM `document`
-        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status = 2
+        WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status IN (2, 4)
         ORDER BY file_name ASC, id ASC
     </select>
 

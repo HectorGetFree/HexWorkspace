@@ -1,6 +1,8 @@
 package com.hector.domain.document.service.impl;
 
+import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
+import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +51,7 @@ class DocumentUploadTaskServiceImplTest {
 
     @Test
     void shouldRecoverExpiredRunningTaskToRetryWait() {
+        mockTransactionTemplate();
         DocumentUploadTaskEntity task = task("task_001");
         when(taskRepository.listExpiredRunning(any(LocalDateTime.class), eq(100)))
                 .thenReturn(List.of(task));
@@ -74,14 +78,40 @@ class DocumentUploadTaskServiceImplTest {
         verify(storageRepository, never()).delete("staging/task_001");
     }
 
+    @Test
+    void shouldMarkTaskAndDocumentFailedWhenRetryCountExhausted() {
+        mockTransactionTemplate();
+        DocumentUploadTaskEntity task = task("task_001", 3);
+        DocumentEntity document = DocumentEntity.builder()
+                .id(10L)
+                .status(DocumentStatusVO.CREATING)
+                .build();
+        when(taskRepository.claimForRunning(eq("task_001"), anyString(), any(LocalDateTime.class)))
+                .thenReturn(true);
+        when(taskRepository.findByTaskCode("task_001")).thenReturn(Optional.of(task));
+        when(storageRepository.download("staging/task_001")).thenThrow(new IllegalStateException("MinIO 拒绝访问"));
+        when(taskRepository.markFailedIfOwned(eq("task_001"), anyString(), eq("MinIO 拒绝访问")))
+                .thenReturn(true);
+        when(documentRepository.findById(10L)).thenReturn(Optional.of(document));
+
+        uploadTaskService.execute("task_001");
+
+        verify(documentRepository).update(document);
+        assertEquals(DocumentStatusVO.FAILED, document.getStatus());
+    }
+
     private DocumentUploadTaskEntity task(String taskCode) {
+        return task(taskCode, 0);
+    }
+
+    private DocumentUploadTaskEntity task(String taskCode, int retryCount) {
         return DocumentUploadTaskEntity.builder()
                 .taskCode(taskCode)
                 .documentId(10L)
                 .stagingPath("staging/" + taskCode)
                 .targetPath("document/" + taskCode)
                 .status(DocumentUploadTaskStatusVO.RUNNING)
-                .retryCount(0)
+                .retryCount(retryCount)
                 .build();
     }
 

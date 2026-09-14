@@ -73,7 +73,7 @@ public class FolderController extends BaseController {
                     .folders(folderService.listChildren(workspaceId, folderId).stream()
                             .map(this::toResponse)
                             .collect(Collectors.toList()))
-                    .documents(documentService.listActiveDocumentsByParentId(workspaceId, folderId).stream()
+                    .documents(documentService.listVisibleDocumentsByParentId(workspaceId, folderId).stream()
                             .map(this::toDocumentResponse)
                             .collect(Collectors.toList()))
                     .build();

@@ -24,6 +24,9 @@ public interface IDocumentUploadTaskRepository {
     /** 仅当执行令牌仍有效时登记本次失败。 */
     boolean markRetryIfOwned(String taskCode, String executionToken, String failureReason, LocalDateTime nextRetryAt);
 
+    /** 仅当执行令牌仍有效时终止重试次数耗尽的任务。 */
+    boolean markFailedIfOwned(String taskCode, String executionToken, String failureReason);
+
     /** 查询到达重试时间的失败任务。 */
     List<DocumentUploadTaskEntity> listRetryDue(LocalDateTime now, int limit);
 
@@ -39,4 +42,7 @@ public interface IDocumentUploadTaskRepository {
 
     /** 原子回收超时执行令牌并转入重试等待。 */
     boolean recoverExpiredRunning(String taskCode, LocalDateTime now, LocalDateTime nextRetryAt, String failureReason);
+
+    /** 原子终止执行租约过期且重试次数耗尽的任务。 */
+    boolean markExpiredRunningFailed(String taskCode, LocalDateTime now, String failureReason);
 }

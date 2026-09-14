@@ -28,8 +28,8 @@ public interface IDocumentRepository {
     /** 查询 Workspace 下的全部文档，由调用方决定是否过滤状态。 */
     List<DocumentEntity> listByWorkspaceId(Long workspaceId);
 
-    /** 查询父目录下处于可用状态的直属文档。 */
-    List<DocumentEntity> listActiveByParentId(Long workspaceId, Long parentId);
+    /** 查询父目录下可展示的直属文档。 */
+    List<DocumentEntity> listVisibleByParentId(Long workspaceId, Long parentId);
 
     /** 查询父目录下具有指定完整名称的可用文档，用于重名校验。 */
     Optional<DocumentEntity> findActiveByParentIdAndFileName(Long workspaceId, Long parentId, String fileName);

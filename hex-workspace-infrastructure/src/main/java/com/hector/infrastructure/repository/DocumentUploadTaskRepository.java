@@ -47,6 +47,11 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
     }
 
     @Override
+    public boolean markFailedIfOwned(String taskCode, String executionToken, String failureReason) {
+        return documentUploadTaskDao.markFailedIfOwned(taskCode, executionToken, failureReason) == 1;
+    }
+
+    @Override
     public List<DocumentUploadTaskEntity> listRetryDue(LocalDateTime now, int limit) {
         return documentUploadTaskDao.queryRetryDue(now, limit).stream().map(this::toDocumentUploadTaskEntity).toList();
     }
@@ -64,6 +69,11 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
     @Override
     public boolean recoverExpiredRunning(String taskCode, LocalDateTime now, LocalDateTime nextRetryAt, String failureReason) {
         return documentUploadTaskDao.recoverExpiredRunning(taskCode, now, nextRetryAt, failureReason) == 1;
+    }
+
+    @Override
+    public boolean markExpiredRunningFailed(String taskCode, LocalDateTime now, String failureReason) {
+        return documentUploadTaskDao.markExpiredRunningFailed(taskCode, now, failureReason) == 1;
     }
 
     private DocumentUploadTask toDocumentUploadTaskPo(DocumentUploadTaskEntity entity) {

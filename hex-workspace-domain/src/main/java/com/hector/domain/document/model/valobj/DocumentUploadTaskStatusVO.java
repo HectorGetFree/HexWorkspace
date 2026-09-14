@@ -9,7 +9,9 @@ public enum DocumentUploadTaskStatusVO {
     /** 正式对象写入和文档激活均已完成。 */
     SUCCEEDED(2),
     /** 本次执行失败，等待下一次重试投递。 */
-    RETRY_WAIT(3);
+    RETRY_WAIT(3),
+    /** 重试次数已耗尽，任务终止，不再投递。 */
+    FAILED(4);
 
     private final int code;
     DocumentUploadTaskStatusVO(int code) { this.code = code; }

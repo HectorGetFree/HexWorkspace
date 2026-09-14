@@ -156,15 +156,15 @@ public class DocumentServiceImpl implements IDocumentService {
     }
 
     @Override
-    public List<DocumentEntity> listActiveDocumentsByParentId(Long workspaceId, Long parentId) {
+    public List<DocumentEntity> listVisibleDocumentsByParentId(Long workspaceId, Long parentId) {
         folderService.getActiveFolder(workspaceId, parentId);
-        return documentRepository.listActiveByParentId(workspaceId, parentId);
+        return documentRepository.listVisibleByParentId(workspaceId, parentId);
     }
 
     @Override
-    public List<DocumentEntity> listActiveDocuments(Long workspaceId) {
+    public List<DocumentEntity> listVisibleDocuments(Long workspaceId) {
         validateWorkspaceId(workspaceId);
-        return documentRepository.listByWorkspaceId(workspaceId).stream().filter(DocumentEntity::isActive)
+        return documentRepository.listByWorkspaceId(workspaceId).stream().filter(DocumentEntity::isVisibleInWorkspace)
                 .collect(Collectors.toList());
     }
 

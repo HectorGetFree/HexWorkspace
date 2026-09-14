@@ -198,7 +198,7 @@ public class DocumentController extends BaseController {
             Long currentUserId = SecurityUserUtil.getCurrentUserId();
             log.info("查询文档列表开始 workspaceId:{} userId:{}", workspaceId, currentUserId);
             workspaceService.assertOwner(workspaceId, currentUserId);
-            List<DocumentResponseDTO> documents = documentService.listActiveDocuments(workspaceId).stream()
+            List<DocumentResponseDTO> documents = documentService.listVisibleDocuments(workspaceId).stream()
                     .map(this::toResponse)
                     .collect(Collectors.toList());
             log.info("查询文档列表完成 workspaceId:{} userId:{} documentCount:{}", workspaceId, currentUserId, documents.size());

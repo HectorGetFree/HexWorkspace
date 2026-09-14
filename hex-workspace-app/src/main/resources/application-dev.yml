@@ -18,6 +18,8 @@ app:
     cross-origin: '*'
 
 hexworkspace:
+  document-upload:
+    max-retry-count: 3
   mq:
     document-upload:
       exchange: hex.workspace.document.exchange
