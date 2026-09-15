@@ -22,15 +22,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -128,6 +133,60 @@ class DocumentServiceImplTest {
         assertEquals(2L, taskCaptor.getValue().getVersionNo());
         assertEquals("workspace/10/documents/doc_pdf/versions/2", taskCaptor.getValue().getTargetPath());
         assertEquals(2L, saved.getCurrentVersionNo());
+    }
+
+    @Test
+    void shouldLogicallyDeleteDocumentWithoutChangingCurrentVersionOrContent() {
+        mockTransactionTemplate();
+        DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
+        when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+
+        DocumentEntity deleted = documentService.deleteDocument(10L, "doc_pdf");
+
+        assertEquals(DocumentStatusVO.DELETED, deleted.getStatus());
+        assertNotNull(deleted.getDeletedAt());
+        assertEquals(1L, deleted.getCurrentVersionNo());
+        verify(documentRepository).update(document);
+        verifyNoInteractions(documentVersionRepository, documentStorageRepository);
+    }
+
+    @Test
+    void shouldKeepFirstDeletedAtWhenDeletingDocumentRepeatedly() {
+        mockTransactionTemplate();
+        DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
+        when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+
+        documentService.deleteDocument(10L, "doc_pdf");
+        LocalDateTime firstDeletedAt = document.getDeletedAt();
+        documentService.deleteDocument(10L, "doc_pdf");
+
+        assertEquals(firstDeletedAt, document.getDeletedAt());
+        verify(documentRepository, times(1)).update(document);
+    }
+
+    @Test
+    void shouldRestoreDeletedDocumentWithoutCreatingNewVersion() {
+        mockTransactionTemplate();
+        DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
+        document.delete();
+        when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+
+        DocumentEntity restored = documentService.restoreDocument(10L, "doc_pdf");
+
+        assertEquals(DocumentStatusVO.ACTIVE, restored.getStatus());
+        assertNull(restored.getDeletedAt());
+        assertEquals(1L, restored.getCurrentVersionNo());
+        verify(documentRepository).update(document);
+        verifyNoInteractions(documentVersionRepository, documentStorageRepository);
+    }
+
+    @Test
+    void shouldRejectNormalAccessToDeletedDocument() {
+        DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
+        document.delete();
+        when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+
+        assertThrows(BusinessException.class, () -> documentService.getActiveDocument(10L, "doc_pdf"));
     }
 
     private DocumentEntity document(String fileName, DocumentTypeVO type) {

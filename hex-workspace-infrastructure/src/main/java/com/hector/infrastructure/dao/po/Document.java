@@ -27,6 +27,7 @@ public class Document {
     private Integer status;
     private Long currentVersionNo;
     private String idempotencyKey;
+    private LocalDateTime deletedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

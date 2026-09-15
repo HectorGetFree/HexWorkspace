@@ -159,8 +159,34 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public DocumentEntity deleteDocument(Long workspaceId, String documentCode) {
         return executeInTransaction(() -> {
-            DocumentEntity document = getActiveDocument(workspaceId, documentCode);
+            DocumentEntity document = getDocumentInWorkspace(workspaceId, documentCode);
+            // 1. 重复删除直接返回既有删除态，确保不会刷新 deletedAt。
+            if (document.isDeleted()) {
+                return document;
+            }
+            // 2. 当前阶段仅允许已正式生效的文档进入回收站。
+            if (!document.isActive()) {
+                throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+            }
             document.delete();
+            documentRepository.update(document);
+            return document;
+        });
+    }
+
+    @Override
+    public DocumentEntity restoreDocument(Long workspaceId, String documentCode) {
+        return executeInTransaction(() -> {
+            DocumentEntity document = getDocumentInWorkspace(workspaceId, documentCode);
+            // 1. 已恢复的文档直接返回，恢复不会创建版本或改写内容。
+            if (document.isActive()) {
+                return document;
+            }
+            // 2. 仅允许回收站中的文档恢复，创建中、写入中和失败文档不在本次范围内处理。
+            if (!document.isDeleted()) {
+                throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+            }
+            document.restore();
             documentRepository.update(document);
             return document;
         });
@@ -181,14 +207,24 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Override
     public DocumentEntity getActiveDocument(Long workspaceId, String documentCode) {
-        validateWorkspaceId(workspaceId);
-        if (documentCode == null || documentCode.isBlank()) throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
-        DocumentEntity document = documentRepository.findByDocumentCode(documentCode)
-                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-        if (!workspaceId.equals(document.getWorkspaceId())) throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
+        DocumentEntity document = getDocumentInWorkspace(workspaceId, documentCode);
         if (!document.isActive()) throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
         if (document.getCurrentVersionNo() == null || document.getCurrentVersionNo() <= 0) {
             throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+        }
+        return document;
+    }
+
+    /** 查询 Workspace 内文档，不预先过滤删除态，供删除和恢复两个生命周期操作使用。 */
+    private DocumentEntity getDocumentInWorkspace(Long workspaceId, String documentCode) {
+        validateWorkspaceId(workspaceId);
+        if (documentCode == null || documentCode.isBlank()) {
+            throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
+        }
+        DocumentEntity document = documentRepository.findByDocumentCode(documentCode)
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        if (!workspaceId.equals(document.getWorkspaceId())) {
+            throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
         }
         return document;
     }

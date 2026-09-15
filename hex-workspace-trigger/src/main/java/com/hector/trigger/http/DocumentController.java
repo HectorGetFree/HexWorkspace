@@ -189,6 +189,22 @@ public class DocumentController extends BaseController {
     }
 
     /**
+     * 从回收站恢复逻辑删除文档，不创建新内容版本。
+     * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/documents/doc_xxx/restore" -H "Authorization: Bearer 登录令牌"
+     */
+    @PostMapping("/{documentCode}/restore")
+    public Response<DocumentResponseDTO> restore(@PathVariable("workspaceId") Long workspaceId,
+                                                 @PathVariable("documentCode") String documentCode) {
+        return execute("恢复文档", workspaceId, () -> {
+            workspaceService.assertOwner(workspaceId, SecurityUserUtil.getCurrentUserId());
+            DocumentEntity document = documentService.restoreDocument(workspaceId, documentCode);
+            log.info("恢复文档完成 workspaceId:{} documentCode:{} currentVersionNo:{}",
+                    workspaceId, documentCode, document.getCurrentVersionNo());
+            return success(toResponse(document));
+        });
+    }
+
+    /**
      * 查询当前Workspace下已创建且可用的文档列表。
      *
      * curl 示例：
@@ -259,6 +275,7 @@ public class DocumentController extends BaseController {
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
                 .currentVersionNo(documentEntity.getCurrentVersionNo())
+                .deletedAt(documentEntity.getDeletedAt())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();

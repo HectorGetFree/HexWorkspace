@@ -16,6 +16,7 @@
         <result property="status" column="status"/>
         <result property="currentVersionNo" column="current_version_no"/>
         <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="deletedAt" column="deleted_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
@@ -23,10 +24,10 @@
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
             document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-            idempotency_key, created_at, updated_at
+            idempotency_key, deleted_at, created_at, updated_at
         ) VALUES (
             #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{title}, #{fileName}, #{documentType}, #{status}, #{currentVersionNo},
-            #{idempotencyKey}, #{createdAt}, #{updatedAt}
+            #{idempotencyKey}, #{deletedAt}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -39,13 +40,14 @@
             status = #{status},
             current_version_no = #{currentVersionNo},
             idempotency_key = #{idempotencyKey},
+            deleted_at = #{deletedAt},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
     <select id="queryById" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-               idempotency_key, created_at, updated_at
+               idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
         LIMIT 1
@@ -53,7 +55,7 @@
 
     <select id="queryByUploadIdempotencyKey" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-               idempotency_key, created_at, updated_at
+               idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
           AND owner_user_id = #{ownerUserId}
@@ -63,7 +65,7 @@
 
     <select id="queryByDocumentCode" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-               idempotency_key, created_at, updated_at
+               idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
         LIMIT 1
@@ -71,7 +73,7 @@
 
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-               idempotency_key, created_at, updated_at
+               idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
         ORDER BY updated_at DESC, id DESC
@@ -79,7 +81,7 @@
 
     <select id="queryVisibleByParentId" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-               idempotency_key, created_at, updated_at
+               idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status IN (2, 4)
         ORDER BY file_name ASC, id ASC
@@ -87,7 +89,7 @@
 
     <select id="queryActiveByParentIdAndFileName" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
-               created_at, updated_at
+               deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND file_name = #{fileName} AND status != 3
         LIMIT 1

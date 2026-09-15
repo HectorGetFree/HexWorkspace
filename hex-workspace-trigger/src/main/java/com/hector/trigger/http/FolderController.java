@@ -191,6 +191,7 @@ public class FolderController extends BaseController {
                 .documentType(document.getDocumentType().name())
                 .status(document.getStatus().name())
                 .currentVersionNo(document.getCurrentVersionNo())
+                .deletedAt(document.getDeletedAt())
                 .build();
     }
 }

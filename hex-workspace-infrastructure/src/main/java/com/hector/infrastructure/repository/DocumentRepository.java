@@ -104,6 +104,7 @@ public class DocumentRepository implements IDocumentRepository {
                 .status(documentEntity.getStatus().getCode())
                 .currentVersionNo(documentEntity.getCurrentVersionNo())
                 .idempotencyKey(documentEntity.getIdempotencyKey())
+                .deletedAt(documentEntity.getDeletedAt())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();
@@ -122,6 +123,7 @@ public class DocumentRepository implements IDocumentRepository {
                 .status(DocumentStatusVO.fromCode(document.getStatus()))
                 .currentVersionNo(document.getCurrentVersionNo())
                 .idempotencyKey(document.getIdempotencyKey())
+                .deletedAt(document.getDeletedAt())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
                 .build();

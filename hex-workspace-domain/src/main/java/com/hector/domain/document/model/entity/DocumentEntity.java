@@ -52,15 +52,32 @@ public class DocumentEntity {
     /** 本地上传请求的客户端幂等键；平台新建文档为空。 */
     private String idempotencyKey;
 
+    /** 逻辑删除时间；未删除时为空，用于未来回收站与物理清理保留期计算。 */
+    private LocalDateTime deletedAt;
+
     /** 文档创建时间。 */
     private LocalDateTime createdAt;
 
     /** 文档最后更新时间。 */
     private LocalDateTime updatedAt;
 
-    /** 将文档标记为逻辑删除状态。 */
+    /** 将文档标记为逻辑删除状态，并仅记录首次删除时间。 */
     public void delete() {
+        if (DocumentStatusVO.DELETED == this.status) {
+            return;
+        }
         this.status = DocumentStatusVO.DELETED;
+        this.deletedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 恢复逻辑删除文档，保留原当前版本指针和全部历史内容版本。 */
+    public void restore() {
+        if (DocumentStatusVO.DELETED != this.status) {
+            return;
+        }
+        this.status = DocumentStatusVO.ACTIVE;
+        this.deletedAt = null;
         this.updatedAt = LocalDateTime.now();
     }
 
@@ -111,6 +128,11 @@ public class DocumentEntity {
     /** 判断文档是否处于可用状态。 */
     public boolean isActive() {
         return DocumentStatusVO.ACTIVE == this.status;
+    }
+
+    /** 判断文档是否已进入逻辑删除状态。 */
+    public boolean isDeleted() {
+        return DocumentStatusVO.DELETED == this.status;
     }
 
     /** 判断文档是否应展示在资料库列表中。 */

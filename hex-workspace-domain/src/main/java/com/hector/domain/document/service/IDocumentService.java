@@ -34,6 +34,9 @@ public interface IDocumentService {
     /** 将文档标记为逻辑删除状态。 */
     DocumentEntity deleteDocument(Long workspaceId, String documentCode);
 
+    /** 恢复逻辑删除文档，不创建新的内容版本。 */
+    DocumentEntity restoreDocument(Long workspaceId, String documentCode);
+
     /** 查询父目录下可展示的直属文档。 */
     List<DocumentEntity> listVisibleDocumentsByParentId(Long workspaceId, Long parentId);
 
