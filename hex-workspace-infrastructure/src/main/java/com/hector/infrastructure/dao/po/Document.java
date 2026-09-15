@@ -25,12 +25,7 @@ public class Document {
     private String fileName;
     private Integer documentType;
     private Integer status;
-    private Integer storageType;
-    private String bucketName;
-    private String storagePath;
-    private String contentType;
-    private Long contentSize;
-    private String contentHash;
+    private Long currentVersionNo;
     private String idempotencyKey;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

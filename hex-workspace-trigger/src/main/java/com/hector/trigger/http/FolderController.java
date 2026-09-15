@@ -190,6 +190,7 @@ public class FolderController extends BaseController {
                 .fileName(document.getFileName())
                 .documentType(document.getDocumentType().name())
                 .status(document.getStatus().name())
+                .currentVersionNo(document.getCurrentVersionNo())
                 .build();
     }
 }

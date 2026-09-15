@@ -56,12 +56,7 @@ CREATE TABLE IF NOT EXISTS `document` (
     `file_name` VARCHAR(255) NOT NULL COMMENT '包含后缀的完整文件名',
     `document_type` TINYINT UNSIGNED NOT NULL COMMENT '0=LOCAL_UPLOADED / 1=PLATFORM_CREATED',
     `status` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=CREATING / 1=WRITING / 2=ACTIVE / 3=DELETED / 4=FAILED',
-    `storage_type` TINYINT UNSIGNED NOT NULL COMMENT '0=MINIO',
-    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
-    `storage_path` VARCHAR(512) NOT NULL COMMENT '对象存储路径',
-    `content_type` VARCHAR(128) NOT NULL COMMENT 'MIME 内容类型',
-    `content_size` BIGINT NOT NULL DEFAULT 0 COMMENT '内容大小，单位字节',
-    `content_hash` VARCHAR(128) NOT NULL COMMENT '内容 SHA-256 摘要',
+    `current_version_no` BIGINT DEFAULT NULL COMMENT '当前正式内容版本号；ACTIVE 时必须存在',
     `idempotency_key` VARCHAR(128) DEFAULT NULL COMMENT '本地上传客户端幂等键',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -73,13 +68,35 @@ CREATE TABLE IF NOT EXISTS `document` (
     KEY `idx_document_owner_user_id` (`owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档聚合当前状态表';
 
+CREATE TABLE IF NOT EXISTS `document_version` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `document_id` BIGINT NOT NULL COMMENT '所属文档ID',
+    `version_no` BIGINT NOT NULL COMMENT '文档内版本号，从1开始递增',
+    `storage_type` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=MINIO',
+    `bucket_name` VARCHAR(128) NOT NULL COMMENT '对象存储桶名称',
+    `storage_path` VARCHAR(512) NOT NULL COMMENT '该版本对象存储路径',
+    `content_type` VARCHAR(128) NOT NULL COMMENT 'MIME内容类型',
+    `content_size` BIGINT NOT NULL DEFAULT 0 COMMENT '内容大小，单位字节',
+    `content_hash` VARCHAR(128) NOT NULL COMMENT '内容SHA-256摘要',
+    `created_by` BIGINT NOT NULL COMMENT '版本创建者用户ID',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_document_version` (`document_id`, `version_no`),
+    KEY `idx_document_version_created_at` (`document_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档不可变内容版本表';
+
 CREATE TABLE IF NOT EXISTS `document_upload_task` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `task_code` VARCHAR(64) NOT NULL COMMENT '上传任务编码',
     `document_id` BIGINT NOT NULL COMMENT '关联文档ID',
+    `version_no` BIGINT NOT NULL COMMENT '本任务写入的目标版本号',
+    `created_by` BIGINT NOT NULL COMMENT '本次内容版本创建者用户ID',
     `staging_path` VARCHAR(512) DEFAULT NULL COMMENT 'MinIO临时对象路径；终态任务清理后为空',
     `target_path` VARCHAR(512) NOT NULL COMMENT 'MinIO正式对象路径',
     `content_type` VARCHAR(128) NOT NULL COMMENT '正式对象MIME类型',
+    `bucket_name` VARCHAR(128) NOT NULL COMMENT '正式对象Bucket名称',
+    `content_size` BIGINT NOT NULL COMMENT '正式对象内容大小，单位字节',
+    `content_hash` VARCHAR(128) NOT NULL COMMENT '正式对象内容SHA-256摘要',
     `status` TINYINT UNSIGNED NOT NULL COMMENT '0=PENDING / 1=RUNNING / 2=SUCCEEDED / 3=RETRY_WAIT / 4=FAILED',
     `execution_token` VARCHAR(64) DEFAULT NULL COMMENT '当前消费者执行令牌',
     `running_lease_until` DATETIME DEFAULT NULL COMMENT '当前消费者执行租约截止时间',
@@ -90,6 +107,7 @@ CREATE TABLE IF NOT EXISTS `document_upload_task` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_document_upload_task_code` (`task_code`),
+    UNIQUE KEY `uk_document_upload_task_document_version` (`document_id`, `version_no`),
     KEY `idx_document_upload_task_retry` (`status`, `next_retry_at`),
     KEY `idx_document_upload_task_running_lease` (`status`, `running_lease_until`),
     KEY `idx_document_upload_task_document` (`document_id`)

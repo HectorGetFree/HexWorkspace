@@ -2,12 +2,14 @@ package com.hector.domain.document.service.impl;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
+import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
 import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepository;
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +42,9 @@ class DocumentUploadTaskServiceImplTest {
 
     @Mock
     private IDocumentRepository documentRepository;
+
+    @Mock
+    private IDocumentVersionRepository documentVersionRepository;
 
     @Mock
     private IDocumentStorageRepository storageRepository;
@@ -102,6 +107,29 @@ class DocumentUploadTaskServiceImplTest {
         assertEquals(DocumentStatusVO.FAILED, document.getStatus());
     }
 
+    @Test
+    void shouldCreateImmutableVersionAndActivateDocumentAfterObjectCopy() {
+        mockTransactionTemplate();
+        DocumentUploadTaskEntity task = task("task_001");
+        DocumentEntity document = DocumentEntity.builder()
+                .id(10L)
+                .ownerUserId(1L)
+                .status(DocumentStatusVO.CREATING)
+                .build();
+        when(taskRepository.claimForRunning(eq("task_001"), anyString(), any(LocalDateTime.class)))
+                .thenReturn(true);
+        when(taskRepository.findByTaskCode("task_001")).thenReturn(Optional.of(task));
+        when(taskRepository.completeIfOwned(eq("task_001"), anyString())).thenReturn(true);
+        when(documentRepository.findById(10L)).thenReturn(Optional.of(document));
+
+        uploadTaskService.execute("task_001");
+
+        verify(documentVersionRepository).save(any(DocumentVersionEntity.class));
+        verify(documentRepository).update(document);
+        assertEquals(DocumentStatusVO.ACTIVE, document.getStatus());
+        assertEquals(1L, document.getCurrentVersionNo());
+    }
+
     private DocumentUploadTaskEntity task(String taskCode) {
         return task(taskCode, 0);
     }
@@ -110,9 +138,14 @@ class DocumentUploadTaskServiceImplTest {
         return DocumentUploadTaskEntity.builder()
                 .taskCode(taskCode)
                 .documentId(10L)
+                .versionNo(1L)
+                .createdBy(1L)
                 .stagingPath("staging/" + taskCode)
                 .targetPath("document/" + taskCode)
                 .contentType("application/pdf")
+                .bucketName("hex-workspace")
+                .contentSize(1L)
+                .contentHash("content-hash")
                 .status(DocumentUploadTaskStatusVO.RUNNING)
                 .retryCount(retryCount)
                 .build();

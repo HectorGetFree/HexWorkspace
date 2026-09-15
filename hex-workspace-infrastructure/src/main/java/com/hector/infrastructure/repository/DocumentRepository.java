@@ -2,7 +2,6 @@ package com.hector.infrastructure.repository;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
-import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.infrastructure.dao.IDocumentDao;
@@ -103,12 +102,7 @@ public class DocumentRepository implements IDocumentRepository {
                 .fileName(documentEntity.getFileName())
                 .documentType(documentEntity.getDocumentType().getCode())
                 .status(documentEntity.getStatus().getCode())
-                .storageType(documentEntity.getStorageType().getCode())
-                .bucketName(documentEntity.getBucketName())
-                .storagePath(documentEntity.getStoragePath())
-                .contentType(documentEntity.getContentType())
-                .contentSize(documentEntity.getContentSize())
-                .contentHash(documentEntity.getContentHash())
+                .currentVersionNo(documentEntity.getCurrentVersionNo())
                 .idempotencyKey(documentEntity.getIdempotencyKey())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
@@ -126,12 +120,7 @@ public class DocumentRepository implements IDocumentRepository {
                 .fileName(document.getFileName())
                 .documentType(DocumentTypeVO.fromCode(document.getDocumentType()))
                 .status(DocumentStatusVO.fromCode(document.getStatus()))
-                .storageType(DocumentStorageTypeVO.fromCode(document.getStorageType()))
-                .bucketName(document.getBucketName())
-                .storagePath(document.getStoragePath())
-                .contentType(document.getContentType())
-                .contentSize(document.getContentSize())
-                .contentHash(document.getContentHash())
+                .currentVersionNo(document.getCurrentVersionNo())
                 .idempotencyKey(document.getIdempotencyKey())
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())

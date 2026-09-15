@@ -1,10 +1,15 @@
 package com.hector.domain.document.service.impl;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
+import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
+import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepository;
+import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
+import com.hector.domain.document.service.IDocumentUploadTaskService;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -12,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,6 +28,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +44,18 @@ class DocumentServiceImplTest {
 
     @Mock
     private IDocumentStorageRepository documentStorageRepository;
+
+    @Mock
+    private IDocumentUploadTaskRepository documentUploadTaskRepository;
+
+    @Mock
+    private IDocumentUploadOutboxEventRepository documentUploadOutboxEventRepository;
+
+    @Mock
+    private IDocumentVersionRepository documentVersionRepository;
+
+    @Mock
+    private IDocumentUploadTaskService documentUploadTaskService;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -58,7 +79,6 @@ class DocumentServiceImplTest {
 
     @Test
     void shouldRejectEditingNonMarkdownDocument() {
-        mockTransactionTemplate();
         when(documentRepository.findByDocumentCode("doc_pdf"))
                 .thenReturn(Optional.of(document("方案.pdf", DocumentTypeVO.LOCAL_UPLOADED)));
 
@@ -90,6 +110,26 @@ class DocumentServiceImplTest {
         assertEquals(2, documentService.listVisibleDocuments(10L).size());
     }
 
+    @Test
+    void shouldRegisterVersionTwoTaskWhenSavingMarkdownContent() {
+        mockTransactionTemplate();
+        DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
+        when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+        when(documentStorageRepository.getBucketName()).thenReturn("hex-workspace");
+        doAnswer(invocation -> {
+            document.activateVersion(2L);
+            return null;
+        }).when(documentUploadTaskService).executeOwned(anyString(), anyString());
+
+        DocumentEntity saved = documentService.editMarkdownDocument(10L, "doc_pdf", 1L, "v2 内容");
+
+        ArgumentCaptor<DocumentUploadTaskEntity> taskCaptor = ArgumentCaptor.forClass(DocumentUploadTaskEntity.class);
+        verify(documentUploadTaskRepository).save(taskCaptor.capture());
+        assertEquals(2L, taskCaptor.getValue().getVersionNo());
+        assertEquals("workspace/10/documents/doc_pdf/versions/2", taskCaptor.getValue().getTargetPath());
+        assertEquals(2L, saved.getCurrentVersionNo());
+    }
+
     private DocumentEntity document(String fileName, DocumentTypeVO type) {
         return DocumentEntity.builder()
                 .id(30L)
@@ -99,6 +139,7 @@ class DocumentServiceImplTest {
                 .fileName(fileName)
                 .documentType(type)
                 .status(DocumentStatusVO.ACTIVE)
+                .currentVersionNo(1L)
                 .build();
     }
 

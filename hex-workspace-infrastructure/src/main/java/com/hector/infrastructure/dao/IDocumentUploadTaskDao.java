@@ -12,6 +12,8 @@ import java.util.List;
 public interface IDocumentUploadTaskDao {
     int insert(DocumentUploadTask task);
     DocumentUploadTask queryByTaskCode(@Param("taskCode") String taskCode);
+    DocumentUploadTask queryByDocumentIdAndVersionNo(@Param("documentId") Long documentId,
+                                                      @Param("versionNo") Long versionNo);
     int countByStagingPath(@Param("stagingPath") String stagingPath);
     List<DocumentUploadTask> queryExpiredTerminalTasksWithStagingPath(@Param("expiredBefore") LocalDateTime expiredBefore,
                                                                        @Param("limit") int limit);

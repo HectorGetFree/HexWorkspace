@@ -3,11 +3,15 @@ package com.hector.domain.document.service.impl;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentUploadOutboxEventEntity;
 import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
+import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.model.valobj.DocumentUploadOutboxStatusVO;
+import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
+import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
 import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepository;
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentUploadTaskService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -43,6 +47,9 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
     private IDocumentRepository documentRepository;
 
     @Resource
+    private IDocumentVersionRepository documentVersionRepository;
+
+    @Resource
     private IDocumentStorageRepository storageRepository;
 
     @Resource
@@ -60,20 +67,35 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         }
         DocumentUploadTaskEntity task = taskRepository.findByTaskCode(taskCode)
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        executeClaimedTask(task, executionToken);
+    }
+
+    @Override
+    public void executeOwned(String taskCode, String executionToken) {
+        DocumentUploadTaskEntity task = taskRepository.findByTaskCode(taskCode)
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        if (DocumentUploadTaskStatusVO.RUNNING != task.getStatus()
+                || !executionToken.equals(task.getExecutionToken())) {
+            return;
+        }
+        executeClaimedTask(task, executionToken);
+    }
+
+    private void executeClaimedTask(DocumentUploadTaskEntity task, String executionToken) {
         try {
             // 2. 由 MinIO 服务端复制临时对象到固定正式路径，避免文件内容经过消费者 JVM。
             storageRepository.copy(task.getStagingPath(), task.getTargetPath(), task.getContentType());
-            // 3. 正式对象成功后，在一个 MySQL 事务中同时完成任务和文档状态切换。
+            // 3. 正式对象成功后，在一个 MySQL 事务中写入不可变版本、完成任务并切换当前版本指针。
             boolean completed = executeInTransaction(() -> complete(task, executionToken));
             if (completed) {
                 try {
                     storageRepository.delete(task.getStagingPath());
                 } catch (Exception exception) {
-                    log.warn("文档上传任务-清理临时对象失败 taskCode:{}", taskCode, exception);
+                    log.warn("文档上传任务-清理临时对象失败 taskCode:{}", task.getTaskCode(), exception);
                 }
             }
         } catch (Exception exception) {
-            log.error("文档上传任务-执行失败 taskCode:{} error:{}", taskCode, exception.getMessage(), exception);
+            log.error("文档上传任务-执行失败 taskCode:{} error:{}", task.getTaskCode(), exception.getMessage(), exception);
             executeInTransaction(() -> {
                 fail(task, executionToken, exception);
                 return true;
@@ -127,7 +149,19 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         }
         DocumentEntity document = documentRepository.findById(task.getDocumentId())
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-        document.activate();
+        documentVersionRepository.save(DocumentVersionEntity.builder()
+                .documentId(document.getId())
+                .versionNo(task.getVersionNo())
+                .storageType(DocumentStorageTypeVO.MINIO)
+                .bucketName(task.getBucketName())
+                .storagePath(task.getTargetPath())
+                .contentType(task.getContentType())
+                .contentSize(task.getContentSize())
+                .contentHash(task.getContentHash())
+                .createdBy(task.getCreatedBy())
+                .createdAt(LocalDateTime.now())
+                .build());
+        document.activateVersion(task.getVersionNo());
         documentRepository.update(document);
         return true;
     }

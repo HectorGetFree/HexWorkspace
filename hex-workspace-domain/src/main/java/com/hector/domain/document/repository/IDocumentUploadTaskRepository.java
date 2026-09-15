@@ -15,6 +15,9 @@ public interface IDocumentUploadTaskRepository {
     /** 按任务编码查询。 */
     Optional<DocumentUploadTaskEntity> findByTaskCode(String taskCode);
 
+    /** 按文档与目标版本号查询上传任务，用于初始上传幂等校验。 */
+    Optional<DocumentUploadTaskEntity> findByDocumentIdAndVersionNo(Long documentId, Long versionNo);
+
     /** 判断是否仍存在引用指定临时对象路径的上传任务。 */
     boolean existsByStagingPath(String stagingPath);
 

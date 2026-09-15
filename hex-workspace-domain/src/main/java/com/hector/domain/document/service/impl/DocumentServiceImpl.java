@@ -3,8 +3,8 @@ package com.hector.domain.document.service.impl;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentUploadOutboxEventEntity;
 import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
+import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
-import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.model.valobj.DocumentUploadOutboxStatusVO;
 import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
@@ -12,7 +12,9 @@ import com.hector.domain.document.repository.IDocumentRepository;
 import com.hector.domain.document.repository.IDocumentStorageRepository;
 import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepository;
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentService;
+import com.hector.domain.document.service.IDocumentUploadTaskService;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -33,10 +35,11 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-/** 文档领域服务。文档是唯一内容元数据主体，不维护版本、快照或解析状态。 */
+/** 文档领域服务，负责文档元数据、当前版本指针及内容保存编排。 */
 @Service
 public class DocumentServiceImpl implements IDocumentService {
     private static final String DOCUMENT_CODE_PREFIX = "doc_";
+    private static final int SYNCHRONOUS_EDIT_LEASE_MINUTES = 10;
 
     @Resource
     private IDocumentRepository documentRepository;
@@ -55,6 +58,12 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Resource
     private IDocumentUploadOutboxEventRepository documentUploadOutboxEventRepository;
+
+    @Resource
+    private IDocumentVersionRepository documentVersionRepository;
+
+    @Resource
+    private IDocumentUploadTaskService documentUploadTaskService;
 
     @Override
     public DocumentEntity importDocument(Long workspaceId, Long ownerUserId, Long parentId, String fileName,
@@ -83,27 +92,44 @@ public class DocumentServiceImpl implements IDocumentService {
     public DocumentEntity editMarkdownDocument(Long workspaceId, String documentCode, Long operatorUserId, String content) {
         byte[] contentBytes = (content == null ? "" : content).getBytes(StandardCharsets.UTF_8);
 
-        // 1. 用编码式事务登记 WRITING 状态与待写对象路径，保证 MinIO 对象始终可追溯到文档元数据。
-        DocumentEntity writing = executeInTransaction(() -> {
-            DocumentEntity active = getActiveDocument(workspaceId, documentCode);
-            if (!active.getFileName().toLowerCase(Locale.ROOT).endsWith(".md")) {
-                throw new BusinessException(ResponseCode.DOCUMENT_EDIT_UNSUPPORTED);
-            }
-            DocumentEntity next = copyWithContent(active, DocumentStatusVO.WRITING,
-                    newStoragePath(workspaceId, active.getDocumentCode()), "text/markdown; charset=utf-8", contentBytes);
-            documentRepository.update(next);
-            return next;
-        });
+        // 1. 先基于当前正式版本生成唯一版本路径；历史版本对象绝不覆盖。
+        DocumentEntity active = getActiveDocument(workspaceId, documentCode);
+        if (!active.getFileName().toLowerCase(Locale.ROOT).endsWith(".md")) {
+            throw new BusinessException(ResponseCode.DOCUMENT_EDIT_UNSUPPORTED);
+        }
+        long nextVersionNo = active.getCurrentVersionNo() + 1;
+        String stagingPath = newStagingPath(documentCode);
+        String targetPath = newVersionStoragePath(workspaceId, documentCode, nextVersionNo);
+        String contentType = "text/markdown; charset=utf-8";
+        String executionToken = UUID.randomUUID().toString();
+        boolean taskRegistered = false;
 
-        // 2. MySQL 提交后写入 MinIO；异常中断会留下可扫描恢复的 WRITING 文档，而非孤儿对象。
-        writeObjectAndActivate(writing, contentBytes);
-        return getActiveDocument(workspaceId, documentCode);
+        try {
+            // 2. 先写 staging 并计算摘要；写入后才登记任务，避免 MySQL 记录指向不存在的对象。
+            String contentHash = uploadStagingContent(stagingPath, new ByteArrayInputStream(contentBytes),
+                    contentBytes.length, contentType);
+            String taskCode = registerContentVersionSave(workspaceId, documentCode, active.getCurrentVersionNo(),
+                    nextVersionNo, operatorUserId, stagingPath, targetPath, contentType, contentBytes.length, contentHash,
+                    executionToken);
+            taskRegistered = true;
+
+            // 3. 保持现有编辑接口的同步成功语义；Outbox 仍保留为进程异常后的异步兜底。
+            documentUploadTaskService.executeOwned(taskCode, executionToken);
+            return getActiveDocument(workspaceId, documentCode);
+        } finally {
+            if (!taskRegistered) {
+                deleteStagingObjectQuietly(stagingPath);
+            }
+        }
     }
 
     @Override
     public byte[] readCurrentContent(Long workspaceId, String documentCode) {
         DocumentEntity document = getActiveDocument(workspaceId, documentCode);
-        return documentStorageRepository.download(document.getStoragePath());
+        DocumentVersionEntity version = documentVersionRepository
+                .findByDocumentIdAndVersionNo(document.getId(), document.getCurrentVersionNo())
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE));
+        return documentStorageRepository.download(version.getStoragePath());
     }
 
     @Override
@@ -161,6 +187,9 @@ public class DocumentServiceImpl implements IDocumentService {
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
         if (!workspaceId.equals(document.getWorkspaceId())) throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
         if (!document.isActive()) throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+        if (document.getCurrentVersionNo() == null || document.getCurrentVersionNo() <= 0) {
+            throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+        }
         return document;
     }
 
@@ -170,7 +199,7 @@ public class DocumentServiceImpl implements IDocumentService {
                                           String idempotencyKey) {
         String documentCode = generateDocumentCode();
         String stagingPath = newStagingPath(documentCode);
-        String targetPath = newStoragePath(workspaceId, documentCode);
+        String targetPath = newVersionStoragePath(workspaceId, documentCode, 1L);
         String normalizedContentType = normalizeContentType(contentType);
         boolean documentRegistered = false;
         String contentHash = null;
@@ -228,36 +257,14 @@ public class DocumentServiceImpl implements IDocumentService {
                     .fileName(fileName)
                     .documentType(type)
                     .status(DocumentStatusVO.CREATING)
-                    .storageType(DocumentStorageTypeVO.MINIO)
-                    .bucketName(documentStorageRepository.getBucketName())
-                    .storagePath(targetPath)
-                    .contentType(contentType)
-                    .contentSize(contentSize)
-                    .contentHash(contentHash)
+                    .currentVersionNo(null)
                     .idempotencyKey(idempotencyKey)
                     .createdAt(now)
                     .updatedAt(now)
                     .build());
 
-            String taskCode = newTaskCode();
-            documentUploadTaskRepository.save(DocumentUploadTaskEntity.builder()
-                    .taskCode(taskCode)
-                    .documentId(document.getId())
-                    .stagingPath(stagingPath)
-                    .targetPath(targetPath)
-                    .contentType(contentType)
-                    .status(DocumentUploadTaskStatusVO.PENDING)
-                    .retryCount(0)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build());
-            documentUploadOutboxEventRepository.save(DocumentUploadOutboxEventEntity.builder()
-                    .eventCode(newEventCode())
-                    .taskCode(taskCode)
-                    .status(DocumentUploadOutboxStatusVO.PENDING)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build());
+            saveUploadTaskAndOutbox(document.getId(), 1L, ownerUserId, stagingPath, targetPath,
+                    contentType, contentSize, contentHash, now);
             return document;
         });
     }
@@ -281,30 +288,71 @@ public class DocumentServiceImpl implements IDocumentService {
         }
     }
 
-    /** 写入成功才提交 ACTIVE；失败不伪造成功，保留中间状态给恢复任务处理。 */
-    private void writeObjectAndActivate(DocumentEntity document, byte[] content) {
-        try {
-            documentStorageRepository.upload(document.getStoragePath(), content, document.getContentType());
-            executeInTransaction(() -> {
-                DocumentEntity persisted = documentRepository.findById(document.getId())
-                        .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-                persisted.activate();
-                documentRepository.update(persisted);
-                return persisted;
-            });
-        } catch (Exception exception) {
-            throw new BusinessException(ResponseCode.DOCUMENT_CONTENT_STORE_FAILED);
-        }
+    /**
+     * 原子登记一次版本保存意图。
+     *
+     * <p>状态切换、任务和 Outbox 必须共同提交；否则 staging 对象会成为无引用对象，由既有清理任务回收。</p>
+     */
+    private String registerContentVersionSave(Long workspaceId, String documentCode, Long baseVersionNo, Long nextVersionNo,
+                                              Long createdBy, String stagingPath, String targetPath, String contentType,
+                                              long contentSize, String contentHash, String executionToken) {
+        return executeInTransaction(() -> {
+            DocumentEntity document = getActiveDocument(workspaceId, documentCode);
+            if (!baseVersionNo.equals(document.getCurrentVersionNo())) {
+                throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+            }
+
+            // 1. 先锁定为 WRITING，阻止同一文档在当前单人阶段并发登记两个相同后继版本。
+            document.startWriting();
+            documentRepository.update(document);
+
+            // 2. 保存任务与投递事件，使本次版本转正可由同步调用或 MQ 可靠完成。
+            LocalDateTime now = LocalDateTime.now();
+            return saveUploadTaskAndOutbox(document.getId(), nextVersionNo, createdBy, stagingPath, targetPath,
+                    contentType, contentSize, contentHash, DocumentUploadTaskStatusVO.RUNNING, executionToken,
+                    now.plusMinutes(SYNCHRONOUS_EDIT_LEASE_MINUTES), now);
+        });
     }
 
-    private DocumentEntity copyWithContent(DocumentEntity source, DocumentStatusVO status, String path,
-                                           String contentType, byte[] content) {
-        return DocumentEntity.builder().id(source.getId()).documentCode(source.getDocumentCode())
-                .workspaceId(source.getWorkspaceId()).parentId(source.getParentId()).ownerUserId(source.getOwnerUserId())
-                .title(source.getTitle()).fileName(source.getFileName()).documentType(source.getDocumentType()).status(status)
-                .storageType(DocumentStorageTypeVO.MINIO).bucketName(documentStorageRepository.getBucketName()).storagePath(path)
-                .contentType(normalizeContentType(contentType)).contentSize((long) content.length).contentHash(hash(content))
-                .createdAt(source.getCreatedAt()).updatedAt(LocalDateTime.now()).build();
+    /** 在同一事务内登记内容转正任务及其可靠投递事件。 */
+    private String saveUploadTaskAndOutbox(Long documentId, Long versionNo, Long createdBy, String stagingPath,
+                                           String targetPath, String contentType, long contentSize, String contentHash,
+                                           LocalDateTime now) {
+        return saveUploadTaskAndOutbox(documentId, versionNo, createdBy, stagingPath, targetPath, contentType,
+                contentSize, contentHash, DocumentUploadTaskStatusVO.PENDING, null, null, now);
+    }
+
+    private String saveUploadTaskAndOutbox(Long documentId, Long versionNo, Long createdBy, String stagingPath,
+                                           String targetPath, String contentType, long contentSize, String contentHash,
+                                           DocumentUploadTaskStatusVO status, String executionToken,
+                                           LocalDateTime runningLeaseUntil, LocalDateTime now) {
+        String taskCode = newTaskCode();
+        documentUploadTaskRepository.save(DocumentUploadTaskEntity.builder()
+                .taskCode(taskCode)
+                .documentId(documentId)
+                .versionNo(versionNo)
+                .createdBy(createdBy)
+                .stagingPath(stagingPath)
+                .targetPath(targetPath)
+                .contentType(contentType)
+                .bucketName(documentStorageRepository.getBucketName())
+                .contentSize(contentSize)
+                .contentHash(contentHash)
+                .status(status)
+                .executionToken(executionToken)
+                .runningLeaseUntil(runningLeaseUntil)
+                .retryCount(0)
+                .createdAt(now)
+                .updatedAt(now)
+                .build());
+        documentUploadOutboxEventRepository.save(DocumentUploadOutboxEventEntity.builder()
+                .eventCode(newEventCode())
+                .taskCode(taskCode)
+                .status(DocumentUploadOutboxStatusVO.PENDING)
+                .createdAt(now)
+                .updatedAt(now)
+                .build());
+        return taskCode;
     }
 
     private <T> T executeInTransaction(Supplier<T> action) {
@@ -341,8 +389,8 @@ public class DocumentServiceImpl implements IDocumentService {
                 .ifPresent(found -> { throw new BusinessException(ResponseCode.DOCUMENT_NAME_DUPLICATE); });
     }
 
-    private String newStoragePath(Long workspaceId, String documentCode) {
-        return "workspace/" + workspaceId + "/documents/" + documentCode + "/" + UUID.randomUUID();
+    private String newVersionStoragePath(Long workspaceId, String documentCode, Long versionNo) {
+        return "workspace/" + workspaceId + "/documents/" + documentCode + "/versions/" + versionNo;
     }
 
     private String newStagingPath(String documentCode) {
@@ -370,20 +418,25 @@ public class DocumentServiceImpl implements IDocumentService {
 
     private DocumentEntity assertAndReuseUploadDocument(DocumentEntity document, Long parentId, String fileName,
                                                          String contentType, String contentHash) {
+        DocumentVersionEntity initialVersion = documentVersionRepository
+                .findByDocumentIdAndVersionNo(document.getId(), 1L)
+                .orElse(null);
+        DocumentUploadTaskEntity initialTask = initialVersion == null ? documentUploadTaskRepository
+                .findByDocumentIdAndVersionNo(document.getId(), 1L)
+                .orElse(null) : null;
+        String initialContentType = initialVersion != null ? initialVersion.getContentType()
+                : initialTask == null ? null : initialTask.getContentType();
+        String initialContentHash = initialVersion != null ? initialVersion.getContentHash()
+                : initialTask == null ? null : initialTask.getContentHash();
         boolean sameRequest = parentId.equals(document.getParentId())
                 && fileName.equals(document.getFileName())
-                && contentType.equals(document.getContentType())
-                && contentHash.equals(document.getContentHash())
+                && contentType.equals(initialContentType)
+                && contentHash.equals(initialContentHash)
                 && DocumentTypeVO.LOCAL_UPLOADED == document.getDocumentType();
         if (!sameRequest) {
             throw new BusinessException(ResponseCode.ILLEGAL_PARAMETER);
         }
         return document;
-    }
-
-    private String hash(byte[] content) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)); }
-        catch (Exception exception) { throw new BusinessException(ResponseCode.SYSTEM_ERROR); }
     }
 
     private String generateDocumentCode() {

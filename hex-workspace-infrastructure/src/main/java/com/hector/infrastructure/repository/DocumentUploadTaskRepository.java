@@ -32,6 +32,12 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
     }
 
     @Override
+    public Optional<DocumentUploadTaskEntity> findByDocumentIdAndVersionNo(Long documentId, Long versionNo) {
+        DocumentUploadTask documentUploadTask = documentUploadTaskDao.queryByDocumentIdAndVersionNo(documentId, versionNo);
+        return documentUploadTask == null ? Optional.empty() : Optional.of(toDocumentUploadTaskEntity(documentUploadTask));
+    }
+
+    @Override
     public boolean existsByStagingPath(String stagingPath) {
         return documentUploadTaskDao.countByStagingPath(stagingPath) > 0;
     }
@@ -98,9 +104,14 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
                 .id(entity.getId())
                 .taskCode(entity.getTaskCode())
                 .documentId(entity.getDocumentId())
+                .versionNo(entity.getVersionNo())
+                .createdBy(entity.getCreatedBy())
                 .stagingPath(entity.getStagingPath())
                 .targetPath(entity.getTargetPath())
                 .contentType(entity.getContentType())
+                .bucketName(entity.getBucketName())
+                .contentSize(entity.getContentSize())
+                .contentHash(entity.getContentHash())
                 .status(entity.getStatus().getCode())
                 .executionToken(entity.getExecutionToken())
                 .runningLeaseUntil(entity.getRunningLeaseUntil())
@@ -117,9 +128,14 @@ public class DocumentUploadTaskRepository implements IDocumentUploadTaskReposito
                 .id(po.getId())
                 .taskCode(po.getTaskCode())
                 .documentId(po.getDocumentId())
+                .versionNo(po.getVersionNo())
+                .createdBy(po.getCreatedBy())
                 .stagingPath(po.getStagingPath())
                 .targetPath(po.getTargetPath())
                 .contentType(po.getContentType())
+                .bucketName(po.getBucketName())
+                .contentSize(po.getContentSize())
+                .contentHash(po.getContentHash())
                 .status(DocumentUploadTaskStatusVO.fromCode(po.getStatus()))
                 .executionToken(po.getExecutionToken())
                 .runningLeaseUntil(po.getRunningLeaseUntil())

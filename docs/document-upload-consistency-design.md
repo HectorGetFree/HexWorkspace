@@ -2,9 +2,9 @@
 
 ## 1. 目标与边界
 
-MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交。本设计通过临时对象、上传任务、Outbox 和幂等消费，保证文档最终只会在正式对象已经可用后变为 `ACTIVE`。
+MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交。本设计通过临时对象、上传任务、Outbox 和幂等消费，保证文档最终只会在正式对象已经可用、且不可变 `DocumentVersion` 已落库后变为 `ACTIVE`。
 
-本设计覆盖本地文件导入与平台新建 Markdown 的首次内容写入；RAG 不参与该主链路。
+本设计覆盖本地文件导入、平台新建 Markdown 的首次内容写入，以及 Markdown 的新版本保存；RAG 不参与该主链路。
 
 本地文件导入必须携带 `Idempotency-Key` 请求头。幂等信息直接保存在 `document`：以 `workspace_id + owner_user_id + idempotency_key` 建立唯一索引。命中既有文档时，比较目录、完整文件名、内容哈希、内容类型和来源类型；相同请求复用首次创建的文档，使用同一个键提交不同内容会被拒绝。
 
@@ -13,10 +13,10 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 ```text
 请求内容
   → MinIO staging/{documentCode}/... 临时对象
-  → MySQL 同一事务：Document(CREATING) + UploadTask(PENDING) + OutboxEvent(PENDING)
+  → MySQL 同一事务：Document(CREATING 或 WRITING) + UploadTask + OutboxEvent(PENDING)
   → 定时 Outbox 发布器投递 taskCode 至 RabbitMQ
   → 消费者通过 MinIO 服务端复制临时对象至固定正式 objectKey
-  → MySQL 同一事务：UploadTask(SUCCEEDED) + Document(ACTIVE)
+  → MySQL 同一事务：DocumentVersion(vN) + UploadTask(SUCCEEDED) + Document(ACTIVE, currentVersionNo=N)
   → 删除临时对象
 ```
 
@@ -28,7 +28,7 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 - Outbox 事件只有在 RabbitMQ broker 确认后、且发布令牌仍匹配时才标记为 `SENT`；发布失败或租约超时会回到 `PENDING`。确认结果未知时允许再次投递，由 UploadTask 的执行抢占保证业务幂等。
 - 消费者通过 `PENDING / RETRY_WAIT → RUNNING` 条件更新抢占任务，并写入唯一 `executionToken` 与 10 分钟执行租约；重复消息不会并发处理同一任务。
 - 消费者完成或失败时必须携带同一个 `executionToken` 做条件更新。租约到期仍为 `RUNNING` 的任务由调度器以条件更新回收为 `RETRY_WAIT` 并重新投递；已过期消费者即使继续运行，也不能再激活文档、覆盖任务状态或删除临时对象。
-- 正式对象使用任务固定的 `targetPath`。若 MinIO 写入成功但 MySQL 激活失败，重试会覆盖同一对象，并再次尝试激活，结果保持幂等。
+- 正式对象使用任务固定的 `targetPath`，路径包含版本号，历史对象绝不覆盖。若 MinIO 写入成功但 MySQL 落版失败，重试仅重写同一待生效版本对象，再次尝试写入该版本和切换当前版本指针。
 - UploadTask 保存 `contentType`；MinIO 服务端复制正式对象时使用该类型写入对象元数据，避免正式对象退化为 `application/octet-stream`。
 - 本地文件从 HTTP 输入流直接写入 staging，并在写入过程中计算 SHA-256；正式对象转正使用 MinIO 服务端复制，文件内容不再在请求线程和消费者线程分别完整读入 JVM 内存。
 - 消费失败或执行租约超时后，未耗尽 `max-retry-count` 的任务进入 `RETRY_WAIT`，记录原因和下次重试时间；定时任务重新创建 Outbox 事件，而不依赖消息中间件的内存重试。
@@ -36,6 +36,7 @@ MySQL 与 MinIO 不共享本地事务，不能承诺跨存储的强一致提交�
 - 临时对象写入成功但本地事务提交失败时，请求线程会尽力删除临时对象。进程在该窗口异常退出时，可能留下无任务引用的临时对象；定时清理任务按 `staging/` 前缀扫描，保留 24 小时后删除没有 UploadTask 引用的对象。
 - `SUCCEEDED` 或最终 `FAILED` 的任务同样会在保留期后进入清理：先删除 staging 对象，再以“任务编码 + 原路径 + 终态状态”条件更新清空 `UploadTask.stagingPath`。对象删除失败时保留路径引用，留待下一轮补偿；这不影响已经成功或已终止的文档主链路。
 - staging 路径仅由 UploadTask 保存；Document 不保存该技术中间态，也不承担无任务 `CREATING` 文档的恢复职责。
+- `Document` 仅保存身份、归属、元数据与 `currentVersionNo`；对象路径、内容类型、大小和哈希仅属于不可变 `DocumentVersion`。`ACTIVE` 文档必须存在大于 0 的当前版本号及其对应版本记录。
 - 并发首次上传使用相同幂等键时，数据库唯一索引仍会保证只有一个 Document、Task 与 Outbox；为保持“无任务 CREATING 文档不需要恢复”的边界，当前仍可能短暂产生重复 staging 写入，后续需配合上传预留或无任务 CREATING 恢复机制后再优化。
 
 ## 4. 状态

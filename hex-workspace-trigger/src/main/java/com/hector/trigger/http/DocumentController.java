@@ -258,6 +258,7 @@ public class DocumentController extends BaseController {
                 .source(documentEntity.getDocumentType().name())
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
+                .currentVersionNo(documentEntity.getCurrentVersionNo())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())
                 .build();

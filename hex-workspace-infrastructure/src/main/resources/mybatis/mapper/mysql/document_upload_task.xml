@@ -8,9 +8,14 @@
         <id property="id" column="id"/>
         <result property="taskCode" column="task_code"/>
         <result property="documentId" column="document_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="createdBy" column="created_by"/>
         <result property="stagingPath" column="staging_path"/>
         <result property="targetPath" column="target_path"/>
         <result property="contentType" column="content_type"/>
+        <result property="bucketName" column="bucket_name"/>
+        <result property="contentSize" column="content_size"/>
+        <result property="contentHash" column="content_hash"/>
         <result property="status" column="status"/>
         <result property="executionToken" column="execution_token"/>
         <result property="runningLeaseUntil" column="running_lease_until"/>
@@ -22,17 +27,20 @@
     </resultMap>
 
     <sql id="documentUploadTaskColumns">
-        id, task_code, document_id, staging_path, target_path, content_type, status, execution_token, running_lease_until,
+        id, task_code, document_id, version_no, created_by, staging_path, target_path, content_type, bucket_name, content_size, content_hash,
+        status, execution_token, running_lease_until,
         retry_count, next_retry_at, failure_reason, created_at, updated_at
     </sql>
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.DocumentUploadTask"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO document_upload_task (
-            task_code, document_id, staging_path, target_path, content_type, status, execution_token, running_lease_until,
+            task_code, document_id, version_no, created_by, staging_path, target_path, content_type, bucket_name, content_size, content_hash,
+            status, execution_token, running_lease_until,
             retry_count, next_retry_at, failure_reason, created_at, updated_at
         ) VALUES (
-            #{taskCode}, #{documentId}, #{stagingPath}, #{targetPath}, #{contentType}, #{status}, #{executionToken}, #{runningLeaseUntil},
+            #{taskCode}, #{documentId}, #{versionNo}, #{createdBy}, #{stagingPath}, #{targetPath}, #{contentType}, #{bucketName}, #{contentSize}, #{contentHash},
+            #{status}, #{executionToken}, #{runningLeaseUntil},
             #{retryCount}, #{nextRetryAt}, #{failureReason}, #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -41,6 +49,14 @@
         SELECT <include refid="documentUploadTaskColumns"/>
         FROM document_upload_task
         WHERE task_code = #{taskCode}
+        LIMIT 1
+    </select>
+
+    <select id="queryByDocumentIdAndVersionNo" resultMap="documentUploadTaskResultMap">
+        SELECT <include refid="documentUploadTaskColumns"/>
+        FROM document_upload_task
+        WHERE document_id = #{documentId}
+          AND version_no = #{versionNo}
         LIMIT 1
     </select>
 

@@ -1,7 +1,6 @@
 package com.hector.domain.document.model.entity;
 
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
-import com.hector.domain.document.model.valobj.DocumentStorageTypeVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,7 +11,7 @@ import java.time.LocalDateTime;
 
 /**
  * 文档聚合根。
- * 保存文档的 Workspace 归属、当前内容元数据和生命周期状态。
+ * 保存文档的身份、归属和当前版本指针；具体内容由 DocumentVersionEntity 不可变保存。
  */
 @Getter
 @Builder
@@ -47,23 +46,8 @@ public class DocumentEntity {
     /** 文档当前生命周期状态；只有 ACTIVE 状态可对外读取。 */
     private DocumentStatusVO status;
 
-    /** 内容在 MinIO 中的存储类型。 */
-    private DocumentStorageTypeVO storageType;
-
-    /** 内容所在的 MinIO Bucket 名称。 */
-    private String bucketName;
-
-    /** 内容在 MinIO 中的对象路径。 */
-    private String storagePath;
-
-    /** 内容 MIME 类型。 */
-    private String contentType;
-
-    /** 内容字节大小。 */
-    private Long contentSize;
-
-    /** 内容 SHA-256 摘要，用于校验和幂等判断。 */
-    private String contentHash;
+    /** 当前已正式生效的内容版本号；ACTIVE 文档必须大于 0。 */
+    private Long currentVersionNo;
 
     /** 本地上传请求的客户端幂等键；平台新建文档为空。 */
     private String idempotencyKey;
@@ -102,9 +86,19 @@ public class DocumentEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
-    /** 将已写入 MinIO 的文档切换为可用状态。 */
-    public void activate() {
+    /** 将指定内容版本设为当前正式版本，并将文档切换为可用状态。 */
+    public void activateVersion(Long versionNo) {
+        if (versionNo == null || versionNo <= 0) {
+            throw new IllegalArgumentException("文档当前版本号必须大于0");
+        }
+        this.currentVersionNo = versionNo;
         this.status = DocumentStatusVO.ACTIVE;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 登记一次内容保存中的中间状态，保留原当前版本供失败重试与后续恢复使用。 */
+    public void startWriting() {
+        this.status = DocumentStatusVO.WRITING;
         this.updatedAt = LocalDateTime.now();
     }
 
