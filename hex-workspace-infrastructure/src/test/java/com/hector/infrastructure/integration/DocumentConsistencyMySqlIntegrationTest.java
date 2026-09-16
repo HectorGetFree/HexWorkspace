@@ -4,7 +4,34 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.transaction.SpringManagedTransactionFactory;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.MySQLContainer;
+
+import com.hector.domain.document.model.valobj.DocumentStorageObjectVO;
+import com.hector.domain.document.repository.IDocumentStorageRepository;
+import com.hector.domain.document.service.impl.DocumentUploadTaskServiceImpl;
+import com.hector.domain.knowledge.service.impl.KnowledgeIndexJobServiceImpl;
+import com.hector.domain.knowledge.repository.IKnowledgeIndexJobRepository;
+import com.hector.domain.knowledge.repository.IKnowledgeIndexOutboxEventRepository;
+import com.hector.infrastructure.dao.IDocumentDao;
+import com.hector.infrastructure.dao.IDocumentUploadTaskDao;
+import com.hector.infrastructure.dao.IDocumentVersionDao;
+import com.hector.infrastructure.dao.IKnowledgeIndexJobDao;
+import com.hector.infrastructure.dao.IKnowledgeIndexOutboxEventDao;
+import com.hector.infrastructure.repository.DocumentRepository;
+import com.hector.infrastructure.repository.DocumentUploadTaskRepository;
+import com.hector.infrastructure.repository.DocumentVersionRepository;
+import com.hector.infrastructure.repository.KnowledgeIndexJobRepository;
+import com.hector.infrastructure.repository.KnowledgeIndexOutboxEventRepository;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +48,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.lang.reflect.Proxy;
+import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,6 +61,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>只替代对象存储与 MQ；Document 条件更新、唯一约束及数据库事务均使用 Testcontainers MySQL。</p>
  */
 class DocumentConsistencyMySqlIntegrationTest {
+
+    private DocumentUploadTaskServiceImpl uploadTaskService;
+    private KnowledgeIndexJobRepository jobRepository;
+    private KnowledgeIndexOutboxEventRepository knowledgeOutboxRepository;
 
     private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
             .withDatabaseName("hex_workspace")
@@ -67,6 +100,7 @@ class DocumentConsistencyMySqlIntegrationTest {
                 statement.execute("DELETE FROM " + table);
             }
         }
+        initialiseProductionService();
     }
 
     @Test
@@ -115,6 +149,103 @@ class DocumentConsistencyMySqlIntegrationTest {
         assertEquals(1L, queryLong("SELECT COUNT(*) FROM document_version WHERE document_id = ? AND version_no = 2", documentId));
         assertEquals(1L, queryLong("SELECT COUNT(*) FROM knowledge_index_job WHERE document_id = ? AND version_no = 2", documentId));
         assertEquals(1L, queryLong("SELECT COUNT(*) FROM knowledge_index_outbox_event", documentId));
+    }
+
+    @Test
+    void concurrentUploadTaskExecution_shouldApplyOnlyOnceThroughProductionService() throws Exception {
+        long documentId = seedActiveDocument("doc_service_duplicate", 1L, 1L);
+        try (Connection connection = connection(); PreparedStatement writing = connection.prepareStatement("UPDATE document SET status = 1 WHERE id = ?")) {
+            writing.setLong(1, documentId);
+            writing.executeUpdate();
+        }
+        try (Connection connection = connection(); PreparedStatement task = connection.prepareStatement("INSERT INTO document_upload_task (task_code, document_id, version_no, created_by, staging_path, target_path, content_type, bucket_name, content_size, content_hash, status, retry_count) VALUES ('task-service', ?, 2, 1, 'staging/test', 'document/test', 'text/markdown', 'test', 1, 'hash-v2', 0, 0)")) {
+            task.setLong(1, documentId);
+            task.executeUpdate();
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = executor.submit(() -> { await(start); uploadTaskService.execute("task-service"); });
+            Future<?> second = executor.submit(() -> { await(start); uploadTaskService.execute("task-service"); });
+            start.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+        } finally { executor.shutdownNow(); }
+        assertEquals(2L, queryLong("SELECT current_version_no FROM document WHERE id = ?", documentId));
+        assertEquals(2L, queryLong("SELECT index_input_revision FROM document WHERE id = ?", documentId));
+        assertEquals(1L, queryLong("SELECT COUNT(*) FROM document_version WHERE document_id = ? AND version_no = 2", documentId));
+        assertEquals(1L, queryLong("SELECT COUNT(*) FROM knowledge_index_job WHERE document_id = ? AND version_no = 2", documentId));
+        assertEquals(1L, queryLong("SELECT COUNT(*) FROM knowledge_index_outbox_event", documentId));
+    }
+
+    @Test
+    void indexJobOrKnowledgeOutboxFailure_shouldRollbackProductionUploadCompletion() throws Exception {
+        long documentId = seedWritingDocumentAndPendingTask("doc_service_job_fault", "task-job-fault");
+        configureKnowledgeServiceFailure(true, false);
+        uploadTaskService.execute("task-job-fault");
+        assertProductionRollback(documentId, "task-job-fault");
+
+        documentId = seedWritingDocumentAndPendingTask("doc_service_outbox_fault", "task-outbox-fault");
+        configureKnowledgeServiceFailure(false, true);
+        uploadTaskService.execute("task-outbox-fault");
+        assertProductionRollback(documentId, "task-outbox-fault");
+    }
+
+    private long seedWritingDocumentAndPendingTask(String code, String taskCode) throws Exception {
+        long documentId = seedActiveDocument(code, 1L, 1L);
+        try (Connection connection = connection(); PreparedStatement writing = connection.prepareStatement("UPDATE document SET status = 1 WHERE id = ?"); PreparedStatement task = connection.prepareStatement("INSERT INTO document_upload_task (task_code, document_id, version_no, created_by, staging_path, target_path, content_type, bucket_name, content_size, content_hash, status, retry_count) VALUES (?, ?, 2, 1, 'staging/test', 'document/test', 'text/markdown', 'test', 1, 'hash-v2', 0, 0)")) {
+            writing.setLong(1, documentId); writing.executeUpdate(); task.setString(1, taskCode); task.setLong(2, documentId); task.executeUpdate();
+        }
+        return documentId;
+    }
+
+    private void configureKnowledgeServiceFailure(boolean failJob, boolean failOutbox) {
+        IKnowledgeIndexJobRepository jobs = faultProxy(IKnowledgeIndexJobRepository.class, jobRepository, "saveIfAbsent", failJob);
+        IKnowledgeIndexOutboxEventRepository outbox = faultProxy(IKnowledgeIndexOutboxEventRepository.class, knowledgeOutboxRepository, "save", failOutbox);
+        KnowledgeIndexJobServiceImpl service = new KnowledgeIndexJobServiceImpl();
+        ReflectionTestUtils.setField(service, "jobRepository", jobs); ReflectionTestUtils.setField(service, "outboxEventRepository", outbox);
+        ReflectionTestUtils.setField(uploadTaskService, "knowledgeIndexJobService", service);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T faultProxy(Class<T> type, T delegate, String methodName, boolean fail) {
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
+            if (fail && methodName.equals(method.getName())) throw new IllegalStateException("测试注入失败: " + methodName);
+            try { return method.invoke(delegate, args); } catch (java.lang.reflect.InvocationTargetException exception) { throw exception.getCause(); }
+        });
+    }
+
+    private void assertProductionRollback(long documentId, String taskCode) throws Exception {
+        assertEquals(1L, queryLong("SELECT current_version_no FROM document WHERE id = ?", documentId));
+        assertEquals(1L, queryLong("SELECT index_input_revision FROM document WHERE id = ?", documentId));
+        assertEquals(0L, queryLong("SELECT COUNT(*) FROM document_version WHERE document_id = ? AND version_no = 2", documentId));
+        assertEquals(0L, queryLong("SELECT COUNT(*) FROM knowledge_index_job WHERE document_id = ?", documentId));
+        assertEquals(0L, queryLong("SELECT COUNT(*) FROM knowledge_index_outbox_event", documentId));
+        assertEquals(3L, queryLong("SELECT status FROM document_upload_task WHERE task_code = ?", taskCode));
+    }
+
+    private static void await(CountDownLatch latch) { try { latch.await(); } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new IllegalStateException(exception); } }
+
+    private void initialiseProductionService() throws Exception {
+        DataSource dataSource = new org.springframework.jdbc.datasource.SimpleDriverDataSource(new com.mysql.cj.jdbc.Driver(), MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
+        Configuration configuration = new Configuration(new Environment("test", new SpringManagedTransactionFactory(), dataSource));
+        for (String mapper : List.of("document.xml", "document_version.xml", "document_upload_task.xml", "knowledge_index_job.xml", "knowledge_index_outbox_event.xml")) {
+            new XMLMapperBuilder(org.apache.ibatis.io.Resources.getResourceAsStream("mybatis/mapper/mysql/" + mapper), configuration, mapper, configuration.getSqlFragments()).parse();
+        }
+        SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(configuration);
+        SqlSessionTemplate template = new SqlSessionTemplate(factory);
+        DocumentRepository documents = new DocumentRepository(); ReflectionTestUtils.setField(documents, "documentDao", template.getMapper(IDocumentDao.class));
+        DocumentVersionRepository versions = new DocumentVersionRepository(); ReflectionTestUtils.setField(versions, "documentVersionDao", template.getMapper(IDocumentVersionDao.class));
+        DocumentUploadTaskRepository tasks = new DocumentUploadTaskRepository(); ReflectionTestUtils.setField(tasks, "documentUploadTaskDao", template.getMapper(IDocumentUploadTaskDao.class));
+        jobRepository = new KnowledgeIndexJobRepository(); ReflectionTestUtils.setField(jobRepository, "dao", template.getMapper(IKnowledgeIndexJobDao.class));
+        knowledgeOutboxRepository = new KnowledgeIndexOutboxEventRepository(); ReflectionTestUtils.setField(knowledgeOutboxRepository, "dao", template.getMapper(IKnowledgeIndexOutboxEventDao.class));
+        KnowledgeIndexJobServiceImpl indexService = new KnowledgeIndexJobServiceImpl(); ReflectionTestUtils.setField(indexService, "jobRepository", jobRepository); ReflectionTestUtils.setField(indexService, "outboxEventRepository", knowledgeOutboxRepository);
+        uploadTaskService = new DocumentUploadTaskServiceImpl();
+        ReflectionTestUtils.setField(uploadTaskService, "taskRepository", tasks); ReflectionTestUtils.setField(uploadTaskService, "documentRepository", documents); ReflectionTestUtils.setField(uploadTaskService, "documentVersionRepository", versions); ReflectionTestUtils.setField(uploadTaskService, "knowledgeIndexJobService", indexService); ReflectionTestUtils.setField(uploadTaskService, "storageRepository", new NoopStorage()); ReflectionTestUtils.setField(uploadTaskService, "transactionTemplate", new TransactionTemplate(new DataSourceTransactionManager(dataSource)));
+    }
+
+    private static class NoopStorage implements IDocumentStorageRepository {
+        public String getBucketName() { return "test"; } public void upload(String key, byte[] value, String type) { } public void upload(String key, java.io.InputStream value, long size, String type) { } public void copy(String source, String target, String type) { } public byte[] download(String key) { return new byte[0]; } public void delete(String key) { } public List<DocumentStorageObjectVO> listByPrefix(String prefix) { return List.of(); }
     }
 
     private Callable<Boolean> casAttempt(long documentId, CountDownLatch readSnapshot, CountDownLatch startCas, String suffix) {
@@ -210,6 +341,13 @@ class DocumentConsistencyMySqlIntegrationTest {
             if (sql.contains("?")) {
                 statement.setLong(1, documentId);
             }
+            try (ResultSet result = statement.executeQuery()) { result.next(); return result.getLong(1); }
+        }
+    }
+
+    private long queryLong(String sql, String value) throws Exception {
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, value);
             try (ResultSet result = statement.executeQuery()) { result.next(); return result.getLong(1); }
         }
     }
