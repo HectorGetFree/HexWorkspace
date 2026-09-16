@@ -49,6 +49,9 @@ public class DocumentEntity {
     /** 当前已正式生效的内容版本号；ACTIVE 文档必须大于 0。 */
     private Long currentVersionNo;
 
+    /** 影响索引输入的单调修订号；内容版本生效或标题变更时递增。 */
+    private Long indexInputRevision;
+
     /** 本地上传请求的客户端幂等键；平台新建文档为空。 */
     private String idempotencyKey;
 
@@ -93,6 +96,12 @@ public class DocumentEntity {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /** 标题变更会改变检索时的索引输入，因此必须产生新的索引修订。 */
+    public void renameAndAdvanceIndexRevision(String newFileName) {
+        rename(newFileName);
+        advanceIndexInputRevision();
+    }
+
     /**
      * 将文档移动到新的父目录。
      *
@@ -110,7 +119,12 @@ public class DocumentEntity {
         }
         this.currentVersionNo = versionNo;
         this.status = DocumentStatusVO.ACTIVE;
+        advanceIndexInputRevision();
         this.updatedAt = LocalDateTime.now();
+    }
+
+    private void advanceIndexInputRevision() {
+        this.indexInputRevision = (this.indexInputRevision == null ? 0L : this.indexInputRevision) + 1;
     }
 
     /** 登记一次内容保存中的中间状态，保留原当前版本供失败重试与后续恢复使用。 */

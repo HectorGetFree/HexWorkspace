@@ -48,6 +48,30 @@ public class DocumentRepository implements IDocumentRepository {
     }
 
     @Override
+    public boolean activateVersionIfCurrent(DocumentEntity documentEntity, Long expectedVersionNo, Long expectedIndexInputRevision) {
+        Document document = toPo(documentEntity);
+        document.setExpectedVersionNo(expectedVersionNo);
+        document.setExpectedIndexInputRevision(expectedIndexInputRevision);
+        return documentDao.activateVersionIfCurrent(document) == 1;
+    }
+
+    @Override
+    public boolean startWritingIfCurrent(DocumentEntity documentEntity, Long expectedVersionNo,
+                                         Long expectedIndexInputRevision) {
+        Document document = toPo(documentEntity);
+        document.setExpectedVersionNo(expectedVersionNo);
+        document.setExpectedIndexInputRevision(expectedIndexInputRevision);
+        return documentDao.startWritingIfCurrent(document) == 1;
+    }
+
+    @Override
+    public boolean renameAndAdvanceIndexRevisionIfCurrent(DocumentEntity documentEntity, Long expectedIndexInputRevision) {
+        Document document = toPo(documentEntity);
+        document.setExpectedIndexInputRevision(expectedIndexInputRevision);
+        return documentDao.renameAndAdvanceIndexRevisionIfCurrent(document) == 1;
+    }
+
+    @Override
     public Optional<DocumentEntity> findById(Long documentId) {
         log.info("文档仓储-按ID查询开始 documentId:{}", documentId);
         Document document = documentDao.queryById(documentId);
@@ -103,6 +127,7 @@ public class DocumentRepository implements IDocumentRepository {
                 .documentType(documentEntity.getDocumentType().getCode())
                 .status(documentEntity.getStatus().getCode())
                 .currentVersionNo(documentEntity.getCurrentVersionNo())
+                .indexInputRevision(documentEntity.getIndexInputRevision())
                 .idempotencyKey(documentEntity.getIdempotencyKey())
                 .deletedAt(documentEntity.getDeletedAt())
                 .createdAt(documentEntity.getCreatedAt())
@@ -122,6 +147,7 @@ public class DocumentRepository implements IDocumentRepository {
                 .documentType(DocumentTypeVO.fromCode(document.getDocumentType()))
                 .status(DocumentStatusVO.fromCode(document.getStatus()))
                 .currentVersionNo(document.getCurrentVersionNo())
+                .indexInputRevision(document.getIndexInputRevision())
                 .idempotencyKey(document.getIdempotencyKey())
                 .deletedAt(document.getDeletedAt())
                 .createdAt(document.getCreatedAt())

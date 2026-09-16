@@ -10,6 +10,7 @@ import com.hector.domain.document.repository.IDocumentStorageRepository;
 import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepository;
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
 import com.hector.domain.document.repository.IDocumentVersionRepository;
+import com.hector.domain.knowledge.service.IKnowledgeIndexJobService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -48,6 +49,9 @@ class DocumentUploadTaskServiceImplTest {
 
     @Mock
     private IDocumentStorageRepository storageRepository;
+
+    @Mock
+    private IKnowledgeIndexJobService knowledgeIndexJobService;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -121,13 +125,36 @@ class DocumentUploadTaskServiceImplTest {
         when(taskRepository.findByTaskCode("task_001")).thenReturn(Optional.of(task));
         when(taskRepository.completeIfOwned(eq("task_001"), anyString())).thenReturn(true);
         when(documentRepository.findById(10L)).thenReturn(Optional.of(document));
+        when(documentRepository.activateVersionIfCurrent(any(DocumentEntity.class), eq(0L), eq(0L))).thenReturn(true);
 
         uploadTaskService.execute("task_001");
 
         verify(documentVersionRepository).save(any(DocumentVersionEntity.class));
-        verify(documentRepository).update(document);
+        verify(documentRepository).activateVersionIfCurrent(any(DocumentEntity.class), eq(0L), eq(0L));
+        verify(knowledgeIndexJobService).registerAutomatic(any(DocumentEntity.class));
         assertEquals(DocumentStatusVO.ACTIVE, document.getStatus());
         assertEquals(1L, document.getCurrentVersionNo());
+    }
+
+    @Test
+    void shouldNotRegisterKnowledgeJobWhenDocumentActivationCasFails() {
+        mockTransactionTemplate();
+        DocumentUploadTaskEntity task = task("task_001");
+        DocumentEntity document = DocumentEntity.builder()
+                .id(10L)
+                .ownerUserId(1L)
+                .status(DocumentStatusVO.CREATING)
+                .build();
+        when(taskRepository.claimForRunning(eq("task_001"), anyString(), any(LocalDateTime.class)))
+                .thenReturn(true);
+        when(taskRepository.findByTaskCode("task_001")).thenReturn(Optional.of(task));
+        when(taskRepository.completeIfOwned(eq("task_001"), anyString())).thenReturn(true);
+        when(documentRepository.findById(10L)).thenReturn(Optional.of(document));
+        when(documentRepository.activateVersionIfCurrent(any(DocumentEntity.class), eq(0L), eq(0L))).thenReturn(false);
+
+        uploadTaskService.execute("task_001");
+
+        verify(knowledgeIndexJobService, never()).registerAutomatic(any(DocumentEntity.class));
     }
 
     private DocumentUploadTaskEntity task(String taskCode) {

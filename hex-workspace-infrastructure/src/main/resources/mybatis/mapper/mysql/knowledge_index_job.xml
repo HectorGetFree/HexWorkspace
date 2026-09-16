@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IKnowledgeIndexJobDao">
+
+    <resultMap id="knowledgeIndexJobResultMap"
+               type="com.hector.infrastructure.dao.po.KnowledgeIndexJob">
+        <id property="id" column="id"/>
+        <result property="jobCode" column="job_code"/>
+        <result property="requestKey" column="request_key"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="documentId" column="document_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="indexInputRevision" column="index_input_revision"/>
+        <result property="jobType" column="job_type"/>
+        <result property="status" column="status"/>
+        <result property="stage" column="stage"/>
+        <result property="workerToken" column="worker_token"/>
+        <result property="runningLeaseUntil" column="running_lease_until"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryAt" column="next_retry_at"/>
+        <result property="failureReason" column="failure_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insertIgnore" parameterType="com.hector.infrastructure.dao.po.KnowledgeIndexJob">
+        INSERT IGNORE INTO knowledge_index_job (
+            job_code, request_key, workspace_id, document_id, version_no, index_input_revision,
+            job_type, status, stage, worker_token, running_lease_until, retry_count,
+            next_retry_at, failure_reason, created_at, updated_at
+        ) VALUES (
+            #{jobCode}, #{requestKey}, #{workspaceId}, #{documentId}, #{versionNo}, #{indexInputRevision},
+            #{jobType}, #{status}, #{stage}, #{workerToken}, #{runningLeaseUntil}, #{retryCount},
+            #{nextRetryAt}, #{failureReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="queryByRequestKey" resultMap="knowledgeIndexJobResultMap">
+        SELECT id, job_code, request_key, workspace_id, document_id, version_no, index_input_revision,
+               job_type, status, stage, worker_token, running_lease_until, retry_count,
+               next_retry_at, failure_reason, created_at, updated_at
+        FROM knowledge_index_job
+        WHERE request_key = #{requestKey}
+        LIMIT 1
+    </select>
+
+    <update id="claimForRunning">
+        UPDATE knowledge_index_job
+        SET status = 1,
+            worker_token = #{workerToken},
+            running_lease_until = #{runningLeaseUntil},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_code = #{jobCode}
+          AND status = 0
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= CURRENT_TIMESTAMP)
+    </update>
+
+    <select id="queryExpiredRunning" resultMap="knowledgeIndexJobResultMap">
+        SELECT id, job_code, request_key, workspace_id, document_id, version_no, index_input_revision,
+               job_type, status, stage, worker_token, running_lease_until, retry_count,
+               next_retry_at, failure_reason, created_at, updated_at
+        FROM knowledge_index_job
+        WHERE status = 1
+          AND running_lease_until &lt;= #{now}
+        ORDER BY running_lease_until ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="recoverExpiredRunning">
+        UPDATE knowledge_index_job
+        SET status = 0,
+            worker_token = NULL,
+            running_lease_until = NULL,
+            failure_reason = #{failureReason},
+            updated_at = #{now}
+        WHERE job_code = #{jobCode}
+          AND status = 1
+          AND running_lease_until &lt;= #{now}
+    </update>
+
+</mapper>

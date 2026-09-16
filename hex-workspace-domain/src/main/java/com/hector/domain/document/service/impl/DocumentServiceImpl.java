@@ -16,6 +16,7 @@ import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentService;
 import com.hector.domain.document.service.IDocumentUploadTaskService;
 import com.hector.domain.folder.service.IFolderService;
+import com.hector.domain.knowledge.service.IKnowledgeIndexJobService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
@@ -52,6 +53,9 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Resource
     private IFolderService folderService;
+
+    @Resource
+    private IKnowledgeIndexJobService knowledgeIndexJobService;
 
     @Resource
     private IDocumentUploadTaskRepository documentUploadTaskRepository;
@@ -138,8 +142,15 @@ public class DocumentServiceImpl implements IDocumentService {
             DocumentEntity document = getActiveDocument(workspaceId, documentCode);
             String normalized = normalizeFileName(fileName, document.getDocumentType() == DocumentTypeVO.PLATFORM_CREATED);
             assertFileNameAvailable(workspaceId, document.getParentId(), normalized, document.getId());
-            document.rename(normalized);
-            documentRepository.update(document);
+            if (normalized.equals(document.getFileName())) {
+                return document;
+            }
+            Long expectedIndexInputRevision = document.getIndexInputRevision() == null ? 0L : document.getIndexInputRevision();
+            document.renameAndAdvanceIndexRevision(normalized);
+            if (!documentRepository.renameAndAdvanceIndexRevisionIfCurrent(document, expectedIndexInputRevision)) {
+                throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+            }
+            knowledgeIndexJobService.registerAutomatic(document);
             return document;
         });
     }
@@ -311,6 +322,7 @@ public class DocumentServiceImpl implements IDocumentService {
                     .documentType(type)
                     .status(DocumentStatusVO.CREATING)
                     .currentVersionNo(null)
+                    .indexInputRevision(0L)
                     .idempotencyKey(idempotencyKey)
                     .createdAt(now)
                     .updatedAt(now)
@@ -355,9 +367,13 @@ public class DocumentServiceImpl implements IDocumentService {
                 throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
             }
 
-            // 1. 先锁定为 WRITING，阻止同一文档在当前单人阶段并发登记两个相同后继版本。
+            // 1. 通过版本与索引修订双条件 CAS 抢占写入权，阻止并发登记相同后继版本。
+            Long expectedIndexInputRevision = document.getIndexInputRevision() == null
+                    ? 0L : document.getIndexInputRevision();
             document.startWriting();
-            documentRepository.update(document);
+            if (!documentRepository.startWritingIfCurrent(document, baseVersionNo, expectedIndexInputRevision)) {
+                throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+            }
 
             // 2. 保存任务与投递事件，使本次版本转正可由同步调用或 MQ 可靠完成。
             LocalDateTime now = LocalDateTime.now();

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IKnowledgeIndexOutboxEventDao">
+
+    <insert id="insert" parameterType="com.hector.infrastructure.dao.po.KnowledgeIndexOutboxEvent"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO knowledge_index_outbox_event (
+            event_code, job_code, status, publishing_token, publishing_lease_until,
+            failure_reason, created_at, updated_at
+        ) VALUES (
+            #{eventCode}, #{jobCode}, #{status}, #{publishingToken}, #{publishingLeaseUntil},
+            #{failureReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+</mapper>

@@ -16,6 +16,12 @@ public interface IDocumentDao {
 
     int update(Document document);
 
+    int activateVersionIfCurrent(Document document);
+
+    int startWritingIfCurrent(Document document);
+
+    int renameAndAdvanceIndexRevisionIfCurrent(Document document);
+
     Document queryById(@Param("id") Long id);
 
     Document queryByDocumentCode(@Param("documentCode") String documentCode);

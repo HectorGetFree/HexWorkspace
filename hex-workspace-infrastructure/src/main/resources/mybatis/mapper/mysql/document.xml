@@ -15,6 +15,7 @@
         <result property="documentType" column="document_type"/>
         <result property="status" column="status"/>
         <result property="currentVersionNo" column="current_version_no"/>
+        <result property="indexInputRevision" column="index_input_revision"/>
         <result property="idempotencyKey" column="idempotency_key"/>
         <result property="deletedAt" column="deleted_at"/>
         <result property="createdAt" column="created_at"/>
@@ -23,10 +24,10 @@
 
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.Document" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO `document` (
-            document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+            document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
             idempotency_key, deleted_at, created_at, updated_at
         ) VALUES (
-            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{title}, #{fileName}, #{documentType}, #{status}, #{currentVersionNo},
+            #{documentCode}, #{workspaceId}, #{parentId}, #{ownerUserId}, #{title}, #{fileName}, #{documentType}, #{status}, #{currentVersionNo}, #{indexInputRevision},
             #{idempotencyKey}, #{deletedAt}, #{createdAt}, #{updatedAt}
         )
     </insert>
@@ -39,14 +40,48 @@
             file_name = #{fileName},
             status = #{status},
             current_version_no = #{currentVersionNo},
+            index_input_revision = #{indexInputRevision},
             idempotency_key = #{idempotencyKey},
             deleted_at = #{deletedAt},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 
+    <update id="activateVersionIfCurrent" parameterType="com.hector.infrastructure.dao.po.Document">
+        UPDATE `document`
+        SET status = #{status},
+            current_version_no = #{currentVersionNo},
+            index_input_revision = #{indexInputRevision},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND index_input_revision = #{expectedIndexInputRevision}
+          AND ((#{expectedVersionNo} = 0 AND current_version_no IS NULL) OR current_version_no = #{expectedVersionNo})
+          AND status IN (0, 1)
+    </update>
+
+    <update id="startWritingIfCurrent" parameterType="com.hector.infrastructure.dao.po.Document">
+        UPDATE `document`
+        SET status = #{status},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND index_input_revision = #{expectedIndexInputRevision}
+          AND current_version_no = #{expectedVersionNo}
+          AND status = 2
+    </update>
+
+    <update id="renameAndAdvanceIndexRevisionIfCurrent" parameterType="com.hector.infrastructure.dao.po.Document">
+        UPDATE `document`
+        SET title = #{title},
+            file_name = #{fileName},
+            index_input_revision = #{indexInputRevision},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND index_input_revision = #{expectedIndexInputRevision}
+          AND status = 2
+    </update>
+
     <select id="queryById" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE id = #{id}
@@ -54,7 +89,7 @@
     </select>
 
     <select id="queryByUploadIdempotencyKey" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
@@ -64,7 +99,7 @@
     </select>
 
     <select id="queryByDocumentCode" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE document_code = #{documentCode}
@@ -72,7 +107,7 @@
     </select>
 
     <select id="queryByWorkspaceId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId}
@@ -80,7 +115,7 @@
     </select>
 
     <select id="queryVisibleByParentId" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                idempotency_key, deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND status IN (2, 4)
@@ -88,7 +123,7 @@
     </select>
 
     <select id="queryActiveByParentIdAndFileName" resultMap="documentResultMap">
-        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no,
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                deleted_at, created_at, updated_at
         FROM `document`
         WHERE workspace_id = #{workspaceId} AND parent_id = #{parentId} AND file_name = #{fileName} AND status != 3

@@ -16,6 +16,7 @@ import com.hector.trigger.http.security.SecurityUserUtil;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,7 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.stream.Collectors;
 
-/** Workspace级知识检索接口，MVP 只返回向量 Top-K 命中，不在此阶段加入问答模型编排。 */
+/**
+ * 历史知识检索接口。
+ *
+ * <p>Phase 1 保留接口代码以便后续迁移，但由于旧索引缺少文档版本与资源权限校验，默认关闭。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/workspaces/{workspaceId}/knowledge")
 public class KnowledgeController extends BaseController {
@@ -40,6 +45,9 @@ public class KnowledgeController extends BaseController {
     @Resource
     private IKnowledgeAnswerService knowledgeAnswerService;
 
+    @Value("${hexworkspace.knowledge.legacy-api.enabled:false}")
+    private boolean legacyKnowledgeApiEnabled;
+
     /**
      * 根据问题查询当前Workspace的知识片段。
      * curl 示例：curl -G "http://127.0.0.1:8098/api/v1/workspaces/1/knowledge/search" -H "Authorization: Bearer 替换为实际登录令牌" --data-urlencode "question=文档讲了什么"
@@ -48,6 +56,7 @@ public class KnowledgeController extends BaseController {
     public Response<KnowledgeSearchResponseDTO> search(@PathVariable("workspaceId") Long workspaceId,
                                                         @RequestParam("question") String question) {
         try {
+            requireLegacyKnowledgeApiEnabled();
             Long userId = SecurityUserUtil.getCurrentUserId();
             log.info("知识检索开始 workspaceId:{} userId:{} questionLength:{}", workspaceId, userId, question == null ? 0 : question.length());
             workspaceService.assertOwner(workspaceId, userId);
@@ -75,6 +84,7 @@ public class KnowledgeController extends BaseController {
     public Response<KnowledgeAskResponseDTO> ask(@PathVariable("workspaceId") Long workspaceId,
                                                   @RequestBody KnowledgeAskRequestDTO request) {
         try {
+            requireLegacyKnowledgeApiEnabled();
             Long userId = SecurityUserUtil.getCurrentUserId();
             String question = request == null ? null : request.getQuestion();
             log.info("知识问答开始 workspaceId:{} userId:{} questionLength:{}", workspaceId, userId, question == null ? 0 : question.length());
@@ -99,5 +109,13 @@ public class KnowledgeController extends BaseController {
     private KnowledgeSearchHitResponseDTO toHit(KnowledgeSearchHitVO hit) {
         return KnowledgeSearchHitResponseDTO.builder().documentId(hit.documentId()).documentCode(hit.documentCode())
                 .chunkNo(hit.chunkNo()).heading(hit.heading()).content(hit.content()).score(hit.score()).build();
+    }
+
+    private void requireLegacyKnowledgeApiEnabled() {
+        if (legacyKnowledgeApiEnabled) {
+            return;
+        }
+        log.warn("历史知识检索接口已关闭，请完成版本与资源授权迁移后再显式开启");
+        throw new BusinessException(ResponseCode.FORBIDDEN);
     }
 }

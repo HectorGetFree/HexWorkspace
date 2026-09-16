@@ -16,6 +16,15 @@ public interface IDocumentRepository {
     /** 更新文档当前状态、名称、目录或版本指针。 */
     void update(DocumentEntity documentEntity);
 
+    /** 基于当前版本与索引修订号执行条件更新，只有成功后版本才真正生效。 */
+    boolean activateVersionIfCurrent(DocumentEntity documentEntity, Long expectedVersionNo, Long expectedIndexInputRevision);
+
+    /** 基于当前版本与索引修订号抢占写入权，避免并发编辑登记同一后继版本。 */
+    boolean startWritingIfCurrent(DocumentEntity documentEntity, Long expectedVersionNo, Long expectedIndexInputRevision);
+
+    /** 基于索引修订号条件更新标题，避免旧重命名覆盖较新的索引输入。 */
+    boolean renameAndAdvanceIndexRevisionIfCurrent(DocumentEntity documentEntity, Long expectedIndexInputRevision);
+
     /** 按数据库主键查询文档。 */
     Optional<DocumentEntity> findById(Long documentId);
 

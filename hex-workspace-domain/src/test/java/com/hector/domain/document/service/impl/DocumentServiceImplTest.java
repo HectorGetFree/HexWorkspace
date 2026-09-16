@@ -10,6 +10,7 @@ import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepositor
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
 import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentUploadTaskService;
+import com.hector.domain.knowledge.service.IKnowledgeIndexJobService;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.hexworkspace.types.exception.BusinessException;
@@ -32,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -62,6 +64,9 @@ class DocumentServiceImplTest {
 
     @Mock
     private IDocumentUploadTaskService documentUploadTaskService;
+
+    @Mock
+    private IKnowledgeIndexJobService knowledgeIndexJobService;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -121,6 +126,7 @@ class DocumentServiceImplTest {
         mockTransactionTemplate();
         DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
         when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+        when(documentRepository.startWritingIfCurrent(any(DocumentEntity.class), eq(1L), eq(0L))).thenReturn(true);
         when(documentStorageRepository.getBucketName()).thenReturn("hex-workspace");
         doAnswer(invocation -> {
             document.activateVersion(2L);

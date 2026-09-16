@@ -13,6 +13,7 @@ import com.hector.domain.document.repository.IDocumentUploadOutboxEventRepositor
 import com.hector.domain.document.repository.IDocumentUploadTaskRepository;
 import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.document.service.IDocumentUploadTaskService;
+import com.hector.domain.knowledge.service.IKnowledgeIndexJobService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
@@ -51,6 +52,9 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
 
     @Resource
     private IDocumentStorageRepository storageRepository;
+
+    @Resource
+    private IKnowledgeIndexJobService knowledgeIndexJobService;
 
     @Resource
     private TransactionTemplate transactionTemplate;
@@ -149,6 +153,7 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
         }
         DocumentEntity document = documentRepository.findById(task.getDocumentId())
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        // 1. 版本、Document CAS 与索引任务登记必须同属当前事务；CAS 失败则整体回滚。
         documentVersionRepository.save(DocumentVersionEntity.builder()
                 .documentId(document.getId())
                 .versionNo(task.getVersionNo())
@@ -161,8 +166,14 @@ public class DocumentUploadTaskServiceImpl implements IDocumentUploadTaskService
                 .createdBy(task.getCreatedBy())
                 .createdAt(LocalDateTime.now())
                 .build());
+        Long expectedVersionNo = task.getVersionNo() == 1L ? 0L : task.getVersionNo() - 1L;
+        Long expectedIndexInputRevision = document.getIndexInputRevision() == null ? 0L : document.getIndexInputRevision();
         document.activateVersion(task.getVersionNo());
-        documentRepository.update(document);
+        if (!documentRepository.activateVersionIfCurrent(document, expectedVersionNo, expectedIndexInputRevision)) {
+            throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
+        }
+        // 2. 只有数据库确认当前版本已经切换后，才登记对应修订的异步索引意图。
+        knowledgeIndexJobService.registerAutomatic(document);
         return true;
     }
 

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +27,17 @@ public class Document {
     private Integer documentType;
     private Integer status;
     private Long currentVersionNo;
+
+    /** 影响知识索引输入的单调修订号。 */
+    private Long indexInputRevision;
+
+    /** 版本生效条件更新中预期的当前版本号；仅用于 Mapper 条件，不落库。 */
+    @Setter
+    private Long expectedVersionNo;
+
+    /** 索引修订条件更新中预期的修订号；仅用于 Mapper 条件，不落库。 */
+    @Setter
+    private Long expectedIndexInputRevision;
     private String idempotencyKey;
     private LocalDateTime deletedAt;
     private LocalDateTime createdAt;

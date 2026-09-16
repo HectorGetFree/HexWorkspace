@@ -18,6 +18,10 @@ app:
     cross-origin: '*'
 
 hexworkspace:
+  knowledge:
+    legacy-api:
+      # 旧知识接口不校验文档版本与文件夹权限，Phase 1 默认关闭。
+      enabled: ${HEX_WORKSPACE_LEGACY_KNOWLEDGE_API_ENABLED:false}
   document-upload:
     max-retry-count: 3
     staging-orphan-retention-hours: 24
