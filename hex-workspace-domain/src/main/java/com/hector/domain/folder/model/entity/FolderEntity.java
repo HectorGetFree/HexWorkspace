@@ -36,6 +36,9 @@ public class FolderEntity {
     /** 文件夹当前生命周期状态。 */
     private FolderStatusVO status;
 
+    /** 显式逻辑删除时间；未删除时为空，供后续回收站保留期计算使用。 */
+    private LocalDateTime deletedAt;
+
     /** 文件夹创建时间。 */
     private LocalDateTime createdAt;
 
@@ -52,6 +55,11 @@ public class FolderEntity {
         return FolderStatusVO.ACTIVE == status;
     }
 
+    /** 判断文件夹是否处于显式逻辑删除状态。 */
+    public boolean isDeleted() {
+        return FolderStatusVO.DELETED == status;
+    }
+
     /** 修改文件夹名称并同步业务更新时间。 */
     public void rename(String newName) {
         this.name = newName;
@@ -66,7 +74,21 @@ public class FolderEntity {
 
     /** 将文件夹标记为逻辑删除，不在领域层物理清理后代内容。 */
     public void delete() {
+        if (isDeleted()) {
+            return;
+        }
         this.status = FolderStatusVO.DELETED;
+        this.deletedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 恢复被显式删除的目录；后代状态和文档内容均不在此处改写。 */
+    public void restore() {
+        if (!isDeleted()) {
+            return;
+        }
+        this.status = FolderStatusVO.ACTIVE;
+        this.deletedAt = null;
         this.updatedAt = LocalDateTime.now();
     }
 }

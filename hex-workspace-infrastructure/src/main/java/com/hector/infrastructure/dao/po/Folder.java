@@ -35,6 +35,9 @@ public class Folder {
     /** 文件夹状态。 */
     private Integer status;
 
+    /** 显式逻辑删除时间；未删除时为空。 */
+    private LocalDateTime deletedAt;
+
     /** 创建时间。 */
     private LocalDateTime createdAt;
 

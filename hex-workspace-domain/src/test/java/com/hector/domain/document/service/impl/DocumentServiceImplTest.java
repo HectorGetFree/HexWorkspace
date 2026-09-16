@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
@@ -185,6 +186,16 @@ class DocumentServiceImplTest {
         DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
         document.delete();
         when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+
+        assertThrows(BusinessException.class, () -> documentService.getActiveDocument(10L, "doc_pdf"));
+    }
+
+    @Test
+    void shouldRejectDocumentAccessWhenParentFolderIsInaccessible() {
+        DocumentEntity document = document("方案.md", DocumentTypeVO.PLATFORM_CREATED);
+        when(documentRepository.findByDocumentCode("doc_pdf")).thenReturn(Optional.of(document));
+        doThrow(new BusinessException("R404", "文件夹不存在"))
+                .when(folderService).getActiveFolder(10L, 20L);
 
         assertThrows(BusinessException.class, () -> documentService.getActiveDocument(10L, "doc_pdf"));
     }

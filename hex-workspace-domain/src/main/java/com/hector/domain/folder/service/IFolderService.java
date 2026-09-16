@@ -24,6 +24,9 @@ public interface IFolderService {
     /** 在当前 Workspace 内移动非根文件夹。 */
     FolderEntity moveFolder(Long workspaceId, Long folderId, Long targetParentId);
 
-    /** 递归逻辑删除非根文件夹及其中的云文档。 */
-    void deleteFolderTree(Long workspaceId, Long folderId);
+    /** 仅逻辑删除指定非根文件夹；不改写后代目录或文档状态。 */
+    FolderEntity deleteFolder(Long workspaceId, Long folderId);
+
+    /** 恢复指定逻辑删除文件夹；仅恢复目标节点。 */
+    FolderEntity restoreFolder(Long workspaceId, Long folderId);
 }

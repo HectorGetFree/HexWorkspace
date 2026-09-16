@@ -136,17 +136,32 @@ public class FolderController extends BaseController {
     }
 
     /**
-     * 逻辑删除文件夹及其目录树资源。
+     * 逻辑删除指定文件夹；其后代资源不会改写状态，但会因祖先不可访问而被冻结。
      * curl -X DELETE "http://127.0.0.1:8098/api/v1/workspaces/1/folders/10" -H "Authorization: Bearer 登录令牌"
      */
     @DeleteMapping("/{folderId}")
     public Response<Boolean> delete(@PathVariable("workspaceId") Long workspaceId,
                                     @PathVariable("folderId") Long folderId) {
-        return execute("删除目录树", workspaceId, () -> {
+        return execute("删除文件夹", workspaceId, () -> {
             assertOwner(workspaceId);
-            folderService.deleteFolderTree(workspaceId, folderId);
-            log.info("删除目录树完成 workspaceId:{} folderId:{}", workspaceId, folderId);
+            folderService.deleteFolder(workspaceId, folderId);
+            log.info("删除文件夹完成 workspaceId:{} folderId:{}", workspaceId, folderId);
             return success(true);
+        });
+    }
+
+    /**
+     * 恢复指定逻辑删除文件夹；仅恢复目标节点，不改写后代目录或文档。
+     * curl -X POST "http://127.0.0.1:8098/api/v1/workspaces/1/folders/10/restore" -H "Authorization: Bearer 登录令牌"
+     */
+    @PostMapping("/{folderId}/restore")
+    public Response<FolderResponseDTO> restore(@PathVariable("workspaceId") Long workspaceId,
+                                               @PathVariable("folderId") Long folderId) {
+        return execute("恢复文件夹", workspaceId, () -> {
+            assertOwner(workspaceId);
+            FolderResponseDTO response = toResponse(folderService.restoreFolder(workspaceId, folderId));
+            log.info("恢复文件夹完成 workspaceId:{} folderId:{}", workspaceId, folderId);
+            return success(response);
         });
     }
 
@@ -177,6 +192,7 @@ public class FolderController extends BaseController {
                 .name(folder.getName())
                 .root(folder.isRoot())
                 .status(folder.getStatus().name())
+                .deletedAt(folder.getDeletedAt())
                 .build();
     }
 

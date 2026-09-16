@@ -9,19 +9,20 @@
         <result property="name" column="name"/>
         <result property="root" column="is_root"/>
         <result property="status" column="status"/>
+        <result property="deletedAt" column="deleted_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
     <sql id="columns">
-        id, folder_code, workspace_id, parent_id, name, is_root, status, created_at, updated_at
+        id, folder_code, workspace_id, parent_id, name, is_root, status, deleted_at, created_at, updated_at
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO folder (
-            folder_code, workspace_id, parent_id, name, is_root, status, created_at, updated_at
+            folder_code, workspace_id, parent_id, name, is_root, status, deleted_at, created_at, updated_at
         ) VALUES (
-            #{folderCode}, #{workspaceId}, #{parentId}, #{name}, #{root}, #{status}, #{createdAt}, #{updatedAt}
+            #{folderCode}, #{workspaceId}, #{parentId}, #{name}, #{root}, #{status}, #{deletedAt}, #{createdAt}, #{updatedAt}
         )
     </insert>
 
@@ -30,6 +31,7 @@
         SET parent_id = #{parentId},
             name = #{name},
             status = #{status},
+            deleted_at = #{deletedAt},
             updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
@@ -47,6 +49,28 @@
         WHERE workspace_id = #{workspaceId}
           AND is_root = 1
         LIMIT 1
+    </select>
+
+    <select id="queryAncestorChain" resultMap="map">
+        WITH RECURSIVE ancestor_chain AS (
+            SELECT id, folder_code, workspace_id, parent_id, name, is_root, status,
+                   deleted_at, created_at, updated_at, 0 AS depth
+            FROM folder
+            WHERE id = #{folderId}
+
+            UNION ALL
+
+            SELECT f.id, f.folder_code, f.workspace_id, f.parent_id, f.name,
+                   f.is_root, f.status, f.deleted_at, f.created_at, f.updated_at,
+                   ancestor_chain.depth + 1
+            FROM folder f
+            INNER JOIN ancestor_chain ON f.id = ancestor_chain.parent_id
+            WHERE ancestor_chain.depth &lt; 255
+        )
+        SELECT id, folder_code, workspace_id, parent_id, name, is_root, status,
+               deleted_at, created_at, updated_at
+        FROM ancestor_chain
+        ORDER BY depth ASC
     </select>
 
     <select id="queryActiveByParentIdAndName" resultMap="map">

@@ -19,6 +19,9 @@ public interface IFolderRepository {
     /** 查询 Workspace 唯一根目录。 */
     Optional<FolderEntity> findRootByWorkspaceId(Long workspaceId);
 
+    /** 一次查询从指定目录到根目录的祖先链，用于统一判断目录可访问性和移动防环。 */
+    List<FolderEntity> listAncestorChain(Long folderId);
+
     /** 查询同一父目录下指定名称的有效文件夹。 */
     Optional<FolderEntity> findActiveByParentIdAndName(Long workspaceId, Long parentId, String name);
 

@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /** Workspace 文件夹响应。 */
 @Data
@@ -34,4 +35,7 @@ public class FolderResponseDTO implements Serializable {
 
     /** 文件夹状态。 */
     private String status;
+
+    /** 显式逻辑删除时间；未删除时为空。 */
+    private LocalDateTime deletedAt;
 }

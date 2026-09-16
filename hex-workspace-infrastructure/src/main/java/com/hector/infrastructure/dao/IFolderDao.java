@@ -18,6 +18,8 @@ public interface IFolderDao {
 
     Folder queryRootByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    List<Folder> queryAncestorChain(@Param("folderId") Long folderId);
+
     Folder queryActiveByParentIdAndName(@Param("workspaceId") Long workspaceId,
                                         @Param("parentId") Long parentId,
                                         @Param("name") String name);

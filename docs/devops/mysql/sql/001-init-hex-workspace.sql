@@ -38,11 +38,14 @@ CREATE TABLE IF NOT EXISTS `folder` (
     `parent_id` BIGINT DEFAULT NULL COMMENT '父文件夹ID，根目录为空',
     `name` VARCHAR(255) NOT NULL COMMENT '文件夹名称',
     `is_root` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为根目录',
+    `root_workspace_id` BIGINT GENERATED ALWAYS AS (CASE WHEN `is_root` = 1 THEN `workspace_id` ELSE NULL END) STORED COMMENT '根目录所属 Workspace；通过唯一索引确保每个 Workspace 最多一个根目录',
     `status` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0=ACTIVE / 1=DELETED',
+    `deleted_at` DATETIME DEFAULT NULL COMMENT '显式逻辑删除时间；未删除时为空',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_folder_code` (`folder_code`),
+    UNIQUE KEY `uk_folder_root_workspace_id` (`root_workspace_id`),
     KEY `idx_folder_parent` (`workspace_id`, `parent_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace目录树';
 

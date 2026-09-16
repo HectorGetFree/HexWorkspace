@@ -54,6 +54,13 @@ public class FolderRepository implements IFolderRepository {
     }
 
     @Override
+    public List<FolderEntity> listAncestorChain(Long folderId) {
+        return folderDao.queryAncestorChain(folderId).stream()
+                .map(this::toEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Optional<FolderEntity> findActiveByParentIdAndName(Long workspaceId, Long parentId, String name) {
         return Optional.ofNullable(folderDao.queryActiveByParentIdAndName(workspaceId, parentId, name))
                 .map(this::toEntity);
@@ -75,6 +82,7 @@ public class FolderRepository implements IFolderRepository {
                 .name(folderEntity.getName())
                 .root(folderEntity.isRoot())
                 .status(folderEntity.getStatus().getCode())
+                .deletedAt(folderEntity.getDeletedAt())
                 .createdAt(folderEntity.getCreatedAt())
                 .updatedAt(folderEntity.getUpdatedAt())
                 .build();
@@ -89,6 +97,7 @@ public class FolderRepository implements IFolderRepository {
                 .name(folder.getName())
                 .root(folder.getRoot())
                 .status(FolderStatusVO.fromCode(folder.getStatus()))
+                .deletedAt(folder.getDeletedAt())
                 .createdAt(folder.getCreatedAt())
                 .updatedAt(folder.getUpdatedAt())
                 .build();

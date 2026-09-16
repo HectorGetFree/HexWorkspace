@@ -168,6 +168,8 @@ public class DocumentServiceImpl implements IDocumentService {
             if (!document.isActive()) {
                 throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
             }
+            // 文档自身 ACTIVE 仍不足以操作；其父目录被删除时，文档必须随子树一并冻结。
+            folderService.getActiveFolder(workspaceId, document.getParentId());
             document.delete();
             documentRepository.update(document);
             return document;
@@ -186,6 +188,8 @@ public class DocumentServiceImpl implements IDocumentService {
             if (!document.isDeleted()) {
                 throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
             }
+            // 不能绕过已删除祖先直接恢复文档；需要先恢复其目录树入口。
+            folderService.getActiveFolder(workspaceId, document.getParentId());
             document.restore();
             documentRepository.update(document);
             return document;
@@ -201,7 +205,9 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public List<DocumentEntity> listVisibleDocuments(Long workspaceId) {
         validateWorkspaceId(workspaceId);
-        return documentRepository.listByWorkspaceId(workspaceId).stream().filter(DocumentEntity::isVisibleInWorkspace)
+        return documentRepository.listByWorkspaceId(workspaceId).stream()
+                .filter(DocumentEntity::isVisibleInWorkspace)
+                .filter(document -> isParentFolderAccessible(workspaceId, document.getParentId()))
                 .collect(Collectors.toList());
     }
 
@@ -212,7 +218,18 @@ public class DocumentServiceImpl implements IDocumentService {
         if (document.getCurrentVersionNo() == null || document.getCurrentVersionNo() <= 0) {
             throw new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE);
         }
+        // 文档访问必须同时满足自身 ACTIVE 和所属目录祖先链可访问，避免 ID 直连绕过删除子树。
+        folderService.getActiveFolder(workspaceId, document.getParentId());
         return document;
+    }
+
+    private boolean isParentFolderAccessible(Long workspaceId, Long parentId) {
+        try {
+            folderService.getActiveFolder(workspaceId, parentId);
+            return true;
+        } catch (BusinessException ignored) {
+            return false;
+        }
     }
 
     /** 查询 Workspace 内文档，不预先过滤删除态，供删除和恢复两个生命周期操作使用。 */
