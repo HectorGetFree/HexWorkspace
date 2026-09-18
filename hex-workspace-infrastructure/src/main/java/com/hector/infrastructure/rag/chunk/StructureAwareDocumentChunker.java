@@ -79,6 +79,9 @@ public class StructureAwareDocumentChunker implements IParsedDocumentChunker {
         int boundedMaxSize = Math.max(1, maxSize);
         int boundedTargetSize = Math.min(Math.max(1, targetSize), boundedMaxSize);
         int boundedOverlap = Math.min(Math.max(0, overlapSize), boundedTargetSize - 1);
+        if (text.length() <= boundedMaxSize) {
+            return List.of(text);
+        }
         List<String> parts = new ArrayList<>();
         int offset = 0;
         while (offset < text.length()) {

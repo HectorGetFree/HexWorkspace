@@ -7,6 +7,8 @@ import com.hector.infrastructure.dao.po.KnowledgeIndexGeneration;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+
 /** Generation 元数据仓储实现。 */
 @Repository
 public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenerationRepository {
@@ -23,9 +25,9 @@ public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenera
 
     @Override
     public boolean attachChunkArtifactIfOwned(String generationId, String workerToken, String artifactKey,
-                                              String artifactChecksum, int chunkCount) {
+                                              String artifactChecksum, int chunkCount, LocalDateTime now) {
         return knowledgeIndexGenerationDao.attachChunkArtifactIfOwned(generationId, workerToken, artifactKey,
-                artifactChecksum, chunkCount) == 1;
+                artifactChecksum, chunkCount, now) == 1;
     }
 
     private KnowledgeIndexGeneration toPo(KnowledgeIndexGenerationEntity entity) {

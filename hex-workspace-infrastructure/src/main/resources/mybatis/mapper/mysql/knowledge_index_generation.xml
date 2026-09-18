@@ -14,13 +14,17 @@
     </insert>
 
     <update id="attachChunkArtifactIfOwned">
-        UPDATE knowledge_index_generation
-        SET chunk_artifact_key = #{chunkArtifactKey},
-            chunk_artifact_checksum = #{chunkArtifactChecksum},
-            chunk_count = #{chunkCount},
-            updated_at = NOW()
-        WHERE generation_id = #{generationId}
-          AND worker_token = #{workerToken}
-          AND status = 0
+        UPDATE knowledge_index_generation generation
+        INNER JOIN knowledge_index_job job ON job.id = generation.job_id
+        SET generation.chunk_artifact_key = #{chunkArtifactKey},
+            generation.chunk_artifact_checksum = #{chunkArtifactChecksum},
+            generation.chunk_count = #{chunkCount},
+            generation.updated_at = NOW()
+        WHERE generation.generation_id = #{generationId}
+          AND generation.worker_token = #{workerToken}
+          AND generation.status = 0
+          AND job.status = 1
+          AND job.worker_token = #{workerToken}
+          AND job.running_lease_until &gt; #{now}
     </update>
 </mapper>

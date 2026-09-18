@@ -102,7 +102,7 @@ public class KnowledgeArtifactPreparationService {
             byte[] payload = objectMapper.writeValueAsBytes(parsedDocument);
             String checksum = checksum(payload);
             KnowledgeParseArtifactEntity artifact = knowledgeParseArtifactRepository.findByIdentity(document.documentId(),
-                            document.versionNo(), document.sourceChecksum(), parsedDocument.parserVersion(), parsedDocument.schemaVersion())
+                    document.versionNo(), document.sourceChecksum(), parsedDocument.parserVersion(), parsedDocument.schemaVersion())
                     .orElseGet(() -> {
                         documentStorageRepository.upload(artifactKey, payload, "application/json");
                         return knowledgeParseArtifactRepository.saveIfAbsent(KnowledgeParseArtifactEntity.builder()
@@ -111,12 +111,23 @@ public class KnowledgeArtifactPreparationService {
                                 .schemaVersion(parsedDocument.schemaVersion()).artifactKey(artifactKey)
                                 .artifactChecksum(checksum).status(READY).createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
                     });
-            if (artifact.getStatus() != READY || artifact.getArtifactKey() == null) {
-                throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
-            }
+            verifyStoredArtifact(artifact);
         } catch (BusinessException exception) {
             throw exception;
         } catch (Exception exception) {
+            throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
+        }
+    }
+
+    /**
+     * 复用解析产物前回读对象存储验证摘要，避免仅因元数据存在就引用丢失或被篡改的对象。
+     */
+    private void verifyStoredArtifact(KnowledgeParseArtifactEntity artifact) {
+        if (artifact.getStatus() != READY || artifact.getArtifactKey() == null || artifact.getArtifactChecksum() == null) {
+            throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
+        }
+        byte[] content = documentStorageRepository.download(artifact.getArtifactKey());
+        if (!checksum(content).equalsIgnoreCase(artifact.getArtifactChecksum())) {
             throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
         }
     }
@@ -127,7 +138,7 @@ public class KnowledgeArtifactPreparationService {
             String artifactKey = "knowledge/chunks/%s.json".formatted(generation.getGenerationId());
             documentStorageRepository.upload(artifactKey, payload, "application/json");
             if (!knowledgeIndexGenerationRepository.attachChunkArtifactIfOwned(generation.getGenerationId(), workerToken,
-                    artifactKey, checksum(payload), chunks.size())) {
+                    artifactKey, checksum(payload), chunks.size(), LocalDateTime.now())) {
                 throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
             }
         } catch (BusinessException exception) {
