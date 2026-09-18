@@ -46,6 +46,15 @@
         LIMIT 1
     </select>
 
+    <select id="queryByJobCode" resultMap="knowledgeIndexJobResultMap">
+        SELECT id, job_code, request_key, workspace_id, document_id, version_no, index_input_revision,
+               job_type, status, stage, worker_token, running_lease_until, retry_count,
+               next_retry_at, failure_reason, created_at, updated_at
+        FROM knowledge_index_job
+        WHERE job_code = #{jobCode}
+        LIMIT 1
+    </select>
+
     <update id="claimForRunning">
         UPDATE knowledge_index_job
         SET status = 1,
@@ -78,6 +87,17 @@
         WHERE job_code = #{jobCode}
           AND status = 1
           AND running_lease_until &lt;= #{now}
+    </update>
+
+    <update id="markSkippedIfOwned">
+        UPDATE knowledge_index_job
+        SET status = 4,
+            failure_reason = #{failureReason},
+            running_lease_until = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_code = #{jobCode}
+          AND worker_token = #{workerToken}
+          AND status = 1
     </update>
 
 </mapper>

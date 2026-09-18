@@ -30,6 +30,12 @@ public class KnowledgeIndexJobRepository implements IKnowledgeIndexJobRepository
     }
 
     @Override
+    public Optional<KnowledgeIndexJobEntity> findByJobCode(String jobCode) {
+        return Optional.ofNullable(dao.queryByJobCode(jobCode))
+                .map(this::toKnowledgeIndexJobEntity);
+    }
+
+    @Override
     public boolean claimForRunning(String jobCode, String workerToken, LocalDateTime runningLeaseUntil) {
         return dao.claimForRunning(jobCode, workerToken, runningLeaseUntil) == 1;
     }
@@ -37,6 +43,11 @@ public class KnowledgeIndexJobRepository implements IKnowledgeIndexJobRepository
     @Override
     public boolean recoverExpiredRunning(String jobCode, LocalDateTime now, String failureReason) {
         return dao.recoverExpiredRunning(jobCode, now, failureReason) == 1;
+    }
+
+    @Override
+    public boolean markSkippedIfOwned(String jobCode, String workerToken, String reason) {
+        return dao.markSkippedIfOwned(jobCode, workerToken, reason) == 1;
     }
 
     @Override

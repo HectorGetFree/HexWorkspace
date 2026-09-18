@@ -12,11 +12,17 @@ public interface IKnowledgeIndexJobRepository {
 
     Optional<KnowledgeIndexJobEntity> findByRequestKey(String requestKey);
 
+    /** 按任务编码查询当前任务，用于 Worker 重新校验租约归属。 */
+    Optional<KnowledgeIndexJobEntity> findByJobCode(String jobCode);
+
     /** 以状态与租约条件原子抢占一个待执行任务。 */
     boolean claimForRunning(String jobCode, String workerToken, LocalDateTime runningLeaseUntil);
 
     /** 回收执行租约已过期的任务，不增加真实执行失败次数。 */
     boolean recoverExpiredRunning(String jobCode, LocalDateTime now, String failureReason);
+
+    /** 仅由持有执行令牌的 Worker 将过期索引输入任务标记为跳过。 */
+    boolean markSkippedIfOwned(String jobCode, String workerToken, String reason);
 
     /** 查询租约已过期的执行中任务。 */
     List<KnowledgeIndexJobEntity> listExpiredRunning(LocalDateTime now, int limit);

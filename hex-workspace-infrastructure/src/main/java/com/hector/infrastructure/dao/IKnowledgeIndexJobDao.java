@@ -13,6 +13,8 @@ public interface IKnowledgeIndexJobDao {
 
     KnowledgeIndexJob queryByRequestKey(@Param("requestKey") String requestKey);
 
+    KnowledgeIndexJob queryByJobCode(@Param("jobCode") String jobCode);
+
     int claimForRunning(@Param("jobCode") String jobCode,
                         @Param("workerToken") String workerToken,
                         @Param("runningLeaseUntil") LocalDateTime runningLeaseUntil);
@@ -23,4 +25,7 @@ public interface IKnowledgeIndexJobDao {
     int recoverExpiredRunning(@Param("jobCode") String jobCode,
                               @Param("now") LocalDateTime now,
                               @Param("failureReason") String failureReason);
+
+    int markSkippedIfOwned(@Param("jobCode") String jobCode, @Param("workerToken") String workerToken,
+                           @Param("failureReason") String failureReason);
 }
