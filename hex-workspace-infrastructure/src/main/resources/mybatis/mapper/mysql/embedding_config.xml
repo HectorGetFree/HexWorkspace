@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IEmbeddingConfigDao">
+    <resultMap id="embeddingConfigResultMap" type="com.hector.infrastructure.dao.po.EmbeddingConfig">
+        <id property="id" column="id"/>
+        <result property="configHash" column="config_hash"/>
+        <result property="provider" column="provider"/>
+        <result property="model" column="model"/>
+        <result property="dimension" column="dimension"/>
+        <result property="distance" column="distance"/>
+        <result property="collectionName" column="collection_name"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO knowledge_embedding_config (
+            config_hash, provider, model, dimension, distance, collection_name, created_at
+        ) VALUES (
+            #{configHash}, #{provider}, #{model}, #{dimension}, #{distance}, #{collectionName}, NOW()
+        )
+    </insert>
+
+    <select id="queryById" resultMap="embeddingConfigResultMap">
+        SELECT id, config_hash, provider, model, dimension, distance, collection_name, created_at
+        FROM knowledge_embedding_config WHERE id = #{id}
+    </select>
+
+    <select id="queryByConfigHash" resultMap="embeddingConfigResultMap">
+        SELECT id, config_hash, provider, model, dimension, distance, collection_name, created_at
+        FROM knowledge_embedding_config WHERE config_hash = #{configHash}
+    </select>
+</mapper>

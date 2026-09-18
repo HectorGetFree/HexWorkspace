@@ -4,6 +4,19 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hector.infrastructure.dao.IKnowledgeIndexOutboxEventDao">
 
+    <resultMap id="knowledgeIndexOutboxEventResultMap"
+               type="com.hector.infrastructure.dao.po.KnowledgeIndexOutboxEvent">
+        <id property="id" column="id"/>
+        <result property="eventCode" column="event_code"/>
+        <result property="jobCode" column="job_code"/>
+        <result property="status" column="status"/>
+        <result property="publishingToken" column="publishing_token"/>
+        <result property="publishingLeaseUntil" column="publishing_lease_until"/>
+        <result property="failureReason" column="failure_reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
     <insert id="insert" parameterType="com.hector.infrastructure.dao.po.KnowledgeIndexOutboxEvent"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO knowledge_index_outbox_event (
@@ -14,5 +27,47 @@
             #{failureReason}, #{createdAt}, #{updatedAt}
         )
     </insert>
+
+    <select id="queryPending" resultMap="knowledgeIndexOutboxEventResultMap">
+        SELECT id, event_code, job_code, status, publishing_token, publishing_lease_until, failure_reason, created_at, updated_at
+        FROM knowledge_index_outbox_event WHERE status = 0 ORDER BY id ASC LIMIT #{limit}
+    </select>
+
+    <update id="claimForPublishing">
+        UPDATE knowledge_index_outbox_event
+        SET status = 2, publishing_token = #{publishingToken}, publishing_lease_until = #{publishingLeaseUntil}, updated_at = CURRENT_TIMESTAMP
+        WHERE event_code = #{eventCode} AND status = 0
+    </update>
+
+    <update id="markSentIfOwned">
+        UPDATE knowledge_index_outbox_event
+        SET status = 1, publishing_token = NULL, publishing_lease_until = NULL, failure_reason = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE event_code = #{eventCode} AND status = 2 AND publishing_token = #{publishingToken}
+    </update>
+
+    <update id="releaseIfOwned">
+        UPDATE knowledge_index_outbox_event
+        SET status = 0, publishing_token = NULL, publishing_lease_until = NULL, failure_reason = #{failureReason}, updated_at = CURRENT_TIMESTAMP
+        WHERE event_code = #{eventCode} AND status = 2 AND publishing_token = #{publishingToken}
+    </update>
+
+    <select id="queryExpiredPublishing" resultMap="knowledgeIndexOutboxEventResultMap">
+        SELECT id, event_code, job_code, status, publishing_token, publishing_lease_until, failure_reason, created_at, updated_at
+        FROM knowledge_index_outbox_event
+        WHERE status = 2 AND publishing_lease_until &lt;= #{now}
+        ORDER BY publishing_lease_until ASC LIMIT #{limit}
+    </select>
+
+    <update id="recoverExpiredPublishing">
+        UPDATE knowledge_index_outbox_event
+        SET status = 0, publishing_token = NULL, publishing_lease_until = NULL, failure_reason = #{failureReason}, updated_at = #{now}
+        WHERE event_code = #{eventCode} AND status = 2 AND publishing_lease_until &lt;= #{now}
+    </update>
+
+    <update id="resetSentForRetry">
+        UPDATE knowledge_index_outbox_event
+        SET status = 0, failure_reason = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE job_code = #{jobCode} AND status = 1
+    </update>
 
 </mapper>

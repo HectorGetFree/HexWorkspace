@@ -36,8 +36,18 @@ public class KnowledgeIndexJobRepository implements IKnowledgeIndexJobRepository
     }
 
     @Override
+    public List<KnowledgeIndexJobEntity> listPendingReady(LocalDateTime now, int limit) {
+        return dao.queryPendingReady(now, limit).stream().map(this::toKnowledgeIndexJobEntity).toList();
+    }
+
+    @Override
     public boolean claimForRunning(String jobCode, String workerToken, LocalDateTime runningLeaseUntil) {
         return dao.claimForRunning(jobCode, workerToken, runningLeaseUntil) == 1;
+    }
+
+    @Override
+    public boolean renewLeaseIfOwned(String jobCode, String workerToken, LocalDateTime runningLeaseUntil) {
+        return dao.renewLeaseIfOwned(jobCode, workerToken, runningLeaseUntil) == 1;
     }
 
     @Override
@@ -55,6 +65,16 @@ public class KnowledgeIndexJobRepository implements IKnowledgeIndexJobRepository
         return dao.queryExpiredRunning(now, limit).stream()
                 .map(this::toKnowledgeIndexJobEntity)
                 .toList();
+    }
+
+    @Override
+    public boolean markSucceededIfOwned(String jobCode, String workerToken, LocalDateTime now) {
+        return dao.markSucceededIfOwned(jobCode, workerToken, now) == 1;
+    }
+
+    @Override
+    public boolean finishFailureIfOwned(String jobCode, String workerToken, int maxRetryCount, LocalDateTime nextRetryAt, String failureReason) {
+        return dao.finishFailureIfOwned(jobCode, workerToken, maxRetryCount, nextRetryAt, failureReason) == 1;
     }
 
     private KnowledgeIndexJob toKnowledgeIndexJobPo(KnowledgeIndexJobEntity entity) {

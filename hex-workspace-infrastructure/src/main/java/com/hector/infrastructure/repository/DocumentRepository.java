@@ -80,6 +80,12 @@ public class DocumentRepository implements IDocumentRepository {
     }
 
     @Override
+    public Optional<DocumentEntity> lockById(Long documentId) {
+        Document document = documentDao.queryByIdForUpdate(documentId);
+        return document == null ? Optional.empty() : Optional.of(toEntity(document));
+    }
+
+    @Override
     public Optional<DocumentEntity> findByDocumentCode(String documentCode) {
         log.info("文档仓储-按编码查询开始 documentCode:{}", documentCode);
         Document document = documentDao.queryByDocumentCode(documentCode);

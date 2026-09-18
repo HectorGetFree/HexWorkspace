@@ -28,6 +28,9 @@ public interface IDocumentRepository {
     /** 按数据库主键查询文档。 */
     Optional<DocumentEntity> findById(Long documentId);
 
+    /** 在发布事务中锁定文档行，防止旧版本索引与新内容提交交叉发布。 */
+    Optional<DocumentEntity> lockById(Long documentId);
+
     /** 按对外业务编码查询文档。 */
     Optional<DocumentEntity> findByDocumentCode(String documentCode);
 

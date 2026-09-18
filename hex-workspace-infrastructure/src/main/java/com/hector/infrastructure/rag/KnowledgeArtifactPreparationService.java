@@ -69,14 +69,14 @@ public class KnowledgeArtifactPreparationService {
      * @param jobCode 索引任务编码
      * @param workerToken 抢占任务时写入的执行令牌
      */
-    public void prepare(String jobCode, String workerToken) {
+    public String prepare(String jobCode, String workerToken) {
         // 1. 重新读取任务，验证 Worker 仍持有有效租约，避免过期执行者写入后续产物。
         KnowledgeIndexJobEntity job = knowledgeIndexJobRepository.findByJobCode(jobCode)
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
         assertWorkerOwnership(job, workerToken);
         if (!isCurrentIndexInput(job)) {
             knowledgeIndexJobRepository.markSkippedIfOwned(jobCode, workerToken, "文档版本或索引修订已过期");
-            return;
+            return null;
         }
 
         // 2. 精确加载不可变版本，解析并将可复用的解析结果写入对象存储与元数据表。
@@ -93,6 +93,7 @@ public class KnowledgeArtifactPreparationService {
                 .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build());
         List<KnowledgeChunkVO> chunks = parsedDocumentChunker.chunk(generation.getGenerationId(), job.getDocumentId(), job.getVersionNo(), parsedDocument);
         persistChunkArtifact(generation, workerToken, chunks);
+        return generation.getGenerationId();
     }
 
     private void persistParseArtifact(LoadedDocumentVO document, ParsedDocumentVO parsedDocument) {

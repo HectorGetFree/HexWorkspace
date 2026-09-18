@@ -55,6 +55,15 @@
         LIMIT 1
     </select>
 
+    <select id="queryPendingReady" resultMap="knowledgeIndexJobResultMap">
+        SELECT id, job_code, request_key, workspace_id, document_id, version_no, index_input_revision,
+               job_type, status, stage, worker_token, running_lease_until, retry_count,
+               next_retry_at, failure_reason, created_at, updated_at
+        FROM knowledge_index_job
+        WHERE status = 0 AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
+        ORDER BY id ASC LIMIT #{limit}
+    </select>
+
     <update id="claimForRunning">
         UPDATE knowledge_index_job
         SET status = 1,
@@ -64,6 +73,13 @@
         WHERE job_code = #{jobCode}
           AND status = 0
           AND (next_retry_at IS NULL OR next_retry_at &lt;= CURRENT_TIMESTAMP)
+    </update>
+
+    <update id="renewLeaseIfOwned">
+        UPDATE knowledge_index_job
+        SET running_lease_until = #{runningLeaseUntil}, updated_at = CURRENT_TIMESTAMP
+        WHERE job_code = #{jobCode} AND status = 1 AND worker_token = #{workerToken}
+          AND running_lease_until &gt; CURRENT_TIMESTAMP
     </update>
 
     <select id="queryExpiredRunning" resultMap="knowledgeIndexJobResultMap">
@@ -98,6 +114,26 @@
         WHERE job_code = #{jobCode}
           AND worker_token = #{workerToken}
           AND status = 1
+    </update>
+
+    <update id="markSucceededIfOwned">
+        UPDATE knowledge_index_job
+        SET status = 2, running_lease_until = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE job_code = #{jobCode} AND worker_token = #{workerToken} AND status = 1
+          AND running_lease_until &gt; #{now}
+    </update>
+
+    <update id="finishFailureIfOwned">
+        UPDATE knowledge_index_job
+        SET retry_count = retry_count + 1,
+            status = CASE WHEN retry_count + 1 &gt;= #{maxRetryCount} THEN 3 ELSE 0 END,
+            worker_token = NULL,
+            running_lease_until = NULL,
+            next_retry_at = CASE WHEN retry_count + 1 &gt;= #{maxRetryCount} THEN NULL ELSE #{nextRetryAt} END,
+            failure_reason = #{failureReason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_code = #{jobCode} AND status = 1 AND worker_token = #{workerToken}
+          AND running_lease_until &gt; CURRENT_TIMESTAMP
     </update>
 
 </mapper>

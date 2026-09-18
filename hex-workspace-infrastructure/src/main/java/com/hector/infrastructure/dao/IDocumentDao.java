@@ -24,6 +24,8 @@ public interface IDocumentDao {
 
     Document queryById(@Param("id") Long id);
 
+    Document queryByIdForUpdate(@Param("id") Long id);
+
     Document queryByDocumentCode(@Param("documentCode") String documentCode);
 
     Document queryByUploadIdempotencyKey(@Param("workspaceId") Long workspaceId,

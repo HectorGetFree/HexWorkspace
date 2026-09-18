@@ -8,6 +8,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 /** Generation 元数据仓储实现。 */
 @Repository
@@ -18,9 +19,14 @@ public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenera
 
     @Override
     public KnowledgeIndexGenerationEntity save(KnowledgeIndexGenerationEntity generation) {
-        KnowledgeIndexGeneration po = toPo(generation);
-        knowledgeIndexGenerationDao.insert(po);
-        return toEntity(po);
+        KnowledgeIndexGeneration record = toKnowledgeIndexGenerationRecord(generation);
+        knowledgeIndexGenerationDao.insert(record);
+        return toKnowledgeIndexGenerationEntity(record);
+    }
+
+    @Override
+    public Optional<KnowledgeIndexGenerationEntity> findByGenerationId(String generationId) {
+        return Optional.ofNullable(knowledgeIndexGenerationDao.queryByGenerationId(generationId)).map(this::toKnowledgeIndexGenerationEntity);
     }
 
     @Override
@@ -30,7 +36,17 @@ public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenera
                 artifactChecksum, chunkCount, now) == 1;
     }
 
-    private KnowledgeIndexGeneration toPo(KnowledgeIndexGenerationEntity entity) {
+    @Override
+    public boolean markReadyIfOwned(String generationId, String workerToken, Long embeddingConfigId, LocalDateTime now) {
+        return knowledgeIndexGenerationDao.markReadyIfOwned(generationId, workerToken, embeddingConfigId, now) == 1;
+    }
+
+    @Override
+    public boolean markFailedIfOwned(String generationId, String workerToken) {
+        return knowledgeIndexGenerationDao.markFailedIfOwned(generationId, workerToken) == 1;
+    }
+
+    private KnowledgeIndexGeneration toKnowledgeIndexGenerationRecord(KnowledgeIndexGenerationEntity entity) {
         return KnowledgeIndexGeneration.builder()
                 .id(entity.getId()).generationId(entity.getGenerationId()).jobId(entity.getJobId())
                 .workspaceId(entity.getWorkspaceId()).documentId(entity.getDocumentId()).versionNo(entity.getVersionNo())
@@ -41,7 +57,7 @@ public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenera
                 .updatedAt(entity.getUpdatedAt()).build();
     }
 
-    private KnowledgeIndexGenerationEntity toEntity(KnowledgeIndexGeneration po) {
+    private KnowledgeIndexGenerationEntity toKnowledgeIndexGenerationEntity(KnowledgeIndexGeneration po) {
         return KnowledgeIndexGenerationEntity.builder()
                 .id(po.getId()).generationId(po.getGenerationId()).jobId(po.getJobId())
                 .workspaceId(po.getWorkspaceId()).documentId(po.getDocumentId()).versionNo(po.getVersionNo())

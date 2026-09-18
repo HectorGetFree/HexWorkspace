@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IKnowledgeIndexStateDao">
+    <resultMap id="knowledgeIndexStateResultMap" type="com.hector.infrastructure.dao.po.KnowledgeIndexState">
+        <id property="documentId" column="document_id"/>
+        <result property="activeGenerationId" column="active_generation_id"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="queryByDocumentId" resultMap="knowledgeIndexStateResultMap">
+        SELECT document_id, active_generation_id, updated_at
+        FROM knowledge_index_state
+        WHERE document_id = #{documentId}
+    </select>
+
+    <insert id="upsertActive">
+        INSERT INTO knowledge_index_state (document_id, active_generation_id, updated_at)
+        VALUES (#{documentId}, #{generationId}, NOW())
+        ON DUPLICATE KEY UPDATE active_generation_id = VALUES(active_generation_id), updated_at = NOW()
+    </insert>
+</mapper>

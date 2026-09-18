@@ -88,6 +88,12 @@
         LIMIT 1
     </select>
 
+    <select id="queryByIdForUpdate" resultMap="documentResultMap">
+        SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
+               idempotency_key, deleted_at, created_at, updated_at
+        FROM `document` WHERE id = #{id} FOR UPDATE
+    </select>
+
     <select id="queryByUploadIdempotencyKey" resultMap="documentResultMap">
         SELECT id, document_code, workspace_id, parent_id, owner_user_id, title, file_name, document_type, status, current_version_no, index_input_revision,
                idempotency_key, deleted_at, created_at, updated_at

@@ -4,6 +4,8 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.hector.domain.knowledge.adapter.port.IVectorStore;
+import com.hector.domain.knowledge.adapter.port.IGenerationVectorStore;
+import com.hector.domain.knowledge.model.valobj.GenerationVectorPointVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeVectorPointVO;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,13 +27,71 @@ import java.util.UUID;
  * Qdrant 仅保存可再生的向量索引；Workspace 与文档正文仍由 MySQL/MinIO 管理。
  */
 @Component
-public class QdrantVectorStore implements IVectorStore {
+public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     @Value("${ai.vector-store.qdrant.endpoint:http://127.0.0.1:6333}")
     private String endpoint;
     @Value("${ai.vector-store.qdrant.collection:hex_workspace_segments}")
     private String collection;
+
+    @Override
+    public void ensureCollection(Integer dimension, String distance, String collectionName) {
+        try {
+            HttpResponse<String> response = send("GET", "/collections/" + collectionName, null);
+            if (response.statusCode() == 404) {
+                JSONObject vectors = new JSONObject();
+                vectors.put("size", dimension);
+                vectors.put("distance", qdrantDistance(distance));
+
+                JSONObject body = new JSONObject();
+                body.put("vectors", vectors);
+                request("PUT", "/collections/" + collectionName, body.toJSONString());
+                return;
+            }
+            if (response.statusCode() / 100 != 2) {
+                throw new IllegalStateException("Qdrant 查询集合失败: " + response.statusCode());
+            }
+            JSONObject vectors = JSON.parseObject(response.body())
+                    .getJSONObject("result")
+                    .getJSONObject("config")
+                    .getJSONObject("params")
+                    .getJSONObject("vectors");
+            if (!dimension.equals(vectors.getInteger("size")) || !distance.equalsIgnoreCase(vectors.getString("distance"))) {
+                throw new IllegalStateException("Qdrant Collection 向量空间不兼容");
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("Qdrant 连接异常", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Qdrant 调用被中断", exception);
+        }
+    }
+
+    @Override
+    public void upsert(String collectionName, List<GenerationVectorPointVO> points) {
+        if (points.isEmpty()) return;
+        JSONArray qdrantPoints = new JSONArray();
+        for (GenerationVectorPointVO source : points) {
+            JSONObject point = new JSONObject();
+            point.put("id", source.pointId());
+            point.put("vector", source.vector());
+            point.put("payload", source.payload());
+            qdrantPoints.add(point);
+        }
+        JSONObject body = new JSONObject();
+        body.put("points", qdrantPoints);
+        request("PUT", "/collections/" + collectionName + "/points?wait=true", body.toJSONString());
+    }
+
+    @Override
+    public long countByGeneration(String collectionName, String generationId) {
+        JSONObject body = new JSONObject();
+        body.put("exact", true);
+        body.put("filter", filter("generation_id", generationId));
+        JSONObject response = JSON.parseObject(request("POST", "/collections/" + collectionName + "/points/count", body.toJSONString()));
+        return response.getJSONObject("result").getLongValue("count");
+    }
 
     @Override
     public void replaceDocument(Long workspaceId, Long documentId, List<KnowledgeVectorPointVO> points) {
@@ -84,17 +144,7 @@ public class QdrantVectorStore implements IVectorStore {
     }
 
     private void ensureCollection(int vectorSize) {
-        try {
-            HttpResponse<String> response = send("GET", "/collections/" + collection, null);
-            if (response.statusCode() == 200) return;
-            if (response.statusCode() != 404) throw new IllegalStateException("Qdrant 查询集合失败: " + response.statusCode() + " " + response.body());
-            JSONObject vectors = new JSONObject(); vectors.put("size", vectorSize); vectors.put("distance", "Cosine");
-            JSONObject body = new JSONObject(); body.put("vectors", vectors);
-            request("PUT", "/collections/" + collection, body.toJSONString());
-        } catch (IOException | InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Qdrant 连接异常", exception);
-        }
+        ensureCollection(vectorSize, "Cosine", collection);
     }
 
     private JSONObject buildMatchCondition(String key, Object value) {
@@ -106,18 +156,37 @@ public class QdrantVectorStore implements IVectorStore {
         return condition;
     }
 
+    private JSONObject filter(String key, Object value) {
+        JSONObject filter = new JSONObject();
+        filter.put("must", List.of(buildMatchCondition(key, value)));
+        return filter;
+    }
+
     private String toQdrantPointId(String businessPointId) {
         return UUID.nameUUIDFromBytes(businessPointId.getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    /** 配置层使用统一的大写枚举，Qdrant REST 枚举要求首字母大写。 */
+    private String qdrantDistance(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Qdrant 距离度量不能为空");
+        }
+        String normalized = value.trim().toLowerCase();
+        return Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
     }
 
     private String request(String method, String path, String body) {
         try {
             HttpResponse<String> response = send(method, path, body);
-            if (response.statusCode() / 100 != 2) throw new IllegalStateException("Qdrant 调用失败: " + response.statusCode() + " " + response.body());
+            if (response.statusCode() / 100 != 2) {
+                throw new IllegalStateException("Qdrant 调用失败: " + response.statusCode() + " " + response.body());
+            }
             return response.body();
-        } catch (IOException | InterruptedException exception) {
-            Thread.currentThread().interrupt();
+        } catch (IOException exception) {
             throw new IllegalStateException("Qdrant 网络调用异常", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Qdrant 调用被中断", exception);
         }
     }
 

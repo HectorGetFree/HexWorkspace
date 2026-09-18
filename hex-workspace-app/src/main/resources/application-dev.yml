@@ -22,6 +22,18 @@ hexworkspace:
     legacy-api:
       # 旧知识接口不校验文档版本与文件夹权限，Phase 1 默认关闭。
       enabled: ${HEX_WORKSPACE_LEGACY_KNOWLEDGE_API_ENABLED:false}
+    embedding:
+      provider: DashScope
+      distance: COSINE
+      batch-size: 16
+      timeout-ms: 10000
+      retry-count: 2
+    worker:
+      lease-seconds: 120
+      max-retry-count: 3
+      retry-delay-seconds: 60
+    dispatcher:
+      fixed-delay-ms: 5000
   document-upload:
     max-retry-count: 3
     staging-orphan-retention-hours: 24
@@ -31,6 +43,11 @@ hexworkspace:
       exchange: hex.workspace.document.exchange
       queue: hex.workspace.document.upload.queue
       routing-key: document.upload.requested
+      outbox-publish-lease-seconds: 30
+    knowledge-index:
+      exchange: hex.workspace.knowledge.exchange
+      queue: hex.workspace.knowledge.index.queue
+      routing-key: knowledge.index.requested
       outbox-publish-lease-seconds: 30
 
 

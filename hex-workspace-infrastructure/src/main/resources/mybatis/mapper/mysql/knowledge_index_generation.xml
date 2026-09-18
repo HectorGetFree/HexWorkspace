@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hector.infrastructure.dao.IKnowledgeIndexGenerationDao">
+    <resultMap id="knowledgeIndexGenerationResultMap" type="com.hector.infrastructure.dao.po.KnowledgeIndexGeneration">
+        <id property="id" column="id"/>
+        <result property="generationId" column="generation_id"/>
+        <result property="jobId" column="job_id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="documentId" column="document_id"/>
+        <result property="versionNo" column="version_no"/>
+        <result property="indexInputRevision" column="index_input_revision"/>
+        <result property="embeddingConfigId" column="embedding_config_id"/>
+        <result property="chunkingConfigHash" column="chunking_config_hash"/>
+        <result property="chunkArtifactKey" column="chunk_artifact_key"/>
+        <result property="chunkArtifactChecksum" column="chunk_artifact_checksum"/>
+        <result property="chunkCount" column="chunk_count"/>
+        <result property="status" column="status"/>
+        <result property="workerToken" column="worker_token"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO knowledge_index_generation (
             generation_id, job_id, workspace_id, document_id, version_no, index_input_revision,
@@ -12,6 +30,13 @@
             #{chunkCount}, #{status}, #{workerToken}, NOW(), NOW()
         )
     </insert>
+
+    <select id="queryByGenerationId" resultMap="knowledgeIndexGenerationResultMap">
+        SELECT id, generation_id, job_id, workspace_id, document_id, version_no, index_input_revision,
+               embedding_config_id, chunking_config_hash, chunk_artifact_key, chunk_artifact_checksum,
+               chunk_count, status, worker_token, created_at, updated_at
+        FROM knowledge_index_generation WHERE generation_id = #{generationId}
+    </select>
 
     <update id="attachChunkArtifactIfOwned">
         UPDATE knowledge_index_generation generation
@@ -26,5 +51,27 @@
           AND job.status = 1
           AND job.worker_token = #{workerToken}
           AND job.running_lease_until &gt; #{now}
+    </update>
+
+    <update id="markReadyIfOwned">
+        UPDATE knowledge_index_generation generation
+        INNER JOIN knowledge_index_job job ON job.id = generation.job_id
+        SET generation.status = 1,
+            generation.embedding_config_id = #{embeddingConfigId},
+            generation.updated_at = NOW()
+        WHERE generation.generation_id = #{generationId}
+          AND generation.worker_token = #{workerToken}
+          AND generation.status = 0
+          AND job.status = 1
+          AND job.worker_token = #{workerToken}
+          AND job.running_lease_until &gt; #{now}
+    </update>
+
+    <update id="markFailedIfOwned">
+        UPDATE knowledge_index_generation
+        SET status = 2, updated_at = NOW()
+        WHERE generation_id = #{generationId}
+          AND worker_token = #{workerToken}
+          AND status = 0
     </update>
 </mapper>
