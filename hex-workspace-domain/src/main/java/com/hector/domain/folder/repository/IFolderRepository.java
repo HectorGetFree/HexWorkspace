@@ -22,6 +22,9 @@ public interface IFolderRepository {
     /** 一次查询从指定目录到根目录的祖先链，用于统一判断目录可访问性和移动防环。 */
     List<FolderEntity> listAncestorChain(Long folderId);
 
+    /** 批量读取 Workspace 完整目录树，供可信检索一次性校验祖先链。 */
+    List<FolderEntity> listByWorkspaceId(Long workspaceId);
+
     /** 查询同一父目录下指定名称的有效文件夹。 */
     Optional<FolderEntity> findActiveByParentIdAndName(Long workspaceId, Long parentId, String name);
 

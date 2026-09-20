@@ -61,6 +61,13 @@ public class FolderRepository implements IFolderRepository {
     }
 
     @Override
+    public List<FolderEntity> listByWorkspaceId(Long workspaceId) {
+        return folderDao.queryByWorkspaceId(workspaceId).stream()
+                .map(this::toEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Optional<FolderEntity> findActiveByParentIdAndName(Long workspaceId, Long parentId, String name) {
         return Optional.ofNullable(folderDao.queryActiveByParentIdAndName(workspaceId, parentId, name))
                 .map(this::toEntity);

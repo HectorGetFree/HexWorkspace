@@ -8,6 +8,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 /** 已发布 Generation 指针仓储实现。 */
 @Repository
@@ -19,6 +20,16 @@ public class KnowledgeIndexStateRepository implements IKnowledgeIndexStateReposi
     @Override
     public Optional<KnowledgeIndexStateEntity> findByDocumentId(Long documentId) {
         return Optional.ofNullable(knowledgeIndexStateDao.queryByDocumentId(documentId)).map(this::toKnowledgeIndexStateEntity);
+    }
+
+    @Override
+    public List<KnowledgeIndexStateEntity> listByDocumentIds(List<Long> documentIds) {
+        if (documentIds == null || documentIds.isEmpty()) {
+            return List.of();
+        }
+        return knowledgeIndexStateDao.queryByDocumentIds(documentIds).stream()
+                .map(this::toKnowledgeIndexStateEntity)
+                .toList();
     }
 
     @Override

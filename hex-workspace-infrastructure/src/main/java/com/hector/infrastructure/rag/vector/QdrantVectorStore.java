@@ -5,9 +5,11 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.hector.domain.knowledge.adapter.port.IVectorStore;
 import com.hector.domain.knowledge.adapter.port.IGenerationVectorStore;
+import com.hector.domain.knowledge.adapter.port.IRetrievalVectorStore;
 import com.hector.domain.knowledge.model.valobj.GenerationVectorPointVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeSearchHitVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeVectorPointVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalCandidateVO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -29,7 +31,7 @@ import java.util.UUID;
  * Qdrant 仅保存可再生的向量索引；Workspace 与文档正文仍由 MySQL/MinIO 管理。
  */
 @Component
-public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
+public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore, IRetrievalVectorStore {
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     @Value("${ai.vector-store.qdrant.endpoint:http://127.0.0.1:6333}")
@@ -91,7 +93,8 @@ public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
         JSONObject body = new JSONObject();
         body.put("exact", true);
         body.put("filter", filter("generation_id", generationId));
-        JSONObject response = JSON.parseObject(request("POST", "/collections/" + collectionName + "/points/count", body.toJSONString()));
+        JSONObject response = JSON.parseObject(request(
+                "POST", "/collections/" + collectionName + "/points/count", body.toJSONString()));
         return response.getJSONObject("result").getLongValue("count");
     }
 
@@ -126,6 +129,16 @@ public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
     }
 
     @Override
+    public void deleteByGeneration(String collectionName, String generationId) {
+        JSONObject body = new JSONObject();
+        body.put("filter", filter("generation_id", generationId));
+        request("POST", "/collections/" + collectionName + "/points/delete?wait=true", body.toJSONString());
+        if (countByGeneration(collectionName, generationId) != 0) {
+            throw new IllegalStateException("Qdrant Generation 向量删除后仍有残留");
+        }
+    }
+
+    @Override
     public void replaceDocument(Long workspaceId, Long documentId, List<KnowledgeVectorPointVO> points) {
         if (points.isEmpty()) return;
         ensureCollection(points.get(0).vector().size());
@@ -140,7 +153,8 @@ public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
         deleteBody.put("filter", filter);
         request("POST", "/collections/" + collection + "/points/delete?wait=true", deleteBody.toJSONString());
 
-        // 2. Qdrant 只接受无符号整数或 UUID 作为 point ID；业务复合键经 name-based UUID 转换后可稳定幂等写入。
+        // 2. Qdrant 只接受无符号整数或 UUID 作为 point ID；业务复合键经
+        // name-based UUID 转换后可稳定幂等写入。
         JSONArray qdrantPoints = new JSONArray();
         for (KnowledgeVectorPointVO pointValue : points) {
             JSONObject payload = new JSONObject();
@@ -162,17 +176,46 @@ public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
         JSONObject match = new JSONObject(); match.put("value", workspaceId);
         JSONObject condition = new JSONObject(); condition.put("key", "workspace_id"); condition.put("match", match);
         JSONObject filter = new JSONObject(); filter.put("must", List.of(condition));
-        JSONObject body = new JSONObject(); body.put("vector", queryVector); body.put("limit", topK); body.put("with_payload", true); body.put("filter", filter);
-        JSONObject result = JSON.parseObject(request("POST", "/collections/" + collection + "/points/search", body.toJSONString()));
+        JSONObject body = new JSONObject();
+        body.put("vector", queryVector);
+        body.put("limit", topK);
+        body.put("with_payload", true);
+        body.put("filter", filter);
+        JSONObject result = JSON.parseObject(request(
+                "POST", "/collections/" + collection + "/points/search", body.toJSONString()));
         JSONArray points = result.getJSONArray("result");
         List<KnowledgeSearchHitVO> hits = new ArrayList<>();
         for (Object item : points) {
             JSONObject point = (JSONObject) item;
             JSONObject payload = point.getJSONObject("payload");
             hits.add(new KnowledgeSearchHitVO(payload.getLong("document_id"), payload.getString("document_code"),
-                    payload.getInteger("chunk_no"), payload.getString("heading"), payload.getString("content"), point.getDouble("score")));
+                    payload.getInteger("chunk_no"), payload.getString("heading"),
+                    payload.getString("content"), point.getDouble("score")));
         }
         return hits;
+    }
+
+    @Override
+    public List<RetrievalCandidateVO> searchCandidates(String collectionName, Long workspaceId,
+                                                        List<Float> queryVector, int limit) {
+        JSONObject body = new JSONObject();
+        body.put("vector", queryVector);
+        body.put("limit", limit);
+        body.put("with_payload", true);
+        body.put("filter", filter("workspace_id", workspaceId));
+        JSONObject response = JSON.parseObject(request(
+                "POST", "/collections/" + collectionName + "/points/search", body.toJSONString()));
+        return response.getJSONArray("result").stream().map(item -> {
+            JSONObject point = (JSONObject) item;
+            JSONObject payload = point.getJSONObject("payload");
+            JSONArray headingPath = payload.getJSONArray("heading_path");
+            return new RetrievalCandidateVO(point.getString("id"), payload.getLong("workspace_id"),
+                    payload.getLong("document_id"), payload.getLong("version_no"),
+                    payload.getLong("index_input_revision"), payload.getString("generation_id"),
+                    payload.getInteger("chunk_no"), headingPath == null ? List.of() : headingPath.toJavaList(String.class),
+                    payload.getString("body"), payload.getInteger("page_start"), payload.getInteger("page_end"),
+                    point.getDouble("score"));
+        }).toList();
     }
 
     private void ensureCollection(int vectorSize) {
@@ -225,6 +268,9 @@ public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
     private HttpResponse<String> send(String method, String path, String body) throws IOException, InterruptedException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(endpoint + path)).timeout(Duration.ofSeconds(30));
         if (body != null) builder.header("Content-Type", "application/json");
-        return httpClient.send(builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+        HttpRequest.BodyPublisher publisher = body == null
+                ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofString(body);
+        return httpClient.send(builder.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString());
     }
 }

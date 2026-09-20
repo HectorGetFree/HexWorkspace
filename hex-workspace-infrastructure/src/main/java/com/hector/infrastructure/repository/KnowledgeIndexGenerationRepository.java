@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 
 /** Generation 元数据仓储实现。 */
 @Repository
@@ -26,7 +27,46 @@ public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenera
 
     @Override
     public Optional<KnowledgeIndexGenerationEntity> findByGenerationId(String generationId) {
-        return Optional.ofNullable(knowledgeIndexGenerationDao.queryByGenerationId(generationId)).map(this::toKnowledgeIndexGenerationEntity);
+        return Optional.ofNullable(knowledgeIndexGenerationDao.queryByGenerationId(generationId))
+                .map(this::toKnowledgeIndexGenerationEntity);
+    }
+
+    @Override
+    public Optional<KnowledgeIndexGenerationEntity> lockByGenerationId(String generationId) {
+        return Optional.ofNullable(knowledgeIndexGenerationDao.queryByGenerationIdForUpdate(generationId))
+                .map(this::toKnowledgeIndexGenerationEntity);
+    }
+
+    @Override
+    public List<KnowledgeIndexGenerationEntity> listByGenerationIds(List<String> generationIds) {
+        if (generationIds == null || generationIds.isEmpty()) {
+            return List.of();
+        }
+        return knowledgeIndexGenerationDao.queryByGenerationIds(generationIds).stream()
+                .map(this::toKnowledgeIndexGenerationEntity)
+                .toList();
+    }
+
+    @Override
+    public List<KnowledgeIndexGenerationEntity> listCleanupCandidates(LocalDateTime expiredBefore, LocalDateTime now, int limit) {
+        return knowledgeIndexGenerationDao.queryCleanupCandidates(expiredBefore, now, limit).stream()
+                .map(this::toKnowledgeIndexGenerationEntity).toList();
+    }
+
+    @Override
+    public boolean claimForCleanup(String generationId, String cleanupToken, LocalDateTime expiredBefore,
+                                   LocalDateTime leaseUntil, LocalDateTime now) {
+        return knowledgeIndexGenerationDao.claimForCleanup(generationId, cleanupToken, expiredBefore, leaseUntil, now) == 1;
+    }
+
+    @Override
+    public boolean markCleanedIfOwned(String generationId, String cleanupToken, LocalDateTime now) {
+        return knowledgeIndexGenerationDao.markCleanedIfOwned(generationId, cleanupToken, now) == 1;
+    }
+
+    @Override
+    public boolean releaseCleanupClaim(String generationId, String cleanupToken, LocalDateTime now) {
+        return knowledgeIndexGenerationDao.releaseCleanupClaim(generationId, cleanupToken, now) == 1;
     }
 
     @Override

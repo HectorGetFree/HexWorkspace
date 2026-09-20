@@ -71,6 +71,20 @@ class QdrantVectorStoreIntegrationTest {
                 collection, "g-extra", List.of(p1, p2, p3)));
     }
 
+    @Test
+    void shouldDeleteOnlySpecifiedGenerationAndRemainIdempotent() {
+        String collection = "phase4_cleanup";
+        store.ensureCollection(3, "COSINE", collection);
+        store.upsert(collection, List.of(point(UUID.randomUUID().toString(), "generation-old"),
+                point(UUID.randomUUID().toString(), "generation-active")));
+
+        store.deleteByGeneration(collection, "generation-old");
+        store.deleteByGeneration(collection, "generation-old");
+
+        assertEquals(0L, store.countByGeneration(collection, "generation-old"));
+        assertEquals(1L, store.countByGeneration(collection, "generation-active"));
+    }
+
     private GenerationVectorPointVO point(String pointId, String generationId) {
         return new GenerationVectorPointVO(pointId, List.of(0.1F, 0.2F, 0.3F), Map.of("generation_id", generationId));
     }

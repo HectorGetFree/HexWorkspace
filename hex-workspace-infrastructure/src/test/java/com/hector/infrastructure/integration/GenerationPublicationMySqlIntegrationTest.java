@@ -173,6 +173,31 @@ class GenerationPublicationMySqlIntegrationTest {
         assertEquals(true, generations.markFailedIfOwned("generation-takeover", "worker-b", LocalDateTime.now()));
     }
 
+    @Test
+    void shouldNotClaimGenerationAfterPublicationHasActivatedIt() throws Exception {
+        Seed seed = seed("generation-publish-first", "worker-a", 1L);
+        publicationService(jobRepository()).publish(seed.generationId(), seed.jobCode(), "worker-a");
+
+        boolean claimed = generationRepository().claimForCleanup(seed.generationId(), "cleanup-a",
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusMinutes(10), LocalDateTime.now());
+
+        assertEquals(false, claimed);
+        assertEquals(seed.generationId(), queryString("SELECT active_generation_id FROM knowledge_index_state WHERE document_id = ?", seed.documentId()));
+        assertEquals(1L, queryLong("SELECT status FROM knowledge_index_generation WHERE generation_id = ?", seed.generationId()));
+    }
+
+    @Test
+    void shouldRejectPublicationAfterCleanupHasClaimedGeneration() throws Exception {
+        Seed seed = seed("generation-cleanup-first", "worker-a", 1L);
+        boolean claimed = generationRepository().claimForCleanup(seed.generationId(), "cleanup-a",
+                LocalDateTime.now().plusHours(1), LocalDateTime.now().plusMinutes(10), LocalDateTime.now());
+        assertEquals(true, claimed);
+
+        assertThrows(BusinessException.class, () -> publicationService(jobRepository()).publish(seed.generationId(), seed.jobCode(), "worker-a"));
+        assertEquals("generation-old", queryString("SELECT active_generation_id FROM knowledge_index_state WHERE document_id = ?", seed.documentId()));
+        assertEquals(3L, queryLong("SELECT status FROM knowledge_index_generation WHERE generation_id = ?", seed.generationId()));
+    }
+
     private GenerationPublicationService publicationService(IKnowledgeIndexJobRepository jobs) {
         DocumentRepository documents = new DocumentRepository();
         ReflectionTestUtils.setField(documents, "documentDao", template.getMapper(IDocumentDao.class));

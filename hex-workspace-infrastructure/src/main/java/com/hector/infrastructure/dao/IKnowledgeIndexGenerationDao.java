@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 单次索引构建尝试的 MyBatis DAO。 */
 @Mapper
@@ -14,6 +15,32 @@ public interface IKnowledgeIndexGenerationDao {
 
     /** 按业务编码查询 Generation。 */
     KnowledgeIndexGeneration queryByGenerationId(@Param("generationId") String generationId);
+
+    KnowledgeIndexGeneration queryByGenerationIdForUpdate(@Param("generationId") String generationId);
+
+    List<KnowledgeIndexGeneration> queryByGenerationIds(@Param("generationIds") List<String> generationIds);
+
+    List<KnowledgeIndexGeneration> queryCleanupCandidates(
+            @Param("expiredBefore") LocalDateTime expiredBefore,
+            @Param("now") LocalDateTime now,
+            @Param("limit") int limit);
+
+    int claimForCleanup(
+            @Param("generationId") String generationId,
+            @Param("cleanupToken") String cleanupToken,
+            @Param("expiredBefore") LocalDateTime expiredBefore,
+            @Param("leaseUntil") LocalDateTime leaseUntil,
+            @Param("now") LocalDateTime now);
+
+    int markCleanedIfOwned(
+            @Param("generationId") String generationId,
+            @Param("cleanupToken") String cleanupToken,
+            @Param("now") LocalDateTime now);
+
+    int releaseCleanupClaim(
+            @Param("generationId") String generationId,
+            @Param("cleanupToken") String cleanupToken,
+            @Param("now") LocalDateTime now);
 
     /** 仅有效 Worker 可写入 Chunk Artifact 元数据。 */
     int attachChunkArtifactIfOwned(@Param("generationId") String generationId, @Param("workerToken") String workerToken,

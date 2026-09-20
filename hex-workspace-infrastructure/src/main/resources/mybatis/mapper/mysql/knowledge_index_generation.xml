@@ -38,6 +38,61 @@
         FROM knowledge_index_generation WHERE generation_id = #{generationId}
     </select>
 
+    <select id="queryByGenerationIdForUpdate" resultMap="knowledgeIndexGenerationResultMap">
+        SELECT id, generation_id, job_id, workspace_id, document_id, version_no, index_input_revision,
+               embedding_config_id, chunking_config_hash, chunk_artifact_key, chunk_artifact_checksum,
+               chunk_count, status, worker_token, created_at, updated_at
+        FROM knowledge_index_generation WHERE generation_id = #{generationId} FOR UPDATE
+    </select>
+
+    <select id="queryByGenerationIds" resultMap="knowledgeIndexGenerationResultMap">
+        SELECT id, generation_id, job_id, workspace_id, document_id, version_no, index_input_revision,
+               embedding_config_id, chunking_config_hash, chunk_artifact_key, chunk_artifact_checksum,
+               chunk_count, status, worker_token, created_at, updated_at
+        FROM knowledge_index_generation
+        WHERE generation_id IN
+        <foreach collection="generationIds" item="generationId" open="(" separator="," close=")">
+            #{generationId}
+        </foreach>
+    </select>
+
+    <select id="queryCleanupCandidates" resultMap="knowledgeIndexGenerationResultMap">
+        SELECT generation.id, generation.generation_id, generation.job_id, generation.workspace_id, generation.document_id,
+               generation.version_no, generation.index_input_revision, generation.embedding_config_id,
+               generation.chunking_config_hash, generation.chunk_artifact_key, generation.chunk_artifact_checksum,
+               generation.chunk_count, generation.status, generation.worker_token, generation.created_at, generation.updated_at
+        FROM knowledge_index_generation generation
+        LEFT JOIN knowledge_index_state state ON state.document_id = generation.document_id
+        WHERE (state.active_generation_id IS NULL OR state.active_generation_id != generation.generation_id)
+          AND ((generation.status IN (1, 2) AND generation.updated_at &lt; #{expiredBefore})
+               OR (generation.status = 3 AND generation.cleanup_lease_until &lt; #{now}))
+        ORDER BY generation.updated_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimForCleanup">
+        UPDATE knowledge_index_generation generation
+        LEFT JOIN knowledge_index_state state ON state.document_id = generation.document_id
+        SET generation.status = 3, generation.cleanup_token = #{cleanupToken},
+            generation.cleanup_lease_until = #{leaseUntil}, generation.updated_at = #{now}
+        WHERE generation.generation_id = #{generationId}
+          AND (state.active_generation_id IS NULL OR state.active_generation_id != generation.generation_id)
+          AND ((generation.status IN (1, 2) AND generation.updated_at &lt; #{expiredBefore})
+               OR (generation.status = 3 AND generation.cleanup_lease_until &lt; #{now}))
+    </update>
+
+    <update id="markCleanedIfOwned">
+        UPDATE knowledge_index_generation
+        SET status = 4, cleanup_lease_until = NULL, cleaned_at = #{now}, updated_at = #{now}
+        WHERE generation_id = #{generationId} AND status = 3 AND cleanup_token = #{cleanupToken}
+    </update>
+
+    <update id="releaseCleanupClaim">
+        UPDATE knowledge_index_generation
+        SET status = 2, cleanup_lease_until = NULL, updated_at = #{now}
+        WHERE generation_id = #{generationId} AND status = 3 AND cleanup_token = #{cleanupToken}
+    </update>
+
     <update id="attachChunkArtifactIfOwned">
         UPDATE knowledge_index_generation generation
         INNER JOIN knowledge_index_job job ON job.id = generation.job_id

@@ -45,4 +45,7 @@ public interface IGenerationVectorStore {
      * @param expectedPointIds 由 Generation 与 Chunk 编号稳定生成的完整 Point ID 集合
      */
     void verifyGenerationPoints(String collectionName, String generationId, List<String> expectedPointIds);
+
+    /** 仅删除指定 Generation 的向量点，重复调用必须安全。 */
+    void deleteByGeneration(String collectionName, String generationId);
 }

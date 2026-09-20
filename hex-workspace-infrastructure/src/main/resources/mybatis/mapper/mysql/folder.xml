@@ -73,6 +73,13 @@
         ORDER BY depth ASC
     </select>
 
+    <select id="queryByWorkspaceId" resultMap="map">
+        SELECT <include refid="columns"/>
+        FROM folder
+        WHERE workspace_id = #{workspaceId}
+        ORDER BY id
+    </select>
+
     <select id="queryActiveByParentIdAndName" resultMap="map">
         SELECT <include refid="columns"/>
         FROM folder

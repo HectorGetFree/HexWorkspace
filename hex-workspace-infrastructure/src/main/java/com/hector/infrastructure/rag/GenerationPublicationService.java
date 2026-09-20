@@ -45,7 +45,7 @@ public class GenerationPublicationService {
         log.info("Generation 发布开始 generationId:{} jobCode:{}", generationId, jobCode);
         Boolean published = transactionTemplate.execute(status -> {
             // 1. 按 Document → IndexState/Job 的顺序检查，避免与文档版本提交交叉发布旧输入。
-            KnowledgeIndexGenerationEntity generation = generationRepository.findByGenerationId(generationId)
+            KnowledgeIndexGenerationEntity generation = generationRepository.lockByGenerationId(generationId)
                     .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED));
             KnowledgeIndexJobEntity job = jobRepository.findByJobCode(jobCode)
                     .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED));

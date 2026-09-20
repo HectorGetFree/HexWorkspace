@@ -61,6 +61,12 @@ class GenerationIndexBuildServiceTest {
         IKnowledgeIndexGenerationRepository generations = new IKnowledgeIndexGenerationRepository() {
             @Override public KnowledgeIndexGenerationEntity save(KnowledgeIndexGenerationEntity value) { return value; }
             @Override public Optional<KnowledgeIndexGenerationEntity> findByGenerationId(String value) { return Optional.of(generation); }
+            @Override public Optional<KnowledgeIndexGenerationEntity> lockByGenerationId(String value) { return Optional.of(generation); }
+            @Override public List<KnowledgeIndexGenerationEntity> listByGenerationIds(List<String> values) { return List.of(generation); }
+            @Override public List<KnowledgeIndexGenerationEntity> listCleanupCandidates(LocalDateTime a, LocalDateTime b, int c) { return List.of(); }
+            @Override public boolean claimForCleanup(String a, String b, LocalDateTime c, LocalDateTime d, LocalDateTime e) { return false; }
+            @Override public boolean markCleanedIfOwned(String a, String b, LocalDateTime c) { return false; }
+            @Override public boolean releaseCleanupClaim(String a, String b, LocalDateTime c) { return false; }
             @Override public boolean attachChunkArtifactIfOwned(String a, String b, String c, String d, int e, LocalDateTime f) { return true; }
             @Override public boolean markReadyIfOwned(String a, String b, Long c, LocalDateTime d) { return true; }
             @Override public boolean markFailedIfOwned(String a, String b, LocalDateTime now) { return true; }
@@ -134,5 +140,6 @@ class GenerationIndexBuildServiceTest {
         @Override public void verifyGenerationPoints(String collection, String generationId, List<String> expectedPointIds) {
             assertEquals(expectedPointIds.size(), points.size());
         }
+        @Override public void deleteByGeneration(String collection, String generationId) { }
     }
 }

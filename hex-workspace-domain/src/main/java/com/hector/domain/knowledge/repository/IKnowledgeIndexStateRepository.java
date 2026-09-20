@@ -3,6 +3,7 @@ package com.hector.domain.knowledge.repository;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexStateEntity;
 
 import java.util.Optional;
+import java.util.List;
 
 /** 已发布 Generation 权威指针仓储。 */
 public interface IKnowledgeIndexStateRepository {
@@ -14,6 +15,9 @@ public interface IKnowledgeIndexStateRepository {
      * @return 文档已经发布索引时返回其状态指针
      */
     Optional<KnowledgeIndexStateEntity> findByDocumentId(Long documentId);
+
+    /** 批量查询候选文档的已发布 Generation 指针，避免按 Chunk 查询。 */
+    List<KnowledgeIndexStateEntity> listByDocumentIds(List<Long> documentIds);
 
     /**
      * 将文档的权威索引指针切换至指定 READY Generation。

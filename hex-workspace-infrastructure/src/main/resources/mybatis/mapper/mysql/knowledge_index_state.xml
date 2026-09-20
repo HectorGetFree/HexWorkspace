@@ -13,6 +13,15 @@
         WHERE document_id = #{documentId}
     </select>
 
+    <select id="queryByDocumentIds" resultMap="knowledgeIndexStateResultMap">
+        SELECT document_id, active_generation_id, updated_at
+        FROM knowledge_index_state
+        WHERE document_id IN
+        <foreach collection="documentIds" item="documentId" open="(" separator="," close=")">
+            #{documentId}
+        </foreach>
+    </select>
+
     <insert id="upsertActive">
         INSERT INTO knowledge_index_state (document_id, active_generation_id, updated_at)
         VALUES (#{documentId}, #{generationId}, NOW())

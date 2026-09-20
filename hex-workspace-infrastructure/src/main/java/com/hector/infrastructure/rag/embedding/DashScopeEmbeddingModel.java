@@ -5,6 +5,8 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.hector.domain.knowledge.adapter.port.IEmbeddingModel;
 import com.hector.domain.knowledge.adapter.port.IEmbeddingClient;
+import com.hector.domain.knowledge.adapter.port.IQueryEmbeddingClient;
+import com.hector.domain.knowledge.model.entity.EmbeddingConfigEntity;
 import com.hector.domain.knowledge.model.valobj.EmbeddingVectorVO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -20,7 +22,7 @@ import java.util.List;
 
 /** DashScope embedding 适配器，直接调用模型 HTTP 接口而不把供应商 SDK 泄漏进领域层。 */
 @Component
-public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClient {
+public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClient, IQueryEmbeddingClient {
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -30,6 +32,10 @@ public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClien
     private String model;
     @Value("${ai.embedding.dashscope.dimensions:1024}")
     private Integer dimensions;
+    @Value("${hexworkspace.knowledge.embedding.provider:DashScope}")
+    private String provider;
+    @Value("${ai.vector-store.qdrant.collection:hex_workspace_segments}")
+    private String collectionName;
     @Value("${hexworkspace.knowledge.embedding.timeout-ms:10000}")
     private long timeoutMs;
     @Value("${hexworkspace.knowledge.embedding.retry-count:2}")
@@ -47,6 +53,21 @@ public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClien
         return embedWithIndex(texts);
     }
 
+    @Override
+    public List<Float> embedQuery(EmbeddingConfigEntity servingConfig, String query) {
+        if (servingConfig == null || !provider.equals(servingConfig.getProvider())
+                || !model.equals(servingConfig.getModel()) || !dimensions.equals(servingConfig.getDimension())
+                || !collectionName.equals(servingConfig.getCollectionName())) {
+            throw new IllegalStateException("当前部署 Embedding 模型与权威向量空间配置不一致");
+        }
+        List<EmbeddingVectorVO> vectors = embedWithIndex(List.of(query));
+        if (vectors.size() != 1 || vectors.get(0).vector() == null
+                || vectors.get(0).vector().size() != servingConfig.getDimension()) {
+            throw new IllegalStateException("查询 Embedding 返回向量维度不符合权威配置");
+        }
+        return vectors.get(0).vector();
+    }
+
     private List<EmbeddingVectorVO> embedWithIndex(List<String> texts) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("未配置 ai.embedding.dashscope.api-key，无法建立或查询知识索引");
@@ -60,10 +81,16 @@ public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClien
         for (int attempt = 0; attempt <= Math.max(0, retryCount); attempt++) {
             try {
                 HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
-                        .timeout(Duration.ofMillis(timeoutMs)).header("Authorization", "Bearer " + apiKey)
-                        .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body.toJSONString())).build();
+                        .timeout(Duration.ofMillis(timeoutMs))
+                        .header("Authorization", "Bearer " + apiKey)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body.toJSONString()))
+                        .build();
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() / 100 != 2) throw new IllegalStateException("DashScope embedding 调用失败: " + response.statusCode() + " " + response.body());
+                if (response.statusCode() / 100 != 2) {
+                    throw new IllegalStateException("DashScope embedding 调用失败: "
+                            + response.statusCode() + " " + response.body());
+                }
                 JSONArray data = JSON.parseObject(response.body()).getJSONArray("data");
                 List<EmbeddingVectorVO> vectors = new ArrayList<>();
                 for (int i = 0; i < data.size(); i++) {
