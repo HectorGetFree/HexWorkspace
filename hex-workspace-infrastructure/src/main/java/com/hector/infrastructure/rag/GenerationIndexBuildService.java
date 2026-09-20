@@ -13,6 +13,7 @@ import com.hector.domain.knowledge.model.valobj.GenerationVectorPointVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeChunkVO;
 import com.hector.domain.knowledge.repository.IEmbeddingConfigRepository;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexGenerationRepository;
+import com.hector.domain.knowledge.repository.IServingVectorSpaceRepository;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
@@ -54,6 +55,9 @@ public class GenerationIndexBuildService {
     @Resource
     private IGenerationVectorStore vectorStore;
 
+    @Resource
+    private IServingVectorSpaceRepository servingVectorSpaceRepository;
+
     @Value("${hexworkspace.knowledge.embedding.provider:DashScope}")
     private String provider;
 
@@ -84,6 +88,7 @@ public class GenerationIndexBuildService {
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
         List<KnowledgeChunkVO> chunks = loadChunks(generation);
         EmbeddingConfigEntity config = embeddingConfigRepository.saveIfAbsent(config());
+        servingVectorSpaceRepository.initializeIfAbsent(config.getId());
         vectorStore.ensureCollection(config.getDimension(), config.getDistance(), config.getCollectionName());
 
         int effectiveBatchSize = Math.max(1, batchSize);
@@ -102,9 +107,10 @@ public class GenerationIndexBuildService {
             }
             vectorStore.upsert(config.getCollectionName(), points);
         }
-        if (vectorStore.countByGeneration(config.getCollectionName(), generationId) != chunks.size()) {
-            throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
-        }
+        vectorStore.verifyGenerationPoints(
+                config.getCollectionName(),
+                generationId,
+                chunks.stream().map(chunk -> pointId(generationId, chunk.chunkNo())).toList());
         if (!generationRepository.markReadyIfOwned(generationId, workerToken, config.getId(), LocalDateTime.now())) {
             throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
         }
@@ -113,7 +119,7 @@ public class GenerationIndexBuildService {
 
     /** Worker 在外部构建失败时仅把自己创建的 BUILDING Generation 标记为失败。 */
     public void markFailed(String generationId, String workerToken) {
-        generationRepository.markFailedIfOwned(generationId, workerToken);
+        generationRepository.markFailedIfOwned(generationId, workerToken, LocalDateTime.now());
     }
 
     private List<KnowledgeChunkVO> loadChunks(KnowledgeIndexGenerationEntity generation) {
@@ -165,7 +171,7 @@ public class GenerationIndexBuildService {
     }
 
     private GenerationVectorPointVO point(DocumentEntity document, KnowledgeIndexGenerationEntity generation, KnowledgeChunkVO chunk, List<Float> vector, Long configId) {
-        String pointId = UUID.nameUUIDFromBytes((generation.getGenerationId() + ":" + chunk.chunkNo()).getBytes(StandardCharsets.UTF_8)).toString();
+        String pointId = pointId(generation.getGenerationId(), chunk.chunkNo());
         Map<String, Object> payload = new HashMap<>();
         payload.put("workspace_id", generation.getWorkspaceId());
         payload.put("document_id", generation.getDocumentId());
@@ -181,6 +187,10 @@ public class GenerationIndexBuildService {
         payload.put("content_hash", chunk.contentHash());
         payload.put("embedding_config_id", configId);
         return new GenerationVectorPointVO(pointId, vector, payload);
+    }
+
+    private String pointId(String generationId, int chunkNo) {
+        return UUID.nameUUIDFromBytes((generationId + ":" + chunkNo).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private String sha256(byte[] source) {

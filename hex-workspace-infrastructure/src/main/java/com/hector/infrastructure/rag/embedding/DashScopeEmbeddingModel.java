@@ -34,6 +34,8 @@ public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClien
     private long timeoutMs;
     @Value("${hexworkspace.knowledge.embedding.retry-count:2}")
     private int retryCount;
+    @Value("${hexworkspace.knowledge.embedding.dashscope-endpoint:https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings}")
+    private String endpoint;
 
     @Override
     public List<List<Float>> embed(List<String> texts) {
@@ -57,7 +59,7 @@ public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClien
         IllegalStateException lastFailure = null;
         for (int attempt = 0; attempt <= Math.max(0, retryCount); attempt++) {
             try {
-                HttpRequest request = HttpRequest.newBuilder(URI.create("https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"))
+                HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
                         .timeout(Duration.ofMillis(timeoutMs)).header("Authorization", "Bearer " + apiKey)
                         .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body.toJSONString())).build();
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());

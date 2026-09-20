@@ -19,7 +19,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -91,6 +93,36 @@ public class QdrantVectorStore implements IVectorStore, IGenerationVectorStore {
         body.put("filter", filter("generation_id", generationId));
         JSONObject response = JSON.parseObject(request("POST", "/collections/" + collectionName + "/points/count", body.toJSONString()));
         return response.getJSONObject("result").getLongValue("count");
+    }
+
+    @Override
+    public void verifyGenerationPoints(String collectionName, String generationId, List<String> expectedPointIds) {
+        if (countByGeneration(collectionName, generationId) != expectedPointIds.size()) {
+            throw new IllegalStateException("Qdrant Generation 向量数量与 Chunk 数量不一致");
+        }
+        Set<String> actualPointIds = new HashSet<>();
+        for (int offset = 0; offset < expectedPointIds.size(); offset += 256) {
+            List<String> batchIds = expectedPointIds.subList(offset, Math.min(expectedPointIds.size(), offset + 256));
+            JSONObject requestBody = new JSONObject();
+            requestBody.put("ids", batchIds);
+            requestBody.put("with_payload", true);
+            requestBody.put("with_vector", false);
+            JSONObject response = JSON.parseObject(request(
+                    "POST", "/collections/" + collectionName + "/points", requestBody.toJSONString()));
+            JSONArray points = response.getJSONArray("result");
+            for (Object item : points) {
+                JSONObject point = (JSONObject) item;
+                JSONObject payload = point.getJSONObject("payload");
+                if (!generationId.equals(payload.getString("generation_id"))) {
+                    throw new IllegalStateException("Qdrant Point Generation 归属不匹配");
+                }
+                actualPointIds.add(point.getString("id"));
+            }
+        }
+        Set<String> expected = new HashSet<>(expectedPointIds);
+        if (expected.size() != expectedPointIds.size() || !expected.equals(actualPointIds)) {
+            throw new IllegalStateException("Qdrant Generation Point 集合不完整或包含意外 Point");
+        }
     }
 
     @Override

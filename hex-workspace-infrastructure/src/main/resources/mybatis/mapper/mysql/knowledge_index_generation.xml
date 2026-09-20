@@ -68,10 +68,14 @@
     </update>
 
     <update id="markFailedIfOwned">
-        UPDATE knowledge_index_generation
-        SET status = 2, updated_at = NOW()
-        WHERE generation_id = #{generationId}
-          AND worker_token = #{workerToken}
-          AND status = 0
+        UPDATE knowledge_index_generation generation
+        INNER JOIN knowledge_index_job job ON job.id = generation.job_id
+        SET generation.status = 2, generation.updated_at = NOW()
+        WHERE generation.generation_id = #{generationId}
+          AND generation.worker_token = #{workerToken}
+          AND generation.status = 0
+          AND job.status = 1
+          AND job.worker_token = #{workerToken}
+          AND job.running_lease_until &gt; #{now}
     </update>
 </mapper>

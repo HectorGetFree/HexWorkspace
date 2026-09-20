@@ -35,4 +35,14 @@ public interface IGenerationVectorStore {
      * @return 当前 Generation 的向量点数量
      */
     long countByGeneration(String collectionName, String generationId);
+
+    /**
+     * 回读校验指定 Generation 的完整 Point 集合。
+     * 必须同时拒绝缺失 Point、意外 Point 和 Generation 归属不匹配的 Point。
+     *
+     * @param collectionName Collection 名称
+     * @param generationId Generation 唯一标识
+     * @param expectedPointIds 由 Generation 与 Chunk 编号稳定生成的完整 Point ID 集合
+     */
+    void verifyGenerationPoints(String collectionName, String generationId, List<String> expectedPointIds);
 }

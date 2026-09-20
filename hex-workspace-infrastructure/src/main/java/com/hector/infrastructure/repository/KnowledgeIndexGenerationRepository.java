@@ -42,8 +42,8 @@ public class KnowledgeIndexGenerationRepository implements IKnowledgeIndexGenera
     }
 
     @Override
-    public boolean markFailedIfOwned(String generationId, String workerToken) {
-        return knowledgeIndexGenerationDao.markFailedIfOwned(generationId, workerToken) == 1;
+    public boolean markFailedIfOwned(String generationId, String workerToken, LocalDateTime now) {
+        return knowledgeIndexGenerationDao.markFailedIfOwned(generationId, workerToken, now) == 1;
     }
 
     private KnowledgeIndexGeneration toKnowledgeIndexGenerationRecord(KnowledgeIndexGenerationEntity entity) {

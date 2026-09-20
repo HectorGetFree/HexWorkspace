@@ -7,6 +7,7 @@ import com.hector.domain.knowledge.model.entity.KnowledgeIndexJobEntity;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexGenerationRepository;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexJobRepository;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexStateRepository;
+import com.hector.domain.knowledge.repository.IServingVectorSpaceRepository;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
@@ -37,6 +38,9 @@ public class GenerationPublicationService {
     @Resource
     private IKnowledgeIndexStateRepository indexStateRepository;
 
+    @Resource
+    private IServingVectorSpaceRepository servingVectorSpaceRepository;
+
     public void publish(String generationId, String jobCode, String workerToken) {
         log.info("Generation 发布开始 generationId:{} jobCode:{}", generationId, jobCode);
         Boolean published = transactionTemplate.execute(status -> {
@@ -47,6 +51,9 @@ public class GenerationPublicationService {
                     .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED));
             DocumentEntity document = documentRepository.lockById(generation.getDocumentId())
                     .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+            Long servingConfigId = servingVectorSpaceRepository.findServingConfig()
+                    .map(config -> config.getId())
+                    .orElse(null);
             LocalDateTime now = LocalDateTime.now();
             if (generation.getStatus() != 1
                     || generation.getEmbeddingConfigId() == null
@@ -55,7 +62,8 @@ public class GenerationPublicationService {
                     || job.getRunningLeaseUntil() == null || !job.getRunningLeaseUntil().isAfter(now)
                     || !generation.getWorkspaceId().equals(document.getWorkspaceId())
                     || !generation.getVersionNo().equals(document.getCurrentVersionNo())
-                    || !generation.getIndexInputRevision().equals(document.getIndexInputRevision())) {
+                    || !generation.getIndexInputRevision().equals(document.getIndexInputRevision())
+                    || !generation.getEmbeddingConfigId().equals(servingConfigId)) {
                 status.setRollbackOnly();
                 return false;
             }

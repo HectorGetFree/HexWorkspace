@@ -13,6 +13,7 @@ import com.hector.domain.knowledge.model.valobj.GenerationVectorPointVO;
 import com.hector.domain.knowledge.model.valobj.KnowledgeChunkVO;
 import com.hector.domain.knowledge.repository.IEmbeddingConfigRepository;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexGenerationRepository;
+import com.hector.domain.knowledge.repository.IServingVectorSpaceRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -62,7 +63,7 @@ class GenerationIndexBuildServiceTest {
             @Override public Optional<KnowledgeIndexGenerationEntity> findByGenerationId(String value) { return Optional.of(generation); }
             @Override public boolean attachChunkArtifactIfOwned(String a, String b, String c, String d, int e, LocalDateTime f) { return true; }
             @Override public boolean markReadyIfOwned(String a, String b, Long c, LocalDateTime d) { return true; }
-            @Override public boolean markFailedIfOwned(String a, String b) { return true; }
+            @Override public boolean markFailedIfOwned(String a, String b, LocalDateTime now) { return true; }
         };
         IDocumentRepository documents = new IDocumentRepository() {
             @Override public Optional<DocumentEntity> findById(Long id) { return Optional.of(DocumentEntity.builder().id(9L).workspaceId(1L).documentCode("doc-9").title("文档标题").currentVersionNo(3L).indexInputRevision(4L).build()); }
@@ -82,6 +83,10 @@ class GenerationIndexBuildServiceTest {
             @Override public EmbeddingConfigEntity saveIfAbsent(EmbeddingConfigEntity value) { return EmbeddingConfigEntity.builder().id(6L).configHash(value.getConfigHash()).provider(value.getProvider()).model(value.getModel()).dimension(value.getDimension()).distance(value.getDistance()).collectionName(value.getCollectionName()).build(); }
             @Override public Optional<EmbeddingConfigEntity> findById(Long id) { return Optional.empty(); }
             @Override public Optional<EmbeddingConfigEntity> findByConfigHash(String hash) { return Optional.empty(); }
+        };
+        IServingVectorSpaceRepository servingVectorSpace = new IServingVectorSpaceRepository() {
+            @Override public Optional<EmbeddingConfigEntity> findServingConfig() { return Optional.empty(); }
+            @Override public boolean initializeIfAbsent(Long embeddingConfigId) { return true; }
         };
         IDocumentStorageRepository storage = new IDocumentStorageRepository() {
             @Override public String getBucketName() { return "test"; }
@@ -105,6 +110,7 @@ class GenerationIndexBuildServiceTest {
         ReflectionTestUtils.setField(service, "storageRepository", storage);
         ReflectionTestUtils.setField(service, "embeddingClient", embedding);
         ReflectionTestUtils.setField(service, "vectorStore", store);
+        ReflectionTestUtils.setField(service, "servingVectorSpaceRepository", servingVectorSpace);
         ReflectionTestUtils.setField(service, "provider", "test");
         ReflectionTestUtils.setField(service, "model", "test-model");
         ReflectionTestUtils.setField(service, "dimension", 3);
@@ -125,5 +131,8 @@ class GenerationIndexBuildServiceTest {
         @Override public void ensureCollection(Integer dimension, String distance, String collection) { }
         @Override public void upsert(String collection, List<GenerationVectorPointVO> values) { points.addAll(values); }
         @Override public long countByGeneration(String collection, String generationId) { return points.size(); }
+        @Override public void verifyGenerationPoints(String collection, String generationId, List<String> expectedPointIds) {
+            assertEquals(expectedPointIds.size(), points.size());
+        }
     }
 }

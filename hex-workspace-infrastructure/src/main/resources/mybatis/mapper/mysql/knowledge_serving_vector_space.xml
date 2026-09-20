@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IServingVectorSpaceDao">
+
+    <select id="queryServingConfig" resultType="com.hector.infrastructure.dao.po.EmbeddingConfig">
+        SELECT config.id, config.config_hash, config.provider, config.model, config.dimension,
+               config.distance, config.collection_name, config.created_at
+        FROM knowledge_serving_vector_space serving
+        INNER JOIN knowledge_embedding_config config ON config.id = serving.embedding_config_id
+        WHERE serving.id = 1
+    </select>
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO knowledge_serving_vector_space (id, embedding_config_id)
+        VALUES (1, #{embeddingConfigId})
+    </insert>
+</mapper>

@@ -103,6 +103,13 @@ CREATE TABLE IF NOT EXISTS `knowledge_embedding_config` (
     UNIQUE KEY `uk_knowledge_embedding_config_hash` (`config_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识索引不可变Embedding配置';
 
+CREATE TABLE IF NOT EXISTS `knowledge_serving_vector_space` (
+    `id` TINYINT UNSIGNED NOT NULL COMMENT '固定为1的单例主键',
+    `embedding_config_id` BIGINT NOT NULL COMMENT '当前权威Embedding配置快照',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='当前部署生效的唯一向量空间';
+
 CREATE TABLE IF NOT EXISTS `knowledge_index_job` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `job_code` VARCHAR(64) NOT NULL COMMENT '任务编码',

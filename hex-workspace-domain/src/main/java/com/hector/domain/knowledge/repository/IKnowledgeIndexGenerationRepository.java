@@ -38,5 +38,5 @@ public interface IKnowledgeIndexGenerationRepository {
     /**
      * 将当前 Worker 尚未发布的 BUILDING Generation 标记为失败。
      */
-    boolean markFailedIfOwned(String generationId, String workerToken);
+    boolean markFailedIfOwned(String generationId, String workerToken, LocalDateTime now);
 }

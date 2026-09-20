@@ -26,6 +26,7 @@ public interface IKnowledgeIndexGenerationDao {
     int markReadyIfOwned(@Param("generationId") String generationId, @Param("workerToken") String workerToken,
                          @Param("embeddingConfigId") Long embeddingConfigId, @Param("now") LocalDateTime now);
 
-    /** 仅当前 Worker 可标记尚未发布的构建失败。 */
-    int markFailedIfOwned(@Param("generationId") String generationId, @Param("workerToken") String workerToken);
+    /** 仅持有未过期 Job 租约的 Worker 可标记尚未发布的构建失败。 */
+    int markFailedIfOwned(@Param("generationId") String generationId, @Param("workerToken") String workerToken,
+                          @Param("now") LocalDateTime now);
 }

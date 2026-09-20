@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
- * RabbitMQ 文档上传任务消息配置。
+ * RabbitMQ 文档上传与知识索引任务消息配置。
  */
 @Configuration
 public class RabbitMqConfig {
