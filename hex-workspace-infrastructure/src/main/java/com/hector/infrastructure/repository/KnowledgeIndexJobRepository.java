@@ -73,8 +73,8 @@ public class KnowledgeIndexJobRepository implements IKnowledgeIndexJobRepository
     }
 
     @Override
-    public boolean finishFailureIfOwned(String jobCode, String workerToken, int maxRetryCount, LocalDateTime nextRetryAt, String failureReason) {
-        return dao.finishFailureIfOwned(jobCode, workerToken, maxRetryCount, nextRetryAt, failureReason) == 1;
+    public boolean finishFailureIfOwned(String jobCode, String workerToken, int maxRetryCount, int retryDelaySeconds, String failureReason) {
+        return dao.finishFailureIfOwned(jobCode, workerToken, maxRetryCount, retryDelaySeconds, failureReason) == 1;
     }
 
     private KnowledgeIndexJob toKnowledgeIndexJobPo(KnowledgeIndexJobEntity entity) {

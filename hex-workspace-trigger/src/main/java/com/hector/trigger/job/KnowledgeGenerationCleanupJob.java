@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 /** 定时清理超过保留期且已不再作为权威索引的 Generation。 */
 @Component
@@ -25,6 +26,6 @@ public class KnowledgeGenerationCleanupJob {
 
     @Scheduled(fixedDelayString = "${hexworkspace.knowledge.generation-cleanup.fixed-delay-ms:3600000}")
     public void cleanExpiredGenerations() {
-        cleanupService.cleanExpired(LocalDateTime.now().minusHours(retentionHours), batchSize, leaseMinutes);
+        cleanupService.cleanExpired(LocalDateTime.now(ZoneOffset.UTC).minusHours(retentionHours), batchSize, leaseMinutes);
     }
 }

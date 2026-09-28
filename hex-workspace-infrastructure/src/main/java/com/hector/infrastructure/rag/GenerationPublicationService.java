@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 /** 将已完整构建的 Generation 与 Job 成功状态在同一 MySQL 事务中发布。 */
 @Component
@@ -54,7 +55,7 @@ public class GenerationPublicationService {
             Long servingConfigId = servingVectorSpaceRepository.findServingConfig()
                     .map(config -> config.getId())
                     .orElse(null);
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
             if (generation.getStatus() != 1
                     || generation.getEmbeddingConfigId() == null
                     || !generation.getJobId().equals(job.getId())

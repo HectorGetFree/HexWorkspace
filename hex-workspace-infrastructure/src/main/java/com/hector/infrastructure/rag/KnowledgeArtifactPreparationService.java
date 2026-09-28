@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -139,7 +140,7 @@ public class KnowledgeArtifactPreparationService {
             String artifactKey = "knowledge/chunks/%s.json".formatted(generation.getGenerationId());
             documentStorageRepository.upload(artifactKey, payload, "application/json");
             if (!knowledgeIndexGenerationRepository.attachChunkArtifactIfOwned(generation.getGenerationId(), workerToken,
-                    artifactKey, checksum(payload), chunks.size(), LocalDateTime.now())) {
+                    artifactKey, checksum(payload), chunks.size(), LocalDateTime.now(ZoneOffset.UTC))) {
                 throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
             }
         } catch (BusinessException exception) {
@@ -151,7 +152,8 @@ public class KnowledgeArtifactPreparationService {
 
     private void assertWorkerOwnership(KnowledgeIndexJobEntity job, String workerToken) {
         if (job.getWorkerToken() == null || !job.getWorkerToken().equals(workerToken)
-                || job.getRunningLeaseUntil() == null || !job.getRunningLeaseUntil().isAfter(LocalDateTime.now())) {
+                || job.getRunningLeaseUntil() == null
+                || !job.getRunningLeaseUntil().isAfter(LocalDateTime.now(ZoneOffset.UTC))) {
             throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
         }
     }

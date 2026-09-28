@@ -129,7 +129,8 @@
             status = CASE WHEN retry_count + 1 &gt;= #{maxRetryCount} THEN 3 ELSE 0 END,
             worker_token = NULL,
             running_lease_until = NULL,
-            next_retry_at = CASE WHEN retry_count + 1 &gt;= #{maxRetryCount} THEN NULL ELSE #{nextRetryAt} END,
+            next_retry_at = CASE WHEN retry_count + 1 &gt;= #{maxRetryCount} THEN NULL
+                                 ELSE DATE_ADD(CURRENT_TIMESTAMP, INTERVAL #{retryDelaySeconds} SECOND) END,
             failure_reason = #{failureReason},
             updated_at = CURRENT_TIMESTAMP
         WHERE job_code = #{jobCode} AND status = 1 AND worker_token = #{workerToken}

@@ -158,7 +158,8 @@ CREATE TABLE IF NOT EXISTS `knowledge_index_generation` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_knowledge_index_generation_id` (`generation_id`),
-    KEY `idx_knowledge_index_generation_document` (`document_id`, `version_no`, `index_input_revision`)
+    KEY `idx_knowledge_index_generation_document` (`document_id`, `version_no`, `index_input_revision`),
+    KEY `idx_knowledge_index_generation_cleanup` (`status`, `updated_at`, `cleanup_lease_until`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='知识索引构建Generation';
 
 CREATE TABLE IF NOT EXISTS `knowledge_index_state` (
@@ -245,6 +246,41 @@ CREATE TABLE IF NOT EXISTS `document_upload_outbox_event` (
     KEY `idx_document_upload_outbox_pending` (`status`, `id`),
     KEY `idx_document_upload_outbox_publishing_lease` (`status`, `publishing_lease_until`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档上传事务发件箱表';
+
+CREATE TABLE IF NOT EXISTS `workspace_conversation` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `conversation_id` VARCHAR(64) NOT NULL COMMENT 'Workspace Conversation 稳定标识',
+    `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace',
+    `user_id` BIGINT NOT NULL COMMENT '发起用户',
+    `title` VARCHAR(255) DEFAULT NULL COMMENT '会话标题',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_workspace_conversation_id` (`conversation_id`),
+    KEY `idx_workspace_conversation_owner` (`workspace_id`, `user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace Agent Conversation';
+
+CREATE TABLE IF NOT EXISTS `agent_run` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `run_id` VARCHAR(64) NOT NULL COMMENT 'WS AgentRun 稳定业务标识',
+    `conversation_id` VARCHAR(64) NOT NULL COMMENT '所属 Conversation',
+    `workspace_id` BIGINT NOT NULL COMMENT '所属 Workspace',
+    `initiator_user_id` BIGINT NOT NULL COMMENT '发起用户',
+    `status` TINYINT UNSIGNED NOT NULL COMMENT '0=PENDING,1=RUNNING,2=PAUSED,3=INCOMPLETE,4=SUCCEEDED,5=FAILED,6=CANCELLED',
+    `instruction` TEXT NOT NULL COMMENT 'StartRun 原始指令',
+    `resource_scope` JSON DEFAULT NULL COMMENT '创建时最大资源边界',
+    `allowed_tools` JSON DEFAULT NULL COMMENT '创建时最大工具边界',
+    `version` BIGINT NOT NULL DEFAULT 0 COMMENT '乐观并发版本',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `started_at` DATETIME DEFAULT NULL COMMENT '开始时间',
+    `finished_at` DATETIME DEFAULT NULL COMMENT '终止时间',
+    `failure_code` VARCHAR(64) DEFAULT NULL COMMENT '稳定失败码',
+    `failure_message` VARCHAR(512) DEFAULT NULL COMMENT '失败信息',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_agent_run_id` (`run_id`),
+    KEY `idx_agent_run_conversation_status` (`conversation_id`, `status`),
+    KEY `idx_agent_run_workspace_user` (`workspace_id`, `initiator_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace AgentRun';
 
 -- 业务约束：
 -- 1. 不使用数据库外键，交由应用层保证 user_id / workspace_id / owner_user_id 的引用一致性。

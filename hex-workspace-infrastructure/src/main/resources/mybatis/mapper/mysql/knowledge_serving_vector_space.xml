@@ -6,7 +6,7 @@
 
     <select id="queryServingConfig" resultType="com.hector.infrastructure.dao.po.EmbeddingConfig">
         SELECT config.id, config.config_hash, config.provider, config.model, config.dimension,
-               config.distance, config.collection_name, config.created_at
+               config.distance, config.collection_name AS collectionName, config.created_at
         FROM knowledge_serving_vector_space serving
         INNER JOIN knowledge_embedding_config config ON config.id = serving.embedding_config_id
         WHERE serving.id = 1

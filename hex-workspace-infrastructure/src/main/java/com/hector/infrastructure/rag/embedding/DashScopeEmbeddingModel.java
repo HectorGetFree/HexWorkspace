@@ -34,7 +34,7 @@ public class DashScopeEmbeddingModel implements IEmbeddingModel, IEmbeddingClien
     private Integer dimensions;
     @Value("${hexworkspace.knowledge.embedding.provider:DashScope}")
     private String provider;
-    @Value("${ai.vector-store.qdrant.collection:hex_workspace_segments}")
+    @Value("${hexworkspace.knowledge.embedding.collection:hex_workspace_rag_v1}")
     private String collectionName;
     @Value("${hexworkspace.knowledge.embedding.timeout-ms:10000}")
     private long timeoutMs;

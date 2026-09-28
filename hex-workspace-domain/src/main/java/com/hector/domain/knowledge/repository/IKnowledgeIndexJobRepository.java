@@ -70,11 +70,6 @@ public interface IKnowledgeIndexJobRepository {
 
     /**
      * 当前执行失败后按重试额度回到待执行或进入终态失败。
-     *
-     * @param maxRetryCount 最大真实失败次数
-     * @param nextRetryAt 未耗尽额度时下次可执行时间
-     * @param failureReason 本次失败原因
-     * @return 是否仍由当前 Worker 成功处理失败状态
      */
-    boolean finishFailureIfOwned(String jobCode, String workerToken, int maxRetryCount, LocalDateTime nextRetryAt, String failureReason);
+    boolean finishFailureIfOwned(String jobCode, String workerToken, int maxRetryCount, int retryDelaySeconds, String failureReason);
 }

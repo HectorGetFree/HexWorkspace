@@ -49,6 +49,6 @@ public interface IKnowledgeIndexJobDao {
 
     /** 按剩余重试次数，将失败任务转为待重试或终态失败。 */
     int finishFailureIfOwned(@Param("jobCode") String jobCode, @Param("workerToken") String workerToken,
-                             @Param("maxRetryCount") int maxRetryCount, @Param("nextRetryAt") LocalDateTime nextRetryAt,
+                             @Param("maxRetryCount") int maxRetryCount, @Param("retryDelaySeconds") int retryDelaySeconds,
                              @Param("failureReason") String failureReason);
 }

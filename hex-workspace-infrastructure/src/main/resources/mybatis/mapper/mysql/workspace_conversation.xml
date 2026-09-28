@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IWorkspaceConversationDao">
+    <resultMap id="conversationResultMap" type="com.hector.infrastructure.dao.po.WorkspaceConversation">
+        <id property="id" column="id"/>
+        <result property="conversationId" column="conversation_id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="title" column="title"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO workspace_conversation (conversation_id, workspace_id, user_id, title, created_at, updated_at)
+        VALUES (#{conversationId}, #{workspaceId}, #{userId}, #{title}, #{createdAt}, #{updatedAt})
+    </insert>
+    <select id="queryByConversationId" resultMap="conversationResultMap">
+        SELECT id, conversation_id, workspace_id, user_id, title, created_at, updated_at
+        FROM workspace_conversation WHERE conversation_id = #{conversationId} LIMIT 1
+    </select>
+    <select id="queryByConversationIdForUpdate" resultMap="conversationResultMap">
+        SELECT id, conversation_id, workspace_id, user_id, title, created_at, updated_at
+        FROM workspace_conversation WHERE conversation_id = #{conversationId} FOR UPDATE
+    </select>
+</mapper>

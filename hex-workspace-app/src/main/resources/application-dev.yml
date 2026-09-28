@@ -18,6 +18,9 @@ app:
     cross-origin: '*'
 
 hexworkspace:
+  hexgent:
+    runtime-url: ${HEXGENT_RUNTIME_URL:http://127.0.0.1:8000}
+    command-timeout-ms: ${HEXGENT_COMMAND_TIMEOUT_MS:5000}
   knowledge:
     legacy-api:
       # 旧知识接口不校验文档版本与文件夹权限，Phase 1 默认关闭。
@@ -25,6 +28,7 @@ hexworkspace:
     embedding:
       provider: DashScope
       distance: COSINE
+      collection: hex_workspace_rag_v1
       batch-size: 16
       timeout-ms: 10000
       retry-count: 2
@@ -34,6 +38,11 @@ hexworkspace:
       retry-delay-seconds: 60
     dispatcher:
       fixed-delay-ms: 5000
+    generation-cleanup:
+      retention-hours: 168
+      batch-size: 20
+      lease-minutes: 10
+      fixed-delay-ms: 3600000
   document-upload:
     max-retry-count: 3
     staging-orphan-retention-hours: 24

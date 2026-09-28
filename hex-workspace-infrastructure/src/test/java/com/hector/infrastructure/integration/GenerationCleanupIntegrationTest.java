@@ -35,6 +35,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.TimeZone;
 import java.util.List;
 import java.util.Map;
 
@@ -129,7 +131,7 @@ class GenerationCleanupIntegrationTest {
         KnowledgeIndexGenerationRepository generations = generationRepository();
         String workerAToken = "worker-a-cleanup-token";
         assertTrue(generations.claimForCleanup("generation-a", workerAToken,
-                LocalDateTime.now().plusDays(1), LocalDateTime.now().plusMinutes(10), LocalDateTime.now()));
+                utcNow().plusDays(1), utcNow().plusMinutes(10), utcNow()));
         assertEquals(3, status("generation-a"));
 
         // 模拟 Worker A 在 Qdrant 删除成功后崩溃：不调用生产异常释放逻辑，也不删除 MinIO Artifact。
@@ -147,12 +149,51 @@ class GenerationCleanupIntegrationTest {
         assertEquals(4, status("generation-a"));
         assertFalse(objectExists("chunks/generation-a.json"));
         assertEquals(0, vectors.countByGeneration(COLLECTION, "generation-a"));
-        assertFalse(generations.markCleanedIfOwned("generation-a", workerAToken, LocalDateTime.now()));
+        assertFalse(generations.markCleanedIfOwned("generation-a", workerAToken, utcNow()));
 
         assertEquals(1, status("generation-b"));
         assertEquals("generation-b", activeGeneration());
         assertEquals(1, vectors.countByGeneration(COLLECTION, "generation-b"));
         assertTrue(objectExists("chunks/generation-b.json"));
+    }
+
+    @Test
+    void shouldRecoverExpiredCleanupLeaseWithConsistentTimeBasis() throws Exception {
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+        try {
+            KnowledgeIndexGenerationRepository generations = generationRepository();
+            LocalDateTime now = utcNow();
+            String workerAToken = "worker-a-time-basis-token";
+
+            assertTrue(generations.claimForCleanup("generation-a", workerAToken,
+                    now.plusDays(1), now.plusMinutes(10), now));
+            assertEquals(3, status("generation-a"));
+            assertFalse(generations.claimForCleanup("generation-a", "worker-b-before-expiry",
+                    now.plusDays(1), now.plusMinutes(10), now));
+
+            try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+                statement.execute("UPDATE knowledge_index_generation "
+                        + "SET cleanup_lease_until = UTC_TIMESTAMP() - INTERVAL 1 MINUTE "
+                        + "WHERE generation_id = 'generation-a' AND status = 3");
+            }
+
+            KnowledgeGenerationCleanupService workerB = cleanupService();
+            assertEquals(1, workerB.cleanExpired(utcNow().minusDays(7), 20, 10));
+            assertEquals(4, status("generation-a"));
+            assertFalse(generations.markCleanedIfOwned("generation-a", workerAToken, utcNow()));
+            assertFalse(objectExists("chunks/generation-a.json"));
+            assertEquals(0, vectors.countByGeneration(COLLECTION, "generation-a"));
+            assertEquals("generation-b", activeGeneration());
+            assertEquals(1, vectors.countByGeneration(COLLECTION, "generation-b"));
+            assertTrue(objectExists("chunks/generation-b.json"));
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
+    }
+
+    private LocalDateTime utcNow() {
+        return LocalDateTime.now(ZoneOffset.UTC);
     }
 
     private KnowledgeGenerationCleanupService cleanupService() {

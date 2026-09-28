@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,7 +45,7 @@ public class KnowledgeIndexWorkerService implements IKnowledgeIndexWorkerService
     public void execute(String jobCode) {
         log.info("知识索引任务-执行开始 jobCode:{}", jobCode);
         String workerToken = UUID.randomUUID().toString();
-        if (!jobRepository.claimForRunning(jobCode, workerToken, LocalDateTime.now().plusSeconds(leaseSeconds))) {
+        if (!jobRepository.claimForRunning(jobCode, workerToken, utcNow().plusSeconds(leaseSeconds))) {
             log.info("知识索引任务-执行跳过，任务已被其他 Worker 抢占 jobCode:{}", jobCode);
             return;
         }
@@ -72,7 +73,7 @@ public class KnowledgeIndexWorkerService implements IKnowledgeIndexWorkerService
                     jobCode,
                     workerToken,
                     maxRetryCount,
-                    LocalDateTime.now().plusSeconds(retryDelaySeconds),
+                    retryDelaySeconds,
                     reason);
             if (!handled) {
                 log.warn("知识索引任务-执行失败但执行权已失效 jobCode:{}", jobCode, exception);
@@ -85,7 +86,7 @@ public class KnowledgeIndexWorkerService implements IKnowledgeIndexWorkerService
     /** 由调度器回收进程异常退出留下的执行租约。 */
     @Override
     public void recoverExpiredRunningJobs() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = utcNow();
         for (KnowledgeIndexJobEntity job : jobRepository.listExpiredRunning(now, 100)) {
             jobRepository.recoverExpiredRunning(job.getJobCode(), now, "知识索引 Worker 执行租约超时");
         }
@@ -93,12 +94,16 @@ public class KnowledgeIndexWorkerService implements IKnowledgeIndexWorkerService
 
     @Override
     public List<KnowledgeIndexJobEntity> listPendingReadyJobs() {
-        return jobRepository.listPendingReady(LocalDateTime.now(), 100);
+        return jobRepository.listPendingReady(utcNow(), 100);
     }
 
     private void renewOrThrow(String jobCode, String workerToken) {
-        if (!jobRepository.renewLeaseIfOwned(jobCode, workerToken, LocalDateTime.now().plusSeconds(leaseSeconds))) {
+        if (!jobRepository.renewLeaseIfOwned(jobCode, workerToken, utcNow().plusSeconds(leaseSeconds))) {
             throw new IllegalStateException("知识索引 Worker 执行租约已失效");
         }
+    }
+
+    private LocalDateTime utcNow() {
+        return LocalDateTime.now(ZoneOffset.UTC);
     }
 }

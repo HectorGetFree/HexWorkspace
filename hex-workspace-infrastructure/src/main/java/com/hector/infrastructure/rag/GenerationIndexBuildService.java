@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -70,7 +71,7 @@ public class GenerationIndexBuildService {
     @Value("${hexworkspace.knowledge.embedding.distance:COSINE}")
     private String distance;
 
-    @Value("${ai.vector-store.qdrant.collection:hex_workspace_segments}")
+    @Value("${hexworkspace.knowledge.embedding.collection:hex_workspace_rag_v1}")
     private String collection;
 
     @Value("${hexworkspace.knowledge.embedding.batch-size:16}")
@@ -111,7 +112,7 @@ public class GenerationIndexBuildService {
                 config.getCollectionName(),
                 generationId,
                 chunks.stream().map(chunk -> pointId(generationId, chunk.chunkNo())).toList());
-        if (!generationRepository.markReadyIfOwned(generationId, workerToken, config.getId(), LocalDateTime.now())) {
+        if (!generationRepository.markReadyIfOwned(generationId, workerToken, config.getId(), LocalDateTime.now(ZoneOffset.UTC))) {
             throw new BusinessException(ResponseCode.DOCUMENT_PARSE_FAILED);
         }
         log.info("Generation 向量构建完成 generationId:{} chunkCount:{}", generationId, chunks.size());
@@ -119,7 +120,7 @@ public class GenerationIndexBuildService {
 
     /** Worker 在外部构建失败时仅把自己创建的 BUILDING Generation 标记为失败。 */
     public void markFailed(String generationId, String workerToken) {
-        generationRepository.markFailedIfOwned(generationId, workerToken, LocalDateTime.now());
+        generationRepository.markFailedIfOwned(generationId, workerToken, LocalDateTime.now(ZoneOffset.UTC));
     }
 
     private List<KnowledgeChunkVO> loadChunks(KnowledgeIndexGenerationEntity generation) {

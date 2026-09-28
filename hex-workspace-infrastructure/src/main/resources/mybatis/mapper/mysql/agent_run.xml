@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IAgentRunDao">
+    <resultMap id="agentRunResultMap" type="com.hector.infrastructure.dao.po.AgentRun">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/>
+        <result property="conversationId" column="conversation_id"/>
+        <result property="workspaceId" column="workspace_id"/>
+        <result property="initiatorUserId" column="initiator_user_id"/>
+        <result property="status" column="status"/>
+        <result property="instruction" column="instruction"/>
+        <result property="resourceScope" column="resource_scope"/>
+        <result property="allowedTools" column="allowed_tools"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="finishedAt" column="finished_at"/>
+        <result property="failureCode" column="failure_code"/>
+        <result property="failureMessage" column="failure_message"/>
+    </resultMap>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_run (run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
+            resource_scope, allowed_tools, version, created_at, started_at, finished_at, failure_code, failure_message)
+        VALUES (#{runId}, #{conversationId}, #{workspaceId}, #{initiatorUserId}, #{status}, #{instruction},
+            CAST(#{resourceScope} AS JSON), CAST(#{allowedTools} AS JSON), #{version}, #{createdAt}, #{startedAt},
+            #{finishedAt}, #{failureCode}, #{failureMessage})
+    </insert>
+    <select id="queryByRunId" resultMap="agentRunResultMap">
+        SELECT id, run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
+               CAST(resource_scope AS CHAR) resource_scope, CAST(allowed_tools AS CHAR) allowed_tools, version,
+               created_at, started_at, finished_at, failure_code, failure_message
+        FROM agent_run WHERE run_id = #{runId} LIMIT 1
+    </select>
+    <select id="queryNonTerminalByConversationId" resultMap="agentRunResultMap">
+        SELECT id, run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
+               CAST(resource_scope AS CHAR) resource_scope, CAST(allowed_tools AS CHAR) allowed_tools, version,
+               created_at, started_at, finished_at, failure_code, failure_message
+        FROM agent_run WHERE conversation_id = #{conversationId} AND status IN (0, 1, 2, 3)
+        ORDER BY id DESC LIMIT 1
+    </select>
+    <update id="markRejected">
+        UPDATE agent_run
+        SET status = 5, failure_code = #{failureCode}, failure_message = #{failureMessage},
+            finished_at = NOW(), version = version + 1
+        WHERE run_id = #{runId} AND status = 0
+    </update>
+</mapper>
