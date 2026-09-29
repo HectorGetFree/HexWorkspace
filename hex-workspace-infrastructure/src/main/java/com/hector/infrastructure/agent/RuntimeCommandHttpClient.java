@@ -29,6 +29,9 @@ public class RuntimeCommandHttpClient implements IRuntimeCommandPort {
     @Value("${hexworkspace.hexgent.command-timeout-ms:5000}")
     private long timeoutMs;
 
+    @Value("${hexworkspace.hexgent.integration-token:}")
+    private String integrationToken;
+
     public RuntimeCommandHttpClient() {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
@@ -48,12 +51,15 @@ public class RuntimeCommandHttpClient implements IRuntimeCommandPort {
             body.put("issuedAt", request.issuedAt());
             body.put("payload", JSON.parseObject(request.payloadJson()));
 
-            HttpRequest httpRequest = HttpRequest.newBuilder(
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(
                             URI.create(runtimeUrl.replaceAll("/+$", "") + "/internal/v1/runtime/commands"))
                     .timeout(Duration.ofMillis(timeoutMs))
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toJSONString()))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toJSONString()));
+            if (integrationToken != null && !integrationToken.isBlank()) {
+                requestBuilder.header("Authorization", "Bearer " + integrationToken);
+            }
+            HttpRequest httpRequest = requestBuilder.build();
             HttpResponse<String> response = httpClient.send(
                     httpRequest, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {

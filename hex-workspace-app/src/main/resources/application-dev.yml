@@ -18,8 +18,11 @@ app:
     cross-origin: '*'
 
 hexworkspace:
+  jwt:
+    access-expire-minutes: 120
   hexgent:
     runtime-url: ${HEXGENT_RUNTIME_URL:http://127.0.0.1:8000}
+    integration-token: ${HEXGENT_WORKSPACE_INTEGRATION_TOKEN:}
     command-timeout-ms: ${HEXGENT_COMMAND_TIMEOUT_MS:5000}
     lifecycle-callback-token: ${HEXGENT_WORKSPACE_LIFECYCLE_TOKEN:}
   knowledge:
