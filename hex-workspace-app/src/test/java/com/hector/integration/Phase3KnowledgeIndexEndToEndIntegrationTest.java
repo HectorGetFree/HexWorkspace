@@ -2,6 +2,8 @@ package com.hector.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hector.domain.document.model.entity.DocumentEntity;
+import com.hector.domain.agent.model.valobj.CapabilityContextVO;
+import com.hector.domain.agent.model.valobj.CapabilityResultVO;
 import com.hector.domain.document.service.impl.DocumentUploadTaskServiceImpl;
 import com.hector.domain.knowledge.adapter.port.IQueryEmbeddingClient;
 import com.hector.domain.knowledge.model.valobj.RetrievalContextVO;
@@ -55,6 +57,7 @@ import com.hector.infrastructure.repository.KnowledgeParseArtifactRepository;
 import com.hector.infrastructure.repository.ServingVectorSpaceRepository;
 import com.hector.trigger.mq.KnowledgeIndexTaskDispatcher;
 import com.hector.trigger.mq.KnowledgeIndexTaskListener;
+import com.hector.trigger.http.handler.capability.SearchWorkspaceCapabilityHandler;
 import io.minio.MinioClient;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.mapping.Environment;
@@ -252,7 +255,8 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
     @Test
     void shouldIndexDocumentVersionAndPublishActiveGenerationEndToEnd() throws Exception {
         DocumentEntity document = seedEffectiveDocument("# Phase 5\n\n第一段正文。\n\n## 小节\n\n第二段正文。");
-        String taskCode = seedPendingUploadTask(document);
+        String taskCode = seedPendingUploadTask(document,
+                "# Phase 6\n\n授权检索内容 ORANGE-7419。");
         documentUploadTaskService().execute(taskCode);
         IKnowledgeIndexJobRepository jobs = jobRepository();
         IKnowledgeIndexOutboxEventRepository outbox = outboxRepository();
@@ -367,6 +371,39 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
         assertEquals(1L, queryLong("SELECT workspace_id FROM document WHERE id = ?", hit.documentId()));
         assertEquals(generationId, queryString("SELECT active_generation_id FROM knowledge_index_state WHERE document_id = ?", hit.documentId()));
         assertEquals(1L, queryLong("SELECT status FROM knowledge_index_generation WHERE generation_id = ?", generationId));
+    }
+
+    @Test
+    void shouldSearchWorkspaceCapabilityUseAuthoritativeRetrievalEndToEnd() throws Exception {
+        DocumentEntity document = seedEffectiveDocument("# Phase 6\n\n授权检索内容 ORANGE-7419。");
+        String taskCode = seedPendingUploadTask(document,
+                "# Phase 6\n\n授权检索内容 ORANGE-7419。");
+        documentUploadTaskService().execute(taskCode);
+        buildAndAwaitIndex(document);
+
+        SearchWorkspaceCapabilityHandler handler = new SearchWorkspaceCapabilityHandler(retrievalService());
+        CapabilityResultVO authorized = handler.invoke(
+                new CapabilityContextVO("run-phase6", "conversation-phase6", 1L, 1L,
+                        "[\"search_workspace\"]"),
+                "{\"query\":\"ORANGE-7419\",\"topK\":5}");
+        assertEquals(CapabilityResultVO.Status.SUCCEEDED, authorized.status(),
+                authorized.errorCode() + ":" + authorized.errorMessage());
+        assertTrue(authorized.dataJson().contains("ORANGE-7419"), authorized.dataJson());
+        assertTrue(authorized.dataJson().contains("documentId"));
+        assertFalse(authorized.dataJson().contains("generationId"));
+        assertFalse(authorized.dataJson().contains("chunkNo"));
+
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(
+                "UPDATE document SET status = 3 WHERE id = ?")) {
+            statement.setLong(1, document.getId());
+            assertEquals(1, statement.executeUpdate());
+        }
+        CapabilityResultVO invalidated = handler.invoke(
+                new CapabilityContextVO("run-phase6", "conversation-phase6", 1L, 1L,
+                        "[\"search_workspace\"]"),
+                "{\"query\":\"ORANGE-7419\",\"topK\":5}");
+        assertEquals(CapabilityResultVO.Status.SUCCEEDED, invalidated.status());
+        assertEquals("{\"items\":[]}", invalidated.dataJson());
     }
 
     @Test
@@ -1150,7 +1187,11 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
     }
 
     private String seedPendingUploadTask(DocumentEntity document) throws Exception {
-        byte[] payload = "# Phase 5\n\n正式版本内容。\n\n## 小节\n\n索引内容。".getBytes(StandardCharsets.UTF_8);
+        return seedPendingUploadTask(document, "# Phase 5\n\n正式版本内容。\n\n## 小节\n\n索引内容。");
+    }
+
+    private String seedPendingUploadTask(DocumentEntity document, String content) throws Exception {
+        byte[] payload = content.getBytes(StandardCharsets.UTF_8);
         String stagingPath = "staging/" + document.getId() + "/2.md";
         String targetPath = "documents/" + document.getId() + "/2.md";
         storage().upload(stagingPath, payload, "text/markdown");

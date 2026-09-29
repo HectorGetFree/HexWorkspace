@@ -69,17 +69,17 @@
         SET status = 1,
             worker_token = #{workerToken},
             running_lease_until = #{runningLeaseUntil},
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = UTC_TIMESTAMP()
         WHERE job_code = #{jobCode}
           AND status = 0
-          AND (next_retry_at IS NULL OR next_retry_at &lt;= CURRENT_TIMESTAMP)
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= UTC_TIMESTAMP())
     </update>
 
     <update id="renewLeaseIfOwned">
         UPDATE knowledge_index_job
-        SET running_lease_until = #{runningLeaseUntil}, updated_at = CURRENT_TIMESTAMP
+        SET running_lease_until = #{runningLeaseUntil}, updated_at = UTC_TIMESTAMP()
         WHERE job_code = #{jobCode} AND status = 1 AND worker_token = #{workerToken}
-          AND running_lease_until &gt; CURRENT_TIMESTAMP
+          AND running_lease_until &gt; UTC_TIMESTAMP()
     </update>
 
     <select id="queryExpiredRunning" resultMap="knowledgeIndexJobResultMap">
@@ -110,7 +110,7 @@
         SET status = 4,
             failure_reason = #{failureReason},
             running_lease_until = NULL,
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = UTC_TIMESTAMP()
         WHERE job_code = #{jobCode}
           AND worker_token = #{workerToken}
           AND status = 1
@@ -118,7 +118,7 @@
 
     <update id="markSucceededIfOwned">
         UPDATE knowledge_index_job
-        SET status = 2, running_lease_until = NULL, updated_at = CURRENT_TIMESTAMP
+        SET status = 2, running_lease_until = NULL, updated_at = UTC_TIMESTAMP()
         WHERE job_code = #{jobCode} AND worker_token = #{workerToken} AND status = 1
           AND running_lease_until &gt; #{now}
     </update>
@@ -130,11 +130,11 @@
             worker_token = NULL,
             running_lease_until = NULL,
             next_retry_at = CASE WHEN retry_count + 1 &gt;= #{maxRetryCount} THEN NULL
-                                 ELSE DATE_ADD(CURRENT_TIMESTAMP, INTERVAL #{retryDelaySeconds} SECOND) END,
+                                 ELSE DATE_ADD(UTC_TIMESTAMP(), INTERVAL #{retryDelaySeconds} SECOND) END,
             failure_reason = #{failureReason},
-            updated_at = CURRENT_TIMESTAMP
+            updated_at = UTC_TIMESTAMP()
         WHERE job_code = #{jobCode} AND status = 1 AND worker_token = #{workerToken}
-          AND running_lease_until &gt; CURRENT_TIMESTAMP
+          AND running_lease_until &gt; UTC_TIMESTAMP()
     </update>
 
 </mapper>

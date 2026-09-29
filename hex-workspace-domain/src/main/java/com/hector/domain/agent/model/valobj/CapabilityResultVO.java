@@ -18,4 +18,8 @@ public record CapabilityResultVO(
     public static CapabilityResultVO failed(String runId, String callId, String code, String message) {
         return new CapabilityResultVO("v1", runId, callId, Status.FAILED, null, code, message);
     }
+
+    public static CapabilityResultVO success(String runId, String callId, String dataJson) {
+        return new CapabilityResultVO("v1", runId, callId, Status.SUCCEEDED, dataJson, null, null);
+    }
 }
