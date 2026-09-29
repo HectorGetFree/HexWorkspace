@@ -46,6 +46,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private ITokenRevocationRepository tokenRevocationRepository;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "/internal/v1/agent-runs/lifecycle".equals(request.getRequestURI());
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String requestUri = request.getRequestURI();

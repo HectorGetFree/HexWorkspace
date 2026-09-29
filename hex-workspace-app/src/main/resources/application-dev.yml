@@ -21,6 +21,7 @@ hexworkspace:
   hexgent:
     runtime-url: ${HEXGENT_RUNTIME_URL:http://127.0.0.1:8000}
     command-timeout-ms: ${HEXGENT_COMMAND_TIMEOUT_MS:5000}
+    lifecycle-callback-token: ${HEXGENT_WORKSPACE_LIFECYCLE_TOKEN:}
   knowledge:
     legacy-api:
       # 旧知识接口不校验文档版本与文件夹权限，Phase 1 默认关闭。

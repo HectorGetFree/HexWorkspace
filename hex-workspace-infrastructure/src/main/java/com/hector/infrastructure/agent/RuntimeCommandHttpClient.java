@@ -32,6 +32,8 @@ public class RuntimeCommandHttpClient implements IRuntimeCommandPort {
     public RuntimeCommandHttpClient() {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
+                // Uvicorn 不支持 Java HttpClient 的 h2c 升级；内部协议固定使用 HTTP/1.1。
+                .version(HttpClient.Version.HTTP_1_1)
                 .build();
     }
 
@@ -56,7 +58,8 @@ public class RuntimeCommandHttpClient implements IRuntimeCommandPort {
                     httpRequest, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) {
                 throw new RuntimeCommandUnknownException(
-                        "Hexgent Runtime HTTP 状态异常：" + response.statusCode());
+                        "Hexgent Runtime HTTP 状态异常：" + response.statusCode()
+                                + " response=" + response.body());
             }
             return parseResult(response.body(), request);
         } catch (RuntimeCommandUnknownException exception) {

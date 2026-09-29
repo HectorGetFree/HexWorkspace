@@ -276,11 +276,24 @@ CREATE TABLE IF NOT EXISTS `agent_run` (
     `finished_at` DATETIME DEFAULT NULL COMMENT '终止时间',
     `failure_code` VARCHAR(64) DEFAULT NULL COMMENT '稳定失败码',
     `failure_message` VARCHAR(512) DEFAULT NULL COMMENT '失败信息',
+    `lifecycle_sequence` BIGINT NOT NULL DEFAULT 0 COMMENT 'Workspace Run 生命周期序号',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_agent_run_id` (`run_id`),
     KEY `idx_agent_run_conversation_status` (`conversation_id`, `status`),
     KEY `idx_agent_run_workspace_user` (`workspace_id`, `initiator_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace AgentRun';
+
+CREATE TABLE IF NOT EXISTS `agent_run_lifecycle_event` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `event_id` VARCHAR(128) NOT NULL COMMENT '确定性生命周期事件标识',
+    `run_id` VARCHAR(64) NOT NULL COMMENT 'Workspace AgentRun 标识',
+    `sequence` BIGINT NOT NULL COMMENT 'Run 作用域连续序号',
+    `event_type` VARCHAR(64) NOT NULL COMMENT 'Workspace 生命周期事件类型',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '接收时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_agent_run_lifecycle_event_id` (`event_id`),
+    UNIQUE KEY `uk_agent_run_lifecycle_run_sequence` (`run_id`, `sequence`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AgentRun 生命周期事件幂等收据';
 
 -- 业务约束：
 -- 1. 不使用数据库外键，交由应用层保证 user_id / workspace_id / owner_user_id 的引用一致性。

@@ -47,6 +47,7 @@ public class SecurityConfig {
                                 "/api/v1/users/login",
                                 "/api/v1/users/refresh",
                                 "/api/v1/users/logout",
+                                "/internal/v1/agent-runs/lifecycle",
                                 "/error") // 这些接口允许匿名访问
                         .permitAll()
                         .anyRequest()

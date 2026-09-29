@@ -58,6 +58,7 @@ public class AgentRunServiceImpl implements IAgentRunService {
                     .resourceScope(resourceScope)
                     .allowedTools(allowedTools)
                     .version(0L)
+                    .lifecycleSequence(0L)
                     .createdAt(now)
                     .build());
         });

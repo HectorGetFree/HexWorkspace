@@ -18,13 +18,23 @@ public class AgentRunRepository implements IAgentRunRepository {
 
     @Override
     public AgentRunEntity save(AgentRunEntity entity) {
-        AgentRun row = AgentRun.builder().runId(entity.getRunId()).conversationId(entity.getConversationId())
-                .workspaceId(entity.getWorkspaceId()).initiatorUserId(entity.getInitiatorUserId())
-                .status(entity.getStatus().ordinal()).instruction(entity.getInstruction())
-                .resourceScope(entity.getResourceScope()).allowedTools(entity.getAllowedTools())
-                .version(entity.getVersion()).createdAt(entity.getCreatedAt()).startedAt(entity.getStartedAt())
-                .finishedAt(entity.getFinishedAt()).failureCode(entity.getFailureCode())
-                .failureMessage(entity.getFailureMessage()).build();
+        AgentRun row = AgentRun.builder()
+                .runId(entity.getRunId())
+                .conversationId(entity.getConversationId())
+                .workspaceId(entity.getWorkspaceId())
+                .initiatorUserId(entity.getInitiatorUserId())
+                .status(entity.getStatus().ordinal())
+                .instruction(entity.getInstruction())
+                .resourceScope(entity.getResourceScope())
+                .allowedTools(entity.getAllowedTools())
+                .version(entity.getVersion())
+                .createdAt(entity.getCreatedAt())
+                .startedAt(entity.getStartedAt())
+                .finishedAt(entity.getFinishedAt())
+                .failureCode(entity.getFailureCode())
+                .failureMessage(entity.getFailureMessage())
+                .lifecycleSequence(entity.getLifecycleSequence())
+                .build();
         dao.insert(row);
         return toEntity(row);
     }
@@ -45,11 +55,23 @@ public class AgentRunRepository implements IAgentRunRepository {
     }
 
     private AgentRunEntity toEntity(AgentRun row) {
-        return AgentRunEntity.builder().id(row.getId()).runId(row.getRunId()).conversationId(row.getConversationId())
-                .workspaceId(row.getWorkspaceId()).initiatorUserId(row.getInitiatorUserId())
-                .status(AgentRunStatusVO.values()[row.getStatus()]).instruction(row.getInstruction())
-                .resourceScope(row.getResourceScope()).allowedTools(row.getAllowedTools()).version(row.getVersion())
-                .createdAt(row.getCreatedAt()).startedAt(row.getStartedAt()).finishedAt(row.getFinishedAt())
-                .failureCode(row.getFailureCode()).failureMessage(row.getFailureMessage()).build();
+        return AgentRunEntity.builder()
+                .id(row.getId())
+                .runId(row.getRunId())
+                .conversationId(row.getConversationId())
+                .workspaceId(row.getWorkspaceId())
+                .initiatorUserId(row.getInitiatorUserId())
+                .status(AgentRunStatusVO.values()[row.getStatus()])
+                .instruction(row.getInstruction())
+                .resourceScope(row.getResourceScope())
+                .allowedTools(row.getAllowedTools())
+                .version(row.getVersion())
+                .createdAt(row.getCreatedAt())
+                .startedAt(row.getStartedAt())
+                .finishedAt(row.getFinishedAt())
+                .failureCode(row.getFailureCode())
+                .failureMessage(row.getFailureMessage())
+                .lifecycleSequence(row.getLifecycleSequence())
+                .build();
     }
 }

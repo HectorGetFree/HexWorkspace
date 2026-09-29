@@ -47,7 +47,7 @@ public class AgentRunController extends BaseController {
      */
     @PostMapping("/api/v1/workspaces/{workspaceId}/conversations")
     public Response<WorkspaceConversationResponseDTO> createConversation(
-            @PathVariable Long workspaceId,
+            @PathVariable("workspaceId") Long workspaceId,
             @RequestBody Request<WorkspaceConversationCreateRequestDTO> request) {
         try {
             Long userId = SecurityUserUtil.getCurrentUserId();
@@ -75,7 +75,7 @@ public class AgentRunController extends BaseController {
      */
     @PostMapping("/api/v1/conversations/{conversationId}/runs")
     public Response<AgentRunResponseDTO> startRun(
-            @PathVariable String conversationId,
+            @PathVariable("conversationId") String conversationId,
             @RequestBody Request<AgentRunStartRequestDTO> request) {
         try {
             Long userId = SecurityUserUtil.getCurrentUserId();
@@ -105,9 +105,9 @@ public class AgentRunController extends BaseController {
      */
     @PostMapping("/api/v1/conversations/{conversationId}/runs/{runId}/{command}")
     public Response<AgentRunResponseDTO> command(
-            @PathVariable String conversationId,
-            @PathVariable String runId,
-            @PathVariable String command,
+            @PathVariable("conversationId") String conversationId,
+            @PathVariable("runId") String runId,
+            @PathVariable("command") String command,
             @RequestBody(required = false) Request<AgentRunCommandRequestDTO> request) {
         try {
             Long userId = SecurityUserUtil.getCurrentUserId();

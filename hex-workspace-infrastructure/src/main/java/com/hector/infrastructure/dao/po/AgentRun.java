@@ -28,4 +28,5 @@ public class AgentRun {
     private LocalDateTime finishedAt;
     private String failureCode;
     private String failureMessage;
+    private Long lifecycleSequence;
 }

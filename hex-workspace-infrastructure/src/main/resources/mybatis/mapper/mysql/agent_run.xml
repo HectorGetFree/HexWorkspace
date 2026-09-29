@@ -17,24 +17,25 @@
         <result property="finishedAt" column="finished_at"/>
         <result property="failureCode" column="failure_code"/>
         <result property="failureMessage" column="failure_message"/>
+        <result property="lifecycleSequence" column="lifecycle_sequence"/>
     </resultMap>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO agent_run (run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
-            resource_scope, allowed_tools, version, created_at, started_at, finished_at, failure_code, failure_message)
+            resource_scope, allowed_tools, version, created_at, started_at, finished_at, failure_code, failure_message, lifecycle_sequence)
         VALUES (#{runId}, #{conversationId}, #{workspaceId}, #{initiatorUserId}, #{status}, #{instruction},
             CAST(#{resourceScope} AS JSON), CAST(#{allowedTools} AS JSON), #{version}, #{createdAt}, #{startedAt},
-            #{finishedAt}, #{failureCode}, #{failureMessage})
+            #{finishedAt}, #{failureCode}, #{failureMessage}, #{lifecycleSequence})
     </insert>
     <select id="queryByRunId" resultMap="agentRunResultMap">
         SELECT id, run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
                CAST(resource_scope AS CHAR) resource_scope, CAST(allowed_tools AS CHAR) allowed_tools, version,
-               created_at, started_at, finished_at, failure_code, failure_message
+               created_at, started_at, finished_at, failure_code, failure_message, lifecycle_sequence
         FROM agent_run WHERE run_id = #{runId} LIMIT 1
     </select>
     <select id="queryNonTerminalByConversationId" resultMap="agentRunResultMap">
         SELECT id, run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
                CAST(resource_scope AS CHAR) resource_scope, CAST(allowed_tools AS CHAR) allowed_tools, version,
-               created_at, started_at, finished_at, failure_code, failure_message
+               created_at, started_at, finished_at, failure_code, failure_message, lifecycle_sequence
         FROM agent_run WHERE conversation_id = #{conversationId} AND status IN (0, 1, 2, 3)
         ORDER BY id DESC LIMIT 1
     </select>
@@ -43,5 +44,18 @@
         SET status = 5, failure_code = #{failureCode}, failure_message = #{failureMessage},
             finished_at = NOW(), version = version + 1
         WHERE run_id = #{runId} AND status = 0
+    </update>
+    <insert id="insertLifecycleEvent">
+        INSERT IGNORE INTO agent_run_lifecycle_event(event_id, run_id, sequence, event_type)
+        VALUES (#{eventId}, #{runId}, #{sequence}, #{eventType})
+    </insert>
+    <update id="updateLifecycle">
+        UPDATE agent_run
+        SET status = #{status}, lifecycle_sequence = #{sequence},
+            failure_code = #{failureCode}, failure_message = #{failureMessage},
+            started_at = CASE WHEN #{status} = 1 AND started_at IS NULL THEN NOW() ELSE started_at END,
+            finished_at = #{finishedAt}, version = version + 1
+        WHERE run_id = #{runId} AND lifecycle_sequence &lt; #{sequence}
+          AND status IN (0, 1, 2, 3)
     </update>
 </mapper>

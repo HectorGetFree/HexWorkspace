@@ -40,4 +40,6 @@ public class AgentRunEntity {
     private String failureCode;
     /** 面向业务的失败信息。 */
     private String failureMessage;
+    /** 最近一次已接受的 Workspace 生命周期序号。 */
+    private Long lifecycleSequence;
 }
