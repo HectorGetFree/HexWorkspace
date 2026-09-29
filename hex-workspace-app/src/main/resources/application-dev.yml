@@ -25,6 +25,9 @@ hexworkspace:
     integration-token: ${HEXGENT_WORKSPACE_INTEGRATION_TOKEN:}
     command-timeout-ms: ${HEXGENT_COMMAND_TIMEOUT_MS:5000}
     lifecycle-callback-token: ${HEXGENT_WORKSPACE_LIFECYCLE_TOKEN:}
+    capability-token: ${HEXGENT_WORKSPACE_CAPABILITY_TOKEN:}
+  capability:
+    phase5-fixture-enabled: ${HEX_WORKSPACE_PHASE5_FIXTURE_ENABLED:false}
   knowledge:
     legacy-api:
       # 旧知识接口不校验文档版本与文件夹权限，Phase 1 默认关闭。

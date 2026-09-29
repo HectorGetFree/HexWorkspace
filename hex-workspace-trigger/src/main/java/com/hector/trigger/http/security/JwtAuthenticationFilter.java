@@ -47,7 +47,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return "/internal/v1/agent-runs/lifecycle".equals(request.getRequestURI());
+        return "/internal/v1/agent-runs/lifecycle".equals(request.getRequestURI())
+                || "/internal/agent/capabilities/invoke".equals(request.getRequestURI());
     }
 
     /**
