@@ -84,8 +84,8 @@ public class SearchWorkspaceCapabilityHandler implements ICapabilityHandler {
     private Map<String, Object> toItem(RetrievalHitVO hit) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("documentId", hit.documentId());
-        // 当前 Retrieval 对外提供的是文档内稳定版本号；不暴露索引内部身份。
-        item.put("versionId", hit.versionNo());
+        // Capability 对外暴露不可变 DocumentVersion 主键；versionNo 仅用于索引内部身份。
+        item.put("versionId", hit.versionId());
         item.put("documentTitle", hit.title());
         item.put("titlePath", hit.headingPath() == null ? List.of() : hit.headingPath());
         item.put("page", hit.pageStart());

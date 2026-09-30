@@ -12,6 +12,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.hector.domain.knowledge.model.valobj.RetrievalContextVO;
 import com.hector.domain.knowledge.model.valobj.RetrievalOptionsVO;
 
@@ -19,7 +20,7 @@ class SearchWorkspaceCapabilityHandlerTest {
     @Test
     void usesTrustedContextAndMapsOnlyPublicSearchFields() {
         RecordingRetrieval retrieval = new RecordingRetrieval(new RetrievalResultVO(List.of(
-                new RetrievalHitVO(11L, "doc-11", 3L, "generation-secret", 2,
+                new RetrievalHitVO(11L, "doc-11", 3L, 43L, "generation-secret", 2,
                         "产品说明", List.of("章节一"), "公开内容", 4, 4, 0.9))));
 
         CapabilityResultVO result = new SearchWorkspaceCapabilityHandler(retrieval).invoke(
@@ -29,6 +30,7 @@ class SearchWorkspaceCapabilityHandlerTest {
         assertEquals(CapabilityResultVO.Status.SUCCEEDED, result.status());
         assertFalse(result.dataJson().contains("generation-secret"));
         assertFalse(result.dataJson().contains("FORGED"));
+        assertTrue(result.dataJson().contains("\"versionId\":43"));
         assertEquals(7L, retrieval.context.userId());
         assertEquals(9L, retrieval.context.workspaceId());
         assertEquals("知识", retrieval.query);

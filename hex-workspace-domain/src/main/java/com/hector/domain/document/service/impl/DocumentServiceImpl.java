@@ -93,10 +93,17 @@ public class DocumentServiceImpl implements IDocumentService {
     @Override
     public DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
                                                  String fileName, String content) {
+        return createMarkdownDocument(workspaceId, ownerUserId, parentId, fileName, content, null);
+    }
+
+    @Override
+    public DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
+                                                 String fileName, String content, String idempotencyKey) {
         String normalized = normalizeFileName(fileName, true);
         byte[] contentBytes = (content == null ? "" : content).getBytes(StandardCharsets.UTF_8);
         return createDocument(workspaceId, ownerUserId, parentId, normalized, DocumentTypeVO.PLATFORM_CREATED,
-                "text/markdown; charset=utf-8", new ByteArrayInputStream(contentBytes), contentBytes.length, null);
+                "text/markdown; charset=utf-8", new ByteArrayInputStream(contentBytes), contentBytes.length,
+                idempotencyKey == null ? null : normalizeIdempotencyKey(idempotencyKey));
     }
 
     @Override
@@ -143,9 +150,11 @@ public class DocumentServiceImpl implements IDocumentService {
                 || !active.isActive()) {
             throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
         }
-        DocumentVersionEntity expectedVersion = documentVersionRepository
-                .findByDocumentIdAndVersionNo(documentId, expectedVersionId)
+        DocumentVersionEntity expectedVersion = documentVersionRepository.findById(expectedVersionId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.VERSION_NOT_FOUND));
+        if (!documentId.equals(expectedVersion.getDocumentId())) {
+            throw new BusinessException(ResponseCode.VERSION_NOT_FOUND);
+        }
         if (!expectedVersion.getVersionNo().equals(active.getCurrentVersionNo())) {
             throw new BusinessException(ResponseCode.VERSION_CONFLICT);
         }
@@ -170,7 +179,7 @@ public class DocumentServiceImpl implements IDocumentService {
             DocumentVersionEntity version = documentVersionRepository
                     .findByDocumentIdAndVersionNo(documentId, targetVersionNo)
                     .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_UPDATE_PENDING));
-            return new DocumentMutationResultVO(documentId, expectedVersionId, version.getVersionNo());
+            return new DocumentMutationResultVO(documentId, expectedVersionId, version.getId());
         } finally {
             if (!taskRegistered) {
                 deleteStagingObjectQuietly(stagingPath);
@@ -192,9 +201,9 @@ public class DocumentServiceImpl implements IDocumentService {
     }
 
     @Override
-    public DocumentReadResultVO readVersionContent(Long workspaceId, Long userId, Long documentId, Long versionNo,
+    public DocumentReadResultVO readVersionContent(Long workspaceId, Long userId, Long documentId, Long versionId,
                                                    int startLine, int lineCount) {
-        if (documentId == null || documentId <= 0 || versionNo == null || versionNo <= 0
+        if (documentId == null || documentId <= 0 || versionId == null || versionId <= 0
                 || startLine < 1 || lineCount < 1 || lineCount > MAX_READ_LINE_COUNT) {
             throw new IllegalArgumentException("文档版本或读取范围无效");
         }
@@ -206,16 +215,18 @@ public class DocumentServiceImpl implements IDocumentService {
         }
         // 每次读取都重新检查当前目录状态，历史检索结果不等于永久授权。
         folderService.getActiveFolder(workspaceId, document.getParentId());
-        DocumentVersionEntity version = documentVersionRepository
-                .findByDocumentIdAndVersionNo(documentId, versionNo)
+        DocumentVersionEntity version = documentVersionRepository.findById(versionId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
-        String text = documentVersionTextReader.read(documentId, versionNo, version.getContentHash());
+        if (!documentId.equals(version.getDocumentId())) {
+            throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
+        }
+        String text = documentVersionTextReader.read(documentId, version.getVersionNo(), version.getContentHash());
         String[] lines = text.split("\\R", -1);
         int from = Math.min(startLine - 1, lines.length);
         int to = Math.min(from + lineCount, lines.length);
         String content = String.join("\n", java.util.Arrays.copyOfRange(lines, from, to));
         int endLine = to == from ? startLine - 1 : to;
-        return new DocumentReadResultVO(documentId, versionNo, document.getTitle(), startLine, endLine,
+        return new DocumentReadResultVO(documentId, version.getId(), document.getTitle(), startLine, endLine,
                 to < lines.length, content);
     }
 
@@ -584,12 +595,14 @@ public class DocumentServiceImpl implements IDocumentService {
                 && fileName.equals(document.getFileName())
                 && contentType.equals(initialContentType)
                 && contentHash.equals(initialContentHash)
-                && DocumentTypeVO.LOCAL_UPLOADED == document.getDocumentType();
+                && (DocumentTypeVO.PLATFORM_CREATED == document.getDocumentType()
+                || DocumentTypeVO.LOCAL_UPLOADED == document.getDocumentType());
         if (!sameRequest) {
             throw new BusinessException(ResponseCode.ILLEGAL_PARAMETER);
         }
         return document;
     }
+
 
     private String generateDocumentCode() {
         for (int i = 0; i < 10; i++) {

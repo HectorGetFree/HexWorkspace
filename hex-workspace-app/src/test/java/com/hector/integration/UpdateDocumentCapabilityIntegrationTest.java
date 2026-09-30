@@ -133,7 +133,7 @@ class UpdateDocumentCapabilityIntegrationTest {
                 Long.class, seed.documentId));
         Long newVersionRowId = jdbcTemplate.queryForObject(
                 "SELECT id FROM document_version WHERE document_id = ? AND version_no = 2", Long.class, seed.documentId);
-        assertTrue(result.dataJson().contains("\"versionId\":2"));
+        assertTrue(result.dataJson().contains("\"versionId\":" + newVersionRowId));
         assertEquals(1L, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM knowledge_index_job WHERE document_id = ? AND version_no = 2",
                 Long.class, seed.documentId));
         assertEquals(1L, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM knowledge_index_outbox_event", Long.class));
@@ -160,7 +160,7 @@ class UpdateDocumentCapabilityIntegrationTest {
                         + ",\"content\":\"" + content + "\"}");
 
         assertEquals(CapabilityResultVO.Status.SUCCEEDED, recovered.status());
-        assertTrue(recovered.dataJson().contains("\"versionId\":2"));
+        assertTrue(recovered.dataJson().contains("\"versionId\":" + versionRowId));
         assertEquals(1L, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM document_version WHERE document_id = ? AND version_no = 2",
                 Long.class, seed.documentId));
         assertEquals(0L, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM document_version WHERE document_id = ? AND version_no = 3",
@@ -264,7 +264,10 @@ class UpdateDocumentCapabilityIntegrationTest {
         jdbcTemplate.update("INSERT INTO document_version (document_id, version_no, bucket_name, storage_path, content_type, content_size, content_hash, created_by) VALUES (?, 1, ?, 'documents/update/v1.md', 'text/markdown', ?, SHA2(?, 256), 1)", documentId, BUCKET, v3Content.length(), v3Content);
         jdbcTemplate.update("UPDATE document SET current_version_no = 1 WHERE id = ?", documentId);
         put("documents/update/v1.md", v3Content);
-        return new Seed(documentId, 1L, "documents/update/v1.md", workspaceId, userId);
+        Long versionId = jdbcTemplate.queryForObject(
+                "SELECT id FROM document_version WHERE document_id = ? AND version_no = 1",
+                Long.class, documentId);
+        return new Seed(documentId, versionId, "documents/update/v1.md", workspaceId, userId);
     }
 
     private CapabilityContextVO context(String runId, String callId, Seed seed) {

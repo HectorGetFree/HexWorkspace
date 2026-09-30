@@ -7,6 +7,7 @@ public record RetrievalHitVO(
         Long documentId,
         String documentCode,
         Long versionNo,
+        Long versionId,
         String generationId,
         Integer chunkNo,
         String title,

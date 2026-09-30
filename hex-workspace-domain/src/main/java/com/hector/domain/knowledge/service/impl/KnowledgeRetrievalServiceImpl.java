@@ -1,7 +1,9 @@
 package com.hector.domain.knowledge.service.impl;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
+import com.hector.domain.document.model.entity.DocumentVersionEntity;
 import com.hector.domain.document.repository.IDocumentRepository;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.repository.IFolderRepository;
 import com.hector.domain.knowledge.adapter.port.IQueryEmbeddingClient;
@@ -49,6 +51,8 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
     private IWorkspaceRepository workspaceRepository;
     @Resource
     private IDocumentRepository documentRepository;
+    @Resource
+    private IDocumentVersionRepository documentVersionRepository;
     @Resource
     private IFolderRepository folderRepository;
     @Resource
@@ -138,13 +142,24 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
         return candidates.stream()
                 .filter(candidate -> isAuthorizedCandidate(
                         candidate, context.workspaceId(), servingConfig, documents, folders, states, generations))
-                .map(candidate -> new RetrievalHitVO(
-                        candidate.documentId(), documents.get(candidate.documentId()).getDocumentCode(),
-                        candidate.versionNo(), candidate.generationId(), candidate.chunkNo(),
-                        documents.get(candidate.documentId()).getTitle(), candidate.headingPath(),
-                        candidate.content(), candidate.pageStart(), candidate.pageEnd(), candidate.score()))
+                .map(candidate -> toRetrievalHit(candidate, documents.get(candidate.documentId())))
+                .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(RetrievalHitVO::score, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
+    }
+
+    /** 将索引内部版本号解析为文档版本的不可变主键，供 Capability 精确引用。 */
+    private RetrievalHitVO toRetrievalHit(RetrievalCandidateVO candidate, DocumentEntity document) {
+        DocumentVersionEntity version = documentVersionRepository
+                .findByDocumentIdAndVersionNo(candidate.documentId(), candidate.versionNo())
+                .orElse(null);
+        if (version == null || version.getId() == null) {
+            return null;
+        }
+        return new RetrievalHitVO(
+                candidate.documentId(), document.getDocumentCode(), candidate.versionNo(), version.getId(),
+                candidate.generationId(), candidate.chunkNo(), document.getTitle(), candidate.headingPath(),
+                candidate.content(), candidate.pageStart(), candidate.pageEnd(), candidate.score());
     }
 
     private boolean isAuthorizedCandidate(

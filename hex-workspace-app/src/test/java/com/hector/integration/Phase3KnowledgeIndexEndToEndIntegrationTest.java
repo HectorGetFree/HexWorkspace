@@ -365,6 +365,8 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
                 .orElseThrow();
         assertEquals(document.getId(), hit.documentId());
         assertEquals(2L, hit.versionNo());
+        assertEquals(queryLong("SELECT id FROM document_version WHERE document_id = ? AND version_no = 2",
+                document.getId()), hit.versionId());
         assertEquals(generationId, hit.generationId());
         assertTrue(hit.content().contains("正式版本内容"));
         assertEquals("Phase 3 文档", hit.title());
@@ -390,6 +392,8 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
                 authorized.errorCode() + ":" + authorized.errorMessage());
         assertTrue(authorized.dataJson().contains("ORANGE-7419"), authorized.dataJson());
         assertTrue(authorized.dataJson().contains("documentId"));
+        assertTrue(authorized.dataJson().contains("\"versionId\":" + queryLong(
+                "SELECT id FROM document_version WHERE document_id = ? AND version_no = 2", document.getId())));
         assertFalse(authorized.dataJson().contains("generationId"));
         assertFalse(authorized.dataJson().contains("chunkNo"));
 
@@ -1099,6 +1103,7 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
         KnowledgeRetrievalServiceImpl service = new KnowledgeRetrievalServiceImpl();
         ReflectionTestUtils.setField(service, "workspaceRepository", workspaceRepository());
         ReflectionTestUtils.setField(service, "documentRepository", documentRepository());
+        ReflectionTestUtils.setField(service, "documentVersionRepository", documentVersionRepository());
         ReflectionTestUtils.setField(service, "folderRepository", folderRepository());
         ReflectionTestUtils.setField(service, "knowledgeIndexStateRepository", indexStateRepository());
         ReflectionTestUtils.setField(service, "knowledgeIndexGenerationRepository", generationRepository());
@@ -1130,6 +1135,7 @@ class Phase3KnowledgeIndexEndToEndIntegrationTest {
         KnowledgeRetrievalServiceImpl service = new KnowledgeRetrievalServiceImpl();
         ReflectionTestUtils.setField(service, "workspaceRepository", workspaceRepository());
         ReflectionTestUtils.setField(service, "documentRepository", documentRepository());
+        ReflectionTestUtils.setField(service, "documentVersionRepository", documentVersionRepository());
         ReflectionTestUtils.setField(service, "folderRepository", folderRepository());
         ReflectionTestUtils.setField(service, "knowledgeIndexStateRepository", indexStateRepository());
         ReflectionTestUtils.setField(service, "knowledgeIndexGenerationRepository", generationRepository());

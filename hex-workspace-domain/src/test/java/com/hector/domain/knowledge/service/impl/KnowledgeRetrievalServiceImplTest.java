@@ -3,6 +3,7 @@ package com.hector.domain.knowledge.service.impl;
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.model.valobj.FolderStatusVO;
 import com.hector.domain.folder.repository.IFolderRepository;
@@ -38,6 +39,7 @@ class KnowledgeRetrievalServiceImplTest {
     void shouldDropCandidateWhenFolderHasBeenDeleted() throws Exception {
         IWorkspaceRepository workspaces = mock(IWorkspaceRepository.class);
         IDocumentRepository documents = mock(IDocumentRepository.class);
+        IDocumentVersionRepository versions = mock(IDocumentVersionRepository.class);
         IFolderRepository folders = mock(IFolderRepository.class);
         IKnowledgeIndexStateRepository states = mock(IKnowledgeIndexStateRepository.class);
         IKnowledgeIndexGenerationRepository generations = mock(IKnowledgeIndexGenerationRepository.class);
@@ -68,6 +70,7 @@ class KnowledgeRetrievalServiceImplTest {
         KnowledgeRetrievalServiceImpl service = new KnowledgeRetrievalServiceImpl();
         inject(service, "workspaceRepository", workspaces);
         inject(service, "documentRepository", documents);
+        inject(service, "documentVersionRepository", versions);
         inject(service, "folderRepository", folders);
         inject(service, "knowledgeIndexStateRepository", states);
         inject(service, "knowledgeIndexGenerationRepository", generations);

@@ -21,6 +21,10 @@ public interface IDocumentService {
     DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
                                           String fileName, String content);
 
+    /** 使用客户端幂等键创建 Markdown 文档，重复请求复用原创建结果。 */
+    DocumentEntity createMarkdownDocument(Long workspaceId, Long ownerUserId, Long parentId,
+                                          String fileName, String content, String idempotencyKey);
+
     /** 编辑 Markdown 正文并替换当前内容。 */
     DocumentEntity editMarkdownDocument(Long workspaceId, String documentCode, Long operatorUserId, String content);
 
@@ -32,7 +36,7 @@ public interface IDocumentService {
     byte[] readCurrentContent(Long workspaceId, String documentCode);
 
     /** 在当前 Workspace 权限下读取指定文档版本的有界文本内容。 */
-    DocumentReadResultVO readVersionContent(Long workspaceId, Long userId, Long documentId, Long versionNo,
+    DocumentReadResultVO readVersionContent(Long workspaceId, Long userId, Long documentId, Long versionId,
                                             int startLine, int lineCount);
 
     /** 修改文档完整名称，并执行同级目录重名校验。 */
