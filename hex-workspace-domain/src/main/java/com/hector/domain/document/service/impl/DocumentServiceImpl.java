@@ -4,8 +4,10 @@ import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.entity.DocumentUploadOutboxEventEntity;
 import com.hector.domain.document.model.entity.DocumentUploadTaskEntity;
 import com.hector.domain.document.model.entity.DocumentVersionEntity;
+import com.hector.domain.document.adapter.port.IDocumentVersionTextReader;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
+import com.hector.domain.document.model.valobj.DocumentReadResultVO;
 import com.hector.domain.document.model.valobj.DocumentUploadOutboxStatusVO;
 import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
@@ -41,6 +43,7 @@ import java.util.stream.Collectors;
 public class DocumentServiceImpl implements IDocumentService {
     private static final String DOCUMENT_CODE_PREFIX = "doc_";
     private static final int SYNCHRONOUS_EDIT_LEASE_MINUTES = 10;
+    private static final int MAX_READ_LINE_COUNT = 500;
 
     @Resource
     private IDocumentRepository documentRepository;
@@ -65,6 +68,9 @@ public class DocumentServiceImpl implements IDocumentService {
 
     @Resource
     private IDocumentVersionRepository documentVersionRepository;
+
+    @Resource
+    private IDocumentVersionTextReader documentVersionTextReader;
 
     @Resource
     private IDocumentUploadTaskService documentUploadTaskService;
@@ -134,6 +140,34 @@ public class DocumentServiceImpl implements IDocumentService {
                 .findByDocumentIdAndVersionNo(document.getId(), document.getCurrentVersionNo())
                 .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE));
         return documentStorageRepository.download(version.getStoragePath());
+    }
+
+    @Override
+    public DocumentReadResultVO readVersionContent(Long workspaceId, Long userId, Long documentId, Long versionNo,
+                                                   int startLine, int lineCount) {
+        if (documentId == null || documentId <= 0 || versionNo == null || versionNo <= 0
+                || startLine < 1 || lineCount < 1 || lineCount > MAX_READ_LINE_COUNT) {
+            throw new IllegalArgumentException("文档版本或读取范围无效");
+        }
+        DocumentEntity document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        if (!workspaceId.equals(document.getWorkspaceId()) || userId == null
+                || !userId.equals(document.getOwnerUserId()) || !document.isActive()) {
+            throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
+        }
+        // 每次读取都重新检查当前目录状态，历史检索结果不等于永久授权。
+        folderService.getActiveFolder(workspaceId, document.getParentId());
+        DocumentVersionEntity version = documentVersionRepository
+                .findByDocumentIdAndVersionNo(documentId, versionNo)
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        String text = documentVersionTextReader.read(documentId, versionNo, version.getContentHash());
+        String[] lines = text.split("\\R", -1);
+        int from = Math.min(startLine - 1, lines.length);
+        int to = Math.min(from + lineCount, lines.length);
+        String content = String.join("\n", java.util.Arrays.copyOfRange(lines, from, to));
+        int endLine = to == from ? startLine - 1 : to;
+        return new DocumentReadResultVO(documentId, versionNo, document.getTitle(), startLine, endLine,
+                to < lines.length, content);
     }
 
     @Override

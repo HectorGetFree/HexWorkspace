@@ -1,6 +1,7 @@
 package com.hector.domain.document.service;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
+import com.hector.domain.document.model.valobj.DocumentReadResultVO;
 
 import java.io.InputStream;
 import java.util.List;
@@ -24,6 +25,10 @@ public interface IDocumentService {
 
     /** 读取文档当前原始内容。 */
     byte[] readCurrentContent(Long workspaceId, String documentCode);
+
+    /** 在当前 Workspace 权限下读取指定文档版本的有界文本内容。 */
+    DocumentReadResultVO readVersionContent(Long workspaceId, Long userId, Long documentId, Long versionNo,
+                                            int startLine, int lineCount);
 
     /** 修改文档完整名称，并执行同级目录重名校验。 */
     DocumentEntity renameDocument(Long workspaceId, String documentCode, String fileName);

@@ -35,4 +35,15 @@
             #{artifactKey}, #{artifactChecksum}, #{status}, NOW(), NOW()
         )
     </insert>
+
+    <select id="queryReadyByVersion" resultMap="knowledgeParseArtifactResultMap">
+        SELECT id, document_id, version_no, source_checksum, parser_version, schema_version,
+               artifact_key, artifact_checksum, status, created_at, updated_at
+        FROM knowledge_parse_artifact
+        WHERE document_id = #{documentId}
+          AND version_no = #{versionNo}
+          AND source_checksum = #{sourceChecksum}
+          AND status = 1
+        ORDER BY id ASC
+    </select>
 </mapper>

@@ -10,6 +10,7 @@ import com.hector.infrastructure.dao.IKnowledgeIndexGenerationDao;
 import com.hector.infrastructure.dao.IKnowledgeIndexJobDao;
 import com.hector.infrastructure.dao.IKnowledgeParseArtifactDao;
 import com.hector.infrastructure.rag.KnowledgeArtifactPreparationService;
+import com.hector.infrastructure.document.DocumentVersionTextReader;
 import com.hector.infrastructure.rag.chunk.StructureAwareDocumentChunker;
 import com.hector.infrastructure.rag.loader.DocumentVersionLoader;
 import com.hector.infrastructure.rag.parser.DocumentParserSelector;
@@ -156,6 +157,22 @@ class KnowledgeArtifactPreparationIntegrationTest {
         Seed corrupted = seedExistingDocument(seed.documentId(), "worker-c");
         assertThrows(BusinessException.class, () -> service.prepare(corrupted.jobCode(), "worker-c"));
         assertEquals(1L, queryLong("SELECT COUNT(*) FROM knowledge_parse_artifact WHERE document_id = ?", seed.documentId()));
+    }
+
+    @Test
+    void shouldReadExactVersionFromParsedArtifactAndRejectMissingArtifact() throws Exception {
+        Seed seed = seed("# Phase 7\n\nPHASE7-V1-ALPHA", "worker-a");
+        KnowledgeArtifactPreparationService preparation = service(storage, parseRepository());
+        preparation.prepare(seed.jobCode(), "worker-a");
+
+        DocumentVersionTextReader reader = new DocumentVersionTextReader();
+        ReflectionTestUtils.setField(reader, "artifactRepository", parseRepository());
+        ReflectionTestUtils.setField(reader, "storageRepository", storage);
+        ReflectionTestUtils.setField(reader, "objectMapper", new ObjectMapper());
+
+        String sourceChecksum = queryString("SELECT content_hash FROM document_version WHERE document_id = ?", seed.documentId());
+        assertEquals("Phase 7\nPHASE7-V1-ALPHA", reader.read(seed.documentId(), 1L, sourceChecksum));
+        assertThrows(BusinessException.class, () -> reader.read(seed.documentId(), 2L, sourceChecksum));
     }
 
     @Test
@@ -344,6 +361,7 @@ class KnowledgeArtifactPreparationIntegrationTest {
         private final IKnowledgeParseArtifactRepository delegate;
         private FailingParseRepository(IKnowledgeParseArtifactRepository delegate) { this.delegate = delegate; }
         public java.util.Optional<com.hector.domain.knowledge.model.entity.KnowledgeParseArtifactEntity> findByIdentity(Long a, Long b, String c, String d, String e) { return delegate.findByIdentity(a, b, c, d, e); }
+        public java.util.Optional<com.hector.domain.knowledge.model.entity.KnowledgeParseArtifactEntity> findReadyByVersion(Long a, Long b, String c) { return delegate.findReadyByVersion(a, b, c); }
         public com.hector.domain.knowledge.model.entity.KnowledgeParseArtifactEntity saveIfAbsent(com.hector.domain.knowledge.model.entity.KnowledgeParseArtifactEntity artifact) { throw new IllegalStateException("注入 MySQL 写入失败"); }
     }
 }

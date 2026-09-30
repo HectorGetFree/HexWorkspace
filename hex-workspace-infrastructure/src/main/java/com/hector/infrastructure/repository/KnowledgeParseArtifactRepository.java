@@ -30,6 +30,14 @@ public class KnowledgeParseArtifactRepository implements IKnowledgeParseArtifact
                 artifact.getParserVersion(), artifact.getSchemaVersion()).orElseThrow();
     }
 
+    @Override
+    public Optional<KnowledgeParseArtifactEntity> findReadyByVersion(Long documentId, Long versionNo,
+                                                                       String sourceChecksum) {
+        var artifacts = knowledgeParseArtifactDao.queryReadyByVersion(documentId, versionNo, sourceChecksum)
+                .stream().filter(item -> item.getStatus() != null && item.getStatus() == 1).toList();
+        return artifacts.size() == 1 ? Optional.of(toEntity(artifacts.get(0))) : Optional.empty();
+    }
+
     private KnowledgeParseArtifact toPo(KnowledgeParseArtifactEntity entity) {
         return KnowledgeParseArtifact.builder()
                 .id(entity.getId())
