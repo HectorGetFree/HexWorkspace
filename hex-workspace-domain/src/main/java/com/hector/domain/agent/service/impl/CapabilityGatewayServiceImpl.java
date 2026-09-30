@@ -10,6 +10,8 @@ import com.hector.domain.agent.model.valobj.CapabilityContextVO;
 import com.hector.domain.agent.model.valobj.CapabilityRequestVO;
 import com.hector.domain.agent.model.valobj.CapabilityResultVO;
 import com.hector.domain.agent.service.IAgentRunService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +19,8 @@ import java.util.List;
 /** 校验 AgentRun 边界并分发 Capability 的 Gateway。 */
 @Service
 public class CapabilityGatewayServiceImpl implements ICapabilityGateway {
+    private static final Logger log = LoggerFactory.getLogger(CapabilityGatewayServiceImpl.class);
+
     private final IAgentRunService runService;
     private final List<ICapabilityHandler> handlers;
 
@@ -56,12 +60,14 @@ public class CapabilityGatewayServiceImpl implements ICapabilityGateway {
         }
         try {
             CapabilityResultVO result = handler.invoke(new CapabilityContextVO(
-                    run.getRunId(), run.getConversationId(), run.getInitiatorUserId(),
+                    run.getRunId(), request.callId(), run.getConversationId(), run.getInitiatorUserId(),
                     run.getWorkspaceId(), run.getAllowedTools()), request.argumentsJson());
             return new CapabilityResultVO(
                     "v1", request.runId(), request.callId(), result.status(), result.dataJson(),
                     result.errorCode(), result.errorMessage());
         } catch (RuntimeException exception) {
+            log.error("Capability Handler 执行异常 runId:{} callId:{} capability:{}",
+                    request.runId(), request.callId(), request.capability(), exception);
             return new CapabilityResultVO("v1", request.runId(), request.callId(),
                     CapabilityResultVO.Status.FAILED, null, "HANDLER_ERROR", "Capability handler failed");
         }

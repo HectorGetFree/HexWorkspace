@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 /** Phase 1 索引任务登记实现；实际 Worker 在后续阶段启用。 */
@@ -33,7 +34,8 @@ public class KnowledgeIndexJobServiceImpl implements IKnowledgeIndexJobService {
                 document.getId(), document.getCurrentVersionNo(), document.getIndexInputRevision());
         String requestKey = "auto:" + document.getId() + ":" + document.getCurrentVersionNo()
                 + ":" + document.getIndexInputRevision();
-        LocalDateTime now = LocalDateTime.now();
+        // 索引任务的租约、重试窗口和审计时间统一按 UTC 保存，避免与 Worker 的租约比较错位。
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         String jobCode = "idx_" + UUID.randomUUID().toString().replace("-", "");
         KnowledgeIndexJobEntity job = KnowledgeIndexJobEntity.builder()
                 .jobCode(jobCode)

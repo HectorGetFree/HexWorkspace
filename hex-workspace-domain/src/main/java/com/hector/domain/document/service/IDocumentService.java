@@ -2,6 +2,7 @@ package com.hector.domain.document.service;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.model.valobj.DocumentReadResultVO;
+import com.hector.domain.document.model.valobj.DocumentMutationResultVO;
 
 import java.io.InputStream;
 import java.util.List;
@@ -22,6 +23,10 @@ public interface IDocumentService {
 
     /** 编辑 Markdown 正文并替换当前内容。 */
     DocumentEntity editMarkdownDocument(Long workspaceId, String documentCode, Long operatorUserId, String content);
+
+    /** 基于精确正式版本身份创建并正式生效下一份 Markdown 版本。 */
+    DocumentMutationResultVO updateMarkdownDocument(Long workspaceId, Long operatorUserId, Long documentId,
+                                                    Long expectedVersionId, String content);
 
     /** 读取文档当前原始内容。 */
     byte[] readCurrentContent(Long workspaceId, String documentCode);

@@ -10,6 +10,8 @@ public interface IDocumentVersionDao {
 
     int insert(DocumentVersion version);
 
+    DocumentVersion queryById(@Param("id") Long id);
+
     DocumentVersion queryByDocumentIdAndVersionNo(@Param("documentId") Long documentId,
                                                   @Param("versionNo") Long versionNo);
 }

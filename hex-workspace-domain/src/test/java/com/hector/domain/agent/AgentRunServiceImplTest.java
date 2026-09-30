@@ -59,6 +59,7 @@ class AgentRunServiceImplTest {
         ArgumentCaptor<RuntimeCommandRequestVO> request = ArgumentCaptor.forClass(RuntimeCommandRequestVO.class);
         verify(runtimeCommandPort).send(request.capture());
         assertEquals("start_" + result.getRunId(), request.getValue().commandId());
+        assertTrue(request.getValue().payloadJson().contains("\"permissionMode\":\"default\""));
     }
 
     @Test

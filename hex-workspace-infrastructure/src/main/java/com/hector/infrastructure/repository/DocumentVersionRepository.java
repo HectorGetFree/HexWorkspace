@@ -25,6 +25,12 @@ public class DocumentVersionRepository implements IDocumentVersionRepository {
     }
 
     @Override
+    public Optional<DocumentVersionEntity> findById(Long versionId) {
+        DocumentVersion documentVersion = documentVersionDao.queryById(versionId);
+        return documentVersion == null ? Optional.empty() : Optional.of(toDocumentVersionEntity(documentVersion));
+    }
+
+    @Override
     public Optional<DocumentVersionEntity> findByDocumentIdAndVersionNo(Long documentId, Long versionNo) {
         DocumentVersion documentVersion = documentVersionDao.queryByDocumentIdAndVersionNo(documentId, versionNo);
         return documentVersion == null ? Optional.empty() : Optional.of(toDocumentVersionEntity(documentVersion));

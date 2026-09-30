@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.ICapabilityMutationRecordDao">
+    <resultMap id="recordMap" type="com.hector.infrastructure.dao.po.CapabilityMutationRecord">
+        <id property="id" column="id"/>
+        <result property="runId" column="run_id"/>
+        <result property="callId" column="call_id"/>
+        <result property="capability" column="capability"/>
+        <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="status" column="status"/>
+        <result property="executionToken" column="execution_token"/>
+        <result property="leaseUntil" column="lease_until"/>
+        <result property="documentId" column="document_id"/>
+        <result property="previousVersionId" column="previous_version_id"/>
+        <result property="versionId" column="version_id"/>
+        <result property="targetVersionNo" column="target_version_no"/>
+        <result property="errorCode" column="error_code"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="queryByIdentity" resultMap="recordMap">
+        SELECT * FROM capability_mutation_record WHERE run_id = #{runId} AND call_id = #{callId} LIMIT 1
+    </select>
+
+    <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO capability_mutation_record
+        (run_id, call_id, capability, request_fingerprint, status, execution_token, lease_until, document_id, target_version_no,
+         error_code, error_message, created_at, updated_at)
+        VALUES (#{runId}, #{callId}, #{capability}, #{requestFingerprint}, #{status}, #{executionToken}, #{leaseUntil}, #{documentId},
+                #{targetVersionNo}, #{errorCode}, #{errorMessage}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="claimExpired">
+        UPDATE capability_mutation_record
+        SET execution_token = #{executionToken}, lease_until = #{leaseUntil}, updated_at = CURRENT_TIMESTAMP
+        WHERE run_id = #{runId} AND call_id = #{callId}
+          AND request_fingerprint = #{fingerprint}
+          AND status IN (0, 3)
+          AND (lease_until IS NULL OR lease_until &lt;= #{now})
+    </update>
+
+    <update id="markSucceeded">
+        UPDATE capability_mutation_record
+        SET status = 1, document_id = #{documentId}, previous_version_id = #{previousVersionId},
+            version_id = #{versionId}, error_code = NULL, error_message = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE run_id = #{runId} AND call_id = #{callId} AND request_fingerprint = #{fingerprint}
+          AND execution_token = #{executionToken} AND status IN (0, 3)
+    </update>
+
+    <update id="markPending">
+        UPDATE capability_mutation_record
+        SET status = 3, error_code = #{errorCode}, error_message = #{errorMessage}, updated_at = CURRENT_TIMESTAMP
+        WHERE run_id = #{runId} AND call_id = #{callId} AND request_fingerprint = #{fingerprint}
+          AND execution_token = #{executionToken} AND status = 0
+    </update>
+
+    <update id="markFailed">
+        UPDATE capability_mutation_record
+        SET status = 2, error_code = #{errorCode}, error_message = #{errorMessage}, updated_at = CURRENT_TIMESTAMP
+        WHERE run_id = #{runId} AND call_id = #{callId} AND request_fingerprint = #{fingerprint}
+          AND execution_token = #{executionToken} AND status = 0
+    </update>
+</mapper>

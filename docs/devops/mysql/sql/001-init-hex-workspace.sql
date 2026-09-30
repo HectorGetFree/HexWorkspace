@@ -90,6 +90,29 @@ CREATE TABLE IF NOT EXISTS `document_version` (
     KEY `idx_document_version_created_at` (`document_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档不可变内容版本表';
 
+CREATE TABLE IF NOT EXISTS `capability_mutation_record` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `run_id` VARCHAR(128) NOT NULL COMMENT 'Workspace AgentRun ID',
+    `call_id` VARCHAR(128) NOT NULL COMMENT '原始 Tool Call ID',
+    `capability` VARCHAR(128) NOT NULL COMMENT 'Capability 名称',
+    `request_fingerprint` CHAR(64) NOT NULL COMMENT '规范化请求 SHA-256',
+    `status` TINYINT UNSIGNED NOT NULL COMMENT '0=PROCESSING / 1=SUCCEEDED / 2=FAILED / 3=PENDING',
+    `execution_token` VARCHAR(64) DEFAULT NULL COMMENT '当前 Capability mutation 执行令牌',
+    `lease_until` DATETIME DEFAULT NULL COMMENT '执行租约截止时间',
+    `document_id` BIGINT DEFAULT NULL COMMENT '目标文档',
+    `previous_version_id` BIGINT DEFAULT NULL COMMENT '原正式版本主键',
+    `version_id` BIGINT DEFAULT NULL COMMENT '新正式版本主键',
+    `target_version_no` BIGINT DEFAULT NULL COMMENT '内部目标版本号',
+    `error_code` VARCHAR(64) DEFAULT NULL COMMENT '最近错误码',
+    `error_message` VARCHAR(512) DEFAULT NULL COMMENT '最近错误信息',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_capability_mutation_identity` (`run_id`, `call_id`),
+    KEY `idx_capability_mutation_document` (`document_id`),
+    KEY `idx_capability_mutation_status` (`status`, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workspace Capability 写操作幂等记录';
+
 CREATE TABLE IF NOT EXISTS `knowledge_embedding_config` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
     `config_hash` VARCHAR(64) NOT NULL COMMENT '不可变向量空间配置摘要',

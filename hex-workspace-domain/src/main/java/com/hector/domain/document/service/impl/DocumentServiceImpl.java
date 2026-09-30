@@ -8,6 +8,7 @@ import com.hector.domain.document.adapter.port.IDocumentVersionTextReader;
 import com.hector.domain.document.model.valobj.DocumentStatusVO;
 import com.hector.domain.document.model.valobj.DocumentTypeVO;
 import com.hector.domain.document.model.valobj.DocumentReadResultVO;
+import com.hector.domain.document.model.valobj.DocumentMutationResultVO;
 import com.hector.domain.document.model.valobj.DocumentUploadOutboxStatusVO;
 import com.hector.domain.document.model.valobj.DocumentUploadTaskStatusVO;
 import com.hector.domain.document.repository.IDocumentRepository;
@@ -131,6 +132,54 @@ public class DocumentServiceImpl implements IDocumentService {
                 deleteStagingObjectQuietly(stagingPath);
             }
         }
+    }
+
+    @Override
+    public DocumentMutationResultVO updateMarkdownDocument(Long workspaceId, Long operatorUserId, Long documentId,
+                                                           Long expectedVersionId, String content) {
+        DocumentEntity active = documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND));
+        if (!workspaceId.equals(active.getWorkspaceId()) || !operatorUserId.equals(active.getOwnerUserId())
+                || !active.isActive()) {
+            throw new BusinessException(ResponseCode.DOCUMENT_NOT_FOUND);
+        }
+        DocumentVersionEntity expectedVersion = documentVersionRepository
+                .findByDocumentIdAndVersionNo(documentId, expectedVersionId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.VERSION_NOT_FOUND));
+        if (!expectedVersion.getVersionNo().equals(active.getCurrentVersionNo())) {
+            throw new BusinessException(ResponseCode.VERSION_CONFLICT);
+        }
+        byte[] contentBytes = (content == null ? "" : content).getBytes(StandardCharsets.UTF_8);
+        String stagingPath = newStagingPath(active.getDocumentCode());
+        long targetVersionNo = active.getCurrentVersionNo() + 1;
+        String targetPath = newVersionStoragePath(workspaceId, active.getDocumentCode(), targetVersionNo);
+        String executionToken = UUID.randomUUID().toString();
+        boolean taskRegistered = false;
+        try {
+            String contentHash = uploadStagingContent(stagingPath, new ByteArrayInputStream(contentBytes),
+                    contentBytes.length, "text/markdown; charset=utf-8");
+            String taskCode = registerContentVersionSave(workspaceId, active.getDocumentCode(),
+                    active.getCurrentVersionNo(), targetVersionNo, operatorUserId, stagingPath, targetPath,
+                    "text/markdown; charset=utf-8", contentBytes.length, contentHash, executionToken);
+            taskRegistered = true;
+            documentUploadTaskService.executeOwned(taskCode, executionToken);
+            DocumentEntity updated = getActiveDocument(workspaceId, active.getDocumentCode());
+            if (!targetVersionNoEquals(updated, targetVersionNo)) {
+                throw new BusinessException(ResponseCode.DOCUMENT_UPDATE_PENDING);
+            }
+            DocumentVersionEntity version = documentVersionRepository
+                    .findByDocumentIdAndVersionNo(documentId, targetVersionNo)
+                    .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_UPDATE_PENDING));
+            return new DocumentMutationResultVO(documentId, expectedVersionId, version.getVersionNo());
+        } finally {
+            if (!taskRegistered) {
+                deleteStagingObjectQuietly(stagingPath);
+            }
+        }
+    }
+
+    private boolean targetVersionNoEquals(DocumentEntity document, long targetVersionNo) {
+        return document.isActive() && Long.valueOf(targetVersionNo).equals(document.getCurrentVersionNo());
     }
 
     @Override

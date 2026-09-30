@@ -41,4 +41,11 @@
           AND version_no = #{versionNo}
         LIMIT 1
     </select>
+
+    <select id="queryById" resultMap="documentVersionResultMap">
+        SELECT <include refid="documentVersionColumns"/>
+        FROM document_version
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
 </mapper>

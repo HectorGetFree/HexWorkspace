@@ -10,6 +10,9 @@ public interface IDocumentVersionRepository {
     /** 保存一份新内容版本并回填主键。 */
     DocumentVersionEntity save(DocumentVersionEntity version);
 
+    /** 按不可变版本主键读取精确版本身份。 */
+    Optional<DocumentVersionEntity> findById(Long versionId);
+
     /** 按文档与版本号查询不可变内容快照。 */
     Optional<DocumentVersionEntity> findByDocumentIdAndVersionNo(Long documentId, Long versionNo);
 }

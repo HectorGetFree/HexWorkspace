@@ -12,6 +12,7 @@ import com.hector.domain.agent.service.IAgentRunService;
 import com.hector.hexworkspace.types.enums.ResponseCode;
 import com.hector.hexworkspace.types.exception.BusinessException;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -23,6 +24,12 @@ import java.util.UUID;
 /** AgentRun 业务服务；创建时锁定 Conversation 行并检查非终态 Run。 */
 @Service
 public class AgentRunServiceImpl implements IAgentRunService {
+    /**
+     * 仅由服务端部署配置控制的新 Session 权限模式；不能由前端请求提升权限。
+     */
+    @Value("${hexworkspace.agent.permission-mode:default}")
+    private String runtimePermissionMode = "default";
+
     @Resource
     private IWorkspaceConversationRepository conversationRepository;
 
@@ -96,7 +103,8 @@ public class AgentRunServiceImpl implements IAgentRunService {
         RuntimeCommandResultVO result = runtimeCommandPort.send(new RuntimeCommandRequestVO(
                 "start_" + run.getRunId(), AgentRunCommandTypeVO.START_RUN, run.getRunId(),
                 conversationId, OffsetDateTime.now(ZoneOffset.UTC).toString(),
-                "{\"instruction\":" + quote(instruction) + "}"));
+                "{\"instruction\":" + quote(instruction)
+                        + ",\"permissionMode\":" + quote(runtimePermissionMode) + "}"));
         if (!result.accepted()) {
             runRepository.markRejected(run.getRunId(), result.reasonCode(), result.message());
             throw new BusinessException(ResponseCode.AGENT_RUNTIME_REJECTED);
