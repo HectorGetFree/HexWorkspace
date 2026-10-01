@@ -9,11 +9,11 @@
         </div>
         <el-button plain size="small"><Settings2 :size="15" /> 设置</el-button>
       </header>
-      <div class="editor-placeholder">
+      <DocumentWorkspace v-if="selectedDocumentCode" :workspace-id="workspace?.workspaceId ?? null" :document-code="selectedDocumentCode" />
+      <div v-else class="editor-placeholder">
         <div class="placeholder-icon"><FileText :size="21" /></div>
-        <h2>{{ route.params.documentCode ? '准备打开文档' : '选择一个文档开始' }}</h2>
-        <p>这里将显示文档内容与编辑器。当前阶段仅提供页面骨架。</p>
-        <el-button type="primary" plain>新建文档</el-button>
+        <h2>选择一个文档开始阅读</h2>
+        <p>从左侧资源树选择文档，打开当前版本内容。</p>
       </div>
     </main>
   </section>
@@ -26,6 +26,7 @@ import { FileText, Settings2 } from 'lucide-vue-next'
 import * as workspaceApi from '../api/workspace'
 import * as folderApi from '../api/folder'
 import ResourceSidebar from '../features/workspace/ResourceSidebar.vue'
+import DocumentWorkspace from '../features/document/DocumentWorkspace.vue'
 import type { DirectoryResponse, ResourceNode, Workspace } from '../types/workspace'
 
 const route = useRoute()
