@@ -3,6 +3,7 @@
 html, body, #app { width: 100%; min-width: 1024px; min-height: 100vh; margin: 0; }
 body { color: var(--color-text-primary); background: var(--color-bg); font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 button { font: inherit; }
+.app-loading { display: grid; min-height: 100vh; place-items: center; color: var(--color-text-secondary); background: var(--color-bg); }
 .app-shell { display: flex; min-height: 100vh; }
 .app-sidebar { width: var(--sidebar-width); flex: 0 0 var(--sidebar-width); display: flex; flex-direction: column; padding: 22px 14px 14px; border-right: 1px solid var(--color-border); background: var(--color-surface); }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 30px; font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
@@ -25,7 +26,8 @@ button { font: inherit; }
 .avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--color-primary); background: var(--color-primary-soft); font-size: 13px; font-weight: 700; }
 .user-placeholder strong, .user-placeholder span { display: block; font-size: 12px; }
 .user-placeholder span { margin-top: 2px; color: var(--color-text-muted); }
-.footer-more { margin-left: auto; color: var(--color-text-muted); }
+.profile-menu-button { display: grid; place-items: center; margin-left: auto; padding: 5px; border: 0; border-radius: 6px; color: var(--color-text-muted); background: transparent; cursor: pointer; }
+.profile-menu-button:hover { color: var(--color-primary); background: var(--color-primary-soft); }
 .app-content { min-width: 0; flex: 1; }
 .page-shell { max-width: 860px; margin: 0 auto; padding: 54px 54px 80px; }
 .page-topline, .eyebrow { color: var(--color-text-muted); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
@@ -64,3 +66,12 @@ button { font: inherit; }
 .placeholder-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border-radius: 14px; color: var(--color-primary); background: var(--color-primary-soft); }
 .editor-placeholder h2 { margin: 0; font-size: 22px; }
 .editor-placeholder p { margin: 10px 0 22px; color: var(--color-text-secondary); }
+.auth-page { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: var(--color-bg); }
+.login-card { width: min(100%, 420px); padding: 34px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); box-shadow: var(--shadow-soft); }
+.login-brand { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; }
+.login-heading { margin: 54px 0 28px; }
+.login-heading h1 { margin: 8px 0 10px; font-size: 25px; letter-spacing: -.04em; }
+.login-heading p { margin: 0; color: var(--color-text-secondary); font-size: 13px; }
+.login-form { display: grid; gap: 18px; }
+.login-form label { display: grid; gap: 7px; color: var(--color-text-secondary); font-size: 13px; }
+.login-button { width: 100%; margin-top: 4px; }

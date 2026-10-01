@@ -39,10 +39,12 @@
       <div class="user-placeholder">
         <div class="avatar">H</div>
         <div>
-          <strong>个人账户</strong>
-          <span>Workspace MVP</span>
+          <strong>{{ auth.currentUser?.username ?? '个人账户' }}</strong>
+          <span>{{ auth.currentUser?.status ?? 'Workspace MVP' }}</span>
         </div>
-        <MoreHorizontal :size="16" class="footer-more" />
+        <button class="profile-menu-button" type="button" title="退出登录" @click="handleLogout">
+          <LogOut :size="16" />
+        </button>
       </div>
     </div>
   </aside>
@@ -50,7 +52,20 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Bot, ChevronDown, ChevronRight, FolderKanban, MessageSquareText, MoreHorizontal, Sparkles } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Bot, ChevronDown, ChevronRight, FolderKanban, LogOut, MessageSquareText, Sparkles } from 'lucide-vue-next'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+
+async function handleLogout(): Promise<void> {
+  try {
+    await auth.logout()
+  } finally {
+    await router.replace('/login')
+  }
+}
 
 const historyExpanded = ref(true)
 const todayConversations = ['示例会话 A', '示例会话 B']
