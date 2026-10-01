@@ -57,8 +57,20 @@ button { font: inherit; }
 .icon-button.small { padding: 3px; }
 .resource-section-label { display: flex; align-items: center; justify-content: space-between; margin: 38px 7px 10px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .resource-list { display: grid; gap: 4px; }
-.resource-item { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border: 0; border-radius: 8px; color: var(--color-text-secondary); background: transparent; text-align: left; cursor: pointer; }
+.resource-tree-list { min-height: 0; max-height: calc(100vh - 180px); overflow-y: auto; }
+.resource-item { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px; border: 0; border-radius: 8px; color: var(--color-text-secondary); background: transparent; text-align: left; cursor: pointer; }
 .resource-item:hover { color: var(--color-primary); background: var(--color-primary-soft); }
+.resource-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-item svg:first-child { flex: 0 0 15px; }
+.folder-item svg:nth-child(2), .document-item svg { flex: 0 0 16px; }
+.resource-children { margin-left: 17px; border-left: 1px solid var(--color-border); padding-left: 7px; }
+.resource-loading { margin-left: auto; animation: resource-spin .8s linear infinite; }
+.resource-empty, .resource-child-error, .resource-status { padding: 8px 10px; color: var(--color-text-muted); font-size: 12px; }
+.resource-child-error { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--color-text-secondary); }
+.resource-child-error button, .resource-status button { padding: 0; border: 0; color: var(--color-primary); background: transparent; cursor: pointer; }
+.resource-status-error { display: grid; gap: 8px; color: var(--color-text-secondary); }
+.document-item.is-selected { color: var(--color-primary); background: var(--color-primary-soft); }
+@keyframes resource-spin { to { transform: rotate(360deg); } }
 .collapsed-toggle { display: grid; place-items: center; width: 100%; padding: 8px 0; border: 0; color: var(--color-text-secondary); background: transparent; cursor: pointer; }
 .workspace-main { min-width: 0; flex: 1; padding: 28px 38px; }
 .workspace-header { padding-bottom: 22px; border-bottom: 1px solid var(--color-border); }
