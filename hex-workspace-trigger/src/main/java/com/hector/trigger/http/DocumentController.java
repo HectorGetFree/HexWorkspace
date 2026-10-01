@@ -130,8 +130,14 @@ public class DocumentController extends BaseController {
         return execute("编辑Markdown文档", workspaceId, () -> {
             Long userId = SecurityUserUtil.getCurrentUserId();
             workspaceService.assertOwner(workspaceId, userId);
-            DocumentEntity document = documentService.editMarkdownDocument(
-                    workspaceId, documentCode, userId, requireData(request).getContent());
+            DocumentCommandRequestDTO data = requireData(request);
+            if (data.getExpectedVersionId() == null) {
+                throw new BusinessException(ResponseCode.ILLEGAL_PARAMETER);
+            }
+            DocumentEntity current = documentService.getActiveDocument(workspaceId, documentCode);
+            documentService.updateMarkdownDocument(
+                    workspaceId, userId, current.getId(), data.getExpectedVersionId(), data.getContent());
+            DocumentEntity document = documentService.getActiveDocument(workspaceId, documentCode);
             log.info("编辑Markdown文档完成 workspaceId:{} documentCode:{}", workspaceId, documentCode);
             return success(toResponse(document, true));
         });
@@ -275,6 +281,7 @@ public class DocumentController extends BaseController {
                 .documentType(documentEntity.getDocumentType().name())
                 .status(documentEntity.getStatus().name())
                 .currentVersionNo(documentEntity.getCurrentVersionNo())
+                .currentVersionId(documentService.getCurrentVersionId(documentEntity))
                 .deletedAt(documentEntity.getDeletedAt())
                 .createdAt(documentEntity.getCreatedAt())
                 .updatedAt(documentEntity.getUpdatedAt())

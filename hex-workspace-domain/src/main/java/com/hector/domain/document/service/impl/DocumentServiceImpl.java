@@ -328,6 +328,18 @@ public class DocumentServiceImpl implements IDocumentService {
         return document;
     }
 
+    @Override
+    public Long getCurrentVersionId(DocumentEntity documentEntity) {
+        if (documentEntity == null || documentEntity.getId() == null
+                || documentEntity.getCurrentVersionNo() == null) {
+            return null;
+        }
+        return documentVersionRepository
+                .findByDocumentIdAndVersionNo(documentEntity.getId(), documentEntity.getCurrentVersionNo())
+                .map(DocumentVersionEntity::getId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.DOCUMENT_STATUS_UNAVAILABLE));
+    }
+
     private boolean isParentFolderAccessible(Long workspaceId, Long parentId) {
         try {
             folderService.getActiveFolder(workspaceId, parentId);
