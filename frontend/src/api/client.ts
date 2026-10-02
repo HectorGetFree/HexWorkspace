@@ -12,7 +12,7 @@ export function bindAuthClearHandler(handler: () => void): void {
   onAuthCleared = handler
 }
 
-async function refreshAccessToken(): Promise<string> {
+export async function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) {
     refreshPromise = rawClient.post('/api/v1/users/refresh')
       .then((response: AxiosResponse<{ data: { token: string } | null }>) => {
@@ -24,6 +24,28 @@ async function refreshAccessToken(): Promise<string> {
       .finally(() => { refreshPromise = null })
   }
   return refreshPromise
+}
+
+async function fetchWithCurrentToken(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers)
+  const token = getAccessToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  return fetch(input, { ...init, headers })
+}
+
+/** 原生 fetch（例如 SSE）也必须复用 Axios 的刷新锁，避免过期 Token 直接把页面判定为掉线。 */
+export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const response = await fetchWithCurrentToken(input, init)
+  if (response.status !== 401) return response
+
+  try {
+    await refreshAccessToken()
+    return fetchWithCurrentToken(input, init)
+  } catch (refreshError) {
+    setAccessToken(null)
+    onAuthCleared?.()
+    throw normalizeApiError(refreshError)
+  }
 }
 
 client.interceptors.request.use((config) => {

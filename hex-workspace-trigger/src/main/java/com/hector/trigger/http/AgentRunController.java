@@ -3,6 +3,8 @@ package com.hector.trigger.http;
 import com.hector.domain.agent.model.entity.AgentRunEntity;
 import com.hector.domain.agent.model.entity.WorkspaceConversationEntity;
 import com.hector.domain.agent.adapter.port.RuntimeCommandUnknownException;
+import com.hector.domain.agent.adapter.port.IRuntimeConversationHistoryPort;
+import com.hector.domain.agent.model.valobj.RuntimeConversationMessageVO;
 import com.hector.domain.agent.model.valobj.AgentRunCommandTypeVO;
 import com.hector.domain.agent.service.IAgentRunService;
 import com.hector.domain.agent.service.IWorkspaceConversationService;
@@ -14,6 +16,9 @@ import com.hector.trigger.api.dto.AgentRunResponseDTO;
 import com.hector.trigger.api.dto.AgentRunStartRequestDTO;
 import com.hector.trigger.api.dto.WorkspaceConversationCreateRequestDTO;
 import com.hector.trigger.api.dto.WorkspaceConversationResponseDTO;
+import com.hector.trigger.api.dto.AgentConversationDetailResponseDTO;
+import com.hector.trigger.api.dto.AgentConversationSummaryResponseDTO;
+import com.hector.trigger.api.dto.AgentConversationMessageResponseDTO;
 import com.hector.trigger.api.request.Request;
 import com.hector.trigger.api.response.Response;
 import com.hector.trigger.http.security.SecurityUserUtil;
@@ -22,9 +27,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /** Workspace AgentRun 最小用户侧接口；Controller 不直接调用 Hexgent Client。 */
 @RestController
@@ -38,6 +46,70 @@ public class AgentRunController extends BaseController {
     private IWorkspaceConversationService conversationService;
     @Resource
     private IAgentRunService runService;
+    @Resource
+    private IRuntimeConversationHistoryPort runtimeConversationHistoryPort;
+
+    /** 返回当前用户的最近 Conversation；浏览器 History 只把 Pinia 当作缓存。 */
+    @GetMapping("/api/v1/conversations")
+    public Response<List<AgentConversationSummaryResponseDTO>> listConversations() {
+        try {
+            Long userId = SecurityUserUtil.getCurrentUserId();
+            return success(conversationService.listByUserId(userId, 50).stream()
+                    .map(conversation -> {
+                        List<AgentRunEntity> runs = runService.listByConversationId(conversation.getConversationId());
+                        AgentRunEntity latest = runs.isEmpty() ? null : runs.get(runs.size() - 1);
+                        return AgentConversationSummaryResponseDTO.builder()
+                                .conversationId(conversation.getConversationId())
+                                .workspaceId(conversation.getWorkspaceId())
+                                .title(latest != null && latest.getInstruction() != null
+                                        && !latest.getInstruction().isBlank()
+                                        ? latest.getInstruction()
+                                        : conversation.getTitle())
+                                .updatedAt(conversation.getUpdatedAt().toString())
+                                .latestRunStatus(latest == null ? null : latest.getStatus().name())
+                                .build();
+                    }).toList());
+        } catch (BusinessException exception) {
+            return failure(exception.getCode(), exception.getInfo());
+        } catch (Exception exception) {
+            log.error("查询Agent Conversation History系统异常", exception);
+            return failure(ResponseCode.SYSTEM_ERROR);
+        }
+    }
+
+    /** 按当前用户授权读取 Conversation、Run 与 Hexgent durable message projection。 */
+    @GetMapping("/api/v1/conversations/{conversationId}")
+    public Response<AgentConversationDetailResponseDTO> getConversation(
+            @PathVariable("conversationId") String conversationId) {
+        try {
+            WorkspaceConversationEntity conversation = requireConversation(
+                    conversationId, SecurityUserUtil.getCurrentUserId());
+            List<AgentRunEntity> runs = runService.listByConversationId(conversationId);
+            List<AgentConversationMessageResponseDTO> messages = List.of();
+            if (!runs.isEmpty()) {
+                AgentRunEntity latest = runs.get(runs.size() - 1);
+                messages = runtimeConversationHistoryPort.readMessages(latest.getRunId()).stream()
+                        .map(this::toMessageResponse).toList();
+            }
+            return success(AgentConversationDetailResponseDTO.builder()
+                    .conversationId(conversation.getConversationId())
+                    .workspaceId(conversation.getWorkspaceId())
+                    .title(conversation.getTitle())
+                    .createdAt(conversation.getCreatedAt().toString())
+                    .updatedAt(conversation.getUpdatedAt().toString())
+                    .runs(runs.stream().map(this::toRunResponse).toList())
+                    .messages(messages)
+                    .build());
+        } catch (RuntimeCommandUnknownException exception) {
+            log.error("读取Agent Conversation Transcript失败 conversationId:{}", conversationId, exception);
+            return failure(ResponseCode.AGENT_RUNTIME_UNAVAILABLE);
+        } catch (BusinessException exception) {
+            return failure(exception.getCode(), exception.getInfo());
+        } catch (Exception exception) {
+            log.error("读取Agent Conversation系统异常 conversationId:{}", conversationId, exception);
+            return failure(ResponseCode.SYSTEM_ERROR);
+        }
+    }
 
     /**
      * 创建 Workspace Conversation。
@@ -161,7 +233,19 @@ public class AgentRunController extends BaseController {
         return AgentRunResponseDTO.builder().runId(entity.getRunId()).conversationId(entity.getConversationId())
                 .workspaceId(entity.getWorkspaceId()).status(entity.getStatus().name())
                 .instruction(entity.getInstruction()).failureCode(entity.getFailureCode())
-                .failureMessage(entity.getFailureMessage()).build();
+                .failureMessage(entity.getFailureMessage())
+                .createdAt(entity.getCreatedAt() == null ? null : entity.getCreatedAt().toString())
+                .finishedAt(entity.getFinishedAt() == null ? null : entity.getFinishedAt().toString())
+                .build();
+    }
+
+    private AgentConversationMessageResponseDTO toMessageResponse(RuntimeConversationMessageVO message) {
+        return AgentConversationMessageResponseDTO.builder()
+                .id("transcript-" + message.sequence())
+                .role(message.role())
+                .content(message.content())
+                .createdAt(message.createdAt())
+                .build();
     }
 
     private String escape(String value) {

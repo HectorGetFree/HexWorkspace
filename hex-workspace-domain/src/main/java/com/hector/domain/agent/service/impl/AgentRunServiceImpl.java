@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 /** AgentRun 业务服务；创建时锁定 Conversation 行并检查非终态 Run。 */
@@ -55,7 +56,7 @@ public class AgentRunServiceImpl implements IAgentRunService {
                 throw new BusinessException(ResponseCode.AGENT_RUN_CONFLICT);
             }
             LocalDateTime now = LocalDateTime.now();
-            return runRepository.save(AgentRunEntity.builder()
+            AgentRunEntity created = runRepository.save(AgentRunEntity.builder()
                     .runId("run_" + UUID.randomUUID().toString().replace("-", ""))
                     .conversationId(conversationId)
                     .workspaceId(conversation.getWorkspaceId())
@@ -68,6 +69,8 @@ public class AgentRunServiceImpl implements IAgentRunService {
                     .lifecycleSequence(0L)
                     .createdAt(now)
                     .build());
+            conversationRepository.touch(conversationId, now);
+            return created;
         });
         if (result == null) {
             throw new BusinessException(ResponseCode.SYSTEM_ERROR);
@@ -79,6 +82,11 @@ public class AgentRunServiceImpl implements IAgentRunService {
     public AgentRunEntity require(String runId) {
         return runRepository.findByRunId(runId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.ILLEGAL_PARAMETER));
+    }
+
+    @Override
+    public List<AgentRunEntity> listByConversationId(String conversationId) {
+        return runRepository.findByConversationId(conversationId);
     }
 
     @Override
@@ -100,11 +108,13 @@ public class AgentRunServiceImpl implements IAgentRunService {
         if (run == null) {
             throw new BusinessException(ResponseCode.SYSTEM_ERROR);
         }
+        String frozenAllowedTools = run.getAllowedTools() == null ? "[]" : run.getAllowedTools();
         RuntimeCommandResultVO result = runtimeCommandPort.send(new RuntimeCommandRequestVO(
                 "start_" + run.getRunId(), AgentRunCommandTypeVO.START_RUN, run.getRunId(),
                 conversationId, OffsetDateTime.now(ZoneOffset.UTC).toString(),
                 "{\"instruction\":" + quote(instruction)
-                        + ",\"permissionMode\":" + quote(runtimePermissionMode) + "}"));
+                        + ",\"permissionMode\":" + quote(runtimePermissionMode)
+                        + ",\"allowedTools\":" + frozenAllowedTools + "}"));
         if (!result.accepted()) {
             runRepository.markRejected(run.getRunId(), result.reasonCode(), result.message());
             throw new BusinessException(ResponseCode.AGENT_RUNTIME_REJECTED);

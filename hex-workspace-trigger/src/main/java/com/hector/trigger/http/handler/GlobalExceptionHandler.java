@@ -5,7 +5,10 @@ import com.hector.hexworkspace.types.exception.BusinessException;
 import com.hector.trigger.api.response.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MultipartException;
@@ -28,6 +31,15 @@ public class GlobalExceptionHandler {
     public Response<Void> handleUnexpectedException(Exception exception) {
         log.error("全局异常处理-未预期异常", exception);
         return Response.<Void>builder().code(ResponseCode.SYSTEM_ERROR.getCode()).info(ResponseCode.SYSTEM_ERROR.getInfo()).build();
+    }
+
+    /**
+     * 异步流超时时不能再按普通 JSON 错误返回，否则 text/event-stream 会触发二次协商异常。
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public ResponseEntity<Void> handleAsyncRequestTimeout(AsyncRequestTimeoutException exception) {
+        log.warn("异步请求超时", exception);
+        return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).build();
     }
 
     /**

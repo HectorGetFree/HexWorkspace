@@ -16,6 +16,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: 'hexgent', component: HexgentPage },
+        { path: 'hexgent/conversations/:conversationId', component: HexgentPage },
         { path: 'workspace', component: WorkspacePage },
         { path: 'workspace/documents/:documentCode', component: WorkspacePage },
       ],

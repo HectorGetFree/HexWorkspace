@@ -1,41 +1,44 @@
 <template>
-  <section class="page-shell hexgent-page">
-    <div class="page-topline">
-      <span class="status-dot" /> <span>Hexgent Workspace</span>
-    </div>
-    <div class="agent-hero">
-      <div class="hero-icon"><Sparkles :size="23" /></div>
-      <h1>你好，今天想完成什么？</h1>
-      <p>让 Hexgent 帮你整理资料、生成内容或探索 Workspace。</p>
-    </div>
-    <div class="prompt-card">
-      <el-input type="textarea" :rows="4" placeholder="告诉 Hexgent 你想做什么……" resize="none" />
-      <div class="prompt-toolbar">
-        <div class="prompt-options">
-          <el-button plain size="small"><FolderKanban :size="14" /> Workspace</el-button>
-          <el-button plain size="small"><ShieldCheck :size="14" /> 默认权限</el-button>
-        </div>
-        <el-button type="primary" circle title="提交"><ArrowUp :size="17" /></el-button>
-      </div>
-    </div>
-    <div class="quick-actions">
-      <span class="eyebrow">QUICK ACTIONS</span>
-      <div class="quick-grid">
-        <button v-for="action in actions" :key="action.label" class="quick-card" type="button">
-          <component :is="action.icon" :size="18" />
-          <span>{{ action.label }}</span>
-        </button>
-      </div>
-    </div>
+  <section class="hexgent-page">
+    <AgentConversation
+      v-if="workspaceId"
+      :conversation-id="conversationId"
+      :workspace-id="workspaceId"
+      :workspace-name="workspaceName"
+      variant="page"
+      @conversation-created="openConversation"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { ArrowUp, FilePlus2, FolderKanban, Search, ShieldCheck, Sparkles, WandSparkles } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import * as workspaceApi from '../api/workspace'
+import AgentConversation from '../features/agent/AgentConversation.vue'
+import { useAgentConversationStore } from '../stores/agentConversation'
 
-const actions = [
-  { label: '总结文档', icon: FilePlus2 },
-  { label: '生成新文档', icon: WandSparkles },
-  { label: '问答与检索', icon: Search },
-]
+const route = useRoute()
+const router = useRouter()
+const agentConversation = useAgentConversationStore()
+const workspaceId = ref<number | null>(null)
+const workspaceName = ref('')
+const conversationId = computed(() => String(route.params.conversationId ?? '') || null)
+
+watch(conversationId, (value) => {
+  agentConversation.selectConversation(value)
+  if (value) void agentConversation.hydrateConversation(value, workspaceName.value)
+}, { immediate: true })
+
+onMounted(async () => {
+  const workspaces = await workspaceApi.listMyWorkspaces()
+  const workspace = workspaces.find((item) => item.isDefault) ?? workspaces[0]
+  workspaceId.value = workspace?.workspaceId ?? null
+  workspaceName.value = workspace?.workspaceName ?? ''
+})
+
+function openConversation(id: string): void {
+  if (conversationId.value === id) return
+  void router.replace(`/hexgent/conversations/${id}`)
+}
 </script>

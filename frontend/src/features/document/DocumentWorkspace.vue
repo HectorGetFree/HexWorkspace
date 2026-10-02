@@ -4,9 +4,11 @@
     <div v-else-if="loadError" class="document-state document-state-error"><p>{{ loadError }}</p><button type="button" @click="loadDocument">重试</button></div>
     <template v-else-if="document">
       <DocumentHeader :document="document" :dirty="dirty" :saving="saving" @save="saveDocument" />
-      <div v-if="saveError" class="document-save-error">{{ saveError }}</div>
-      <div v-if="conflict" class="document-conflict"><span>文档已在其他位置更新。当前修改尚未保存。</span><button type="button" @click="reloadLatest">加载最新版本</button></div>
-      <DocumentContent :content="draft" :editable="true" @change="handleDraftChange" />
+      <div class="document-editor-scroll">
+        <div v-if="saveError" class="document-save-error">{{ saveError }}</div>
+        <div v-if="conflict" class="document-conflict"><span>文档已在其他位置更新。当前修改尚未保存。</span><button type="button" @click="reloadLatest">加载最新版本</button></div>
+        <DocumentContent :content="draft" :editable="true" @change="handleDraftChange" />
+      </div>
     </template>
   </section>
 </template>

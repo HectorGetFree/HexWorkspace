@@ -5,6 +5,7 @@ import com.hector.domain.agent.model.valobj.AgentRunStatusVO;
 import com.hector.domain.agent.model.valobj.LifecycleEventVO;
 import com.hector.domain.agent.service.IAgentRunLifecycleService;
 import com.hector.infrastructure.dao.IAgentRunDao;
+import com.hector.domain.agent.adapter.port.IBrowserEventPublisher;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,8 +21,12 @@ public class AgentRunLifecycleServiceImpl implements IAgentRunLifecycleService {
     @Resource
     private TransactionTemplate transactionTemplate;
 
+    @Resource
+    private IBrowserEventPublisher browserEventPublisher;
+
     @Override
     public void project(LifecycleEventVO event) {
+        boolean[] projected = {false};
         transactionTemplate.executeWithoutResult(status -> {
             if (dao.insertLifecycleEvent(
                     event.eventId(),
@@ -30,7 +35,6 @@ public class AgentRunLifecycleServiceImpl implements IAgentRunLifecycleService {
                     event.type()) == 0) {
                 return;
             }
-
             int targetStatus = targetStatus(event.type());
             String failureCode = null;
             String failureMessage = null;
@@ -40,7 +44,7 @@ public class AgentRunLifecycleServiceImpl implements IAgentRunLifecycleService {
                 failureMessage = payload.getString("failureMessage");
             }
 
-            dao.updateLifecycle(
+            projected[0] = dao.updateLifecycle(
                     event.workspaceRunId(),
                     event.sequence(),
                     targetStatus,
@@ -48,9 +52,16 @@ public class AgentRunLifecycleServiceImpl implements IAgentRunLifecycleService {
                     failureMessage,
                     targetStatus >= AgentRunStatusVO.SUCCEEDED.ordinal()
                             ? LocalDateTime.now()
-                            : null);
-            // CAS 未命中表示事件已过期、终态已落库或前置状态不匹配；均不得回退业务状态。
+                            : null) == 1;
+            // CAS 未命中表示事件已过期、终态已落库或前置状态不匹配；
+            // 仅保留收据，不向浏览器投递会造成状态回退的过期事件。
         });
+        if (projected[0]) {
+            browserEventPublisher.publishLifecycle(event);
+            if (isTerminal(event.type())) {
+                browserEventPublisher.publishEnd(event.workspaceRunId());
+            }
+        }
     }
 
     private int targetStatus(String type) {
@@ -63,5 +74,11 @@ public class AgentRunLifecycleServiceImpl implements IAgentRunLifecycleService {
             case "AgentRunCancelled" -> 6;
             default -> throw new IllegalArgumentException("未知生命周期事件：" + type);
         };
+    }
+
+    private boolean isTerminal(String type) {
+        return "AgentRunSucceeded".equals(type)
+                || "AgentRunFailed".equals(type)
+                || "AgentRunCancelled".equals(type);
     }
 }

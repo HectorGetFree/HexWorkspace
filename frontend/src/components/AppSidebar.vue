@@ -24,50 +24,103 @@
         <span>会话历史</span>
       </button>
       <div v-if="historyExpanded" class="history-list">
-        <span class="history-date">今天</span>
-        <button v-for="conversation in todayConversations" :key="conversation" class="history-item" type="button">
-          {{ conversation }}
+        <button class="history-new-conversation" type="button" @click="startNewConversation">
+          <Plus :size="14" />
+          <span>新对话</span>
         </button>
-        <span class="history-date">昨天</span>
-        <button v-for="conversation in yesterdayConversations" :key="conversation" class="history-item" type="button">
-          {{ conversation }}
+        <span v-if="agentConversation.history.length" class="history-date">最近会话</span>
+        <button
+          v-for="conversation in agentConversation.history"
+          :key="conversation.conversationId"
+          class="history-item"
+          :class="{ 'is-current': conversation.conversationId === agentConversation.currentConversationId }"
+          type="button"
+          @click="openConversation(conversation.conversationId)"
+        >
+          <span>{{ agentConversation.displayLabel(conversation) }}</span>
         </button>
       </div>
     </section>
 
     <div class="sidebar-footer">
-      <div class="user-placeholder">
-        <div class="avatar">H</div>
-        <div>
-          <strong>{{ auth.currentUser?.username ?? '个人账户' }}</strong>
-          <span>{{ auth.currentUser?.status ?? 'Workspace MVP' }}</span>
+      <el-popover placement="top-start" :width="240" trigger="click" popper-class="account-menu-popper">
+        <template #reference>
+          <button class="user-profile-trigger" type="button" aria-label="打开账户菜单">
+            <div class="avatar">{{ userInitial }}</div>
+            <div class="user-profile-copy">
+              <strong>{{ auth.currentUser?.username ?? '个人账户' }}</strong>
+            </div>
+            <ChevronUp :size="15" />
+          </button>
+        </template>
+        <div class="account-menu">
+          <div class="account-menu-user">
+            <strong>{{ auth.currentUser?.username ?? '个人账户' }}</strong>
+          </div>
+          <div class="account-menu-divider" />
+          <button type="button" @click="settingsVisible = true">
+            <Settings :size="16" />
+            <span>设置</span>
+          </button>
+          <button class="is-danger" type="button" @click="handleLogout">
+            <LogOut :size="16" />
+            <span>退出登录</span>
+          </button>
         </div>
-        <button class="profile-menu-button" type="button" title="退出登录" @click="handleLogout">
-          <LogOut :size="16" />
-        </button>
-      </div>
+      </el-popover>
     </div>
+
+    <el-dialog v-model="settingsVisible" title="设置" width="360px" append-to-body>
+      <p class="settings-placeholder">设置功能将在后续版本提供。</p>
+    </el-dialog>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bot, ChevronDown, ChevronRight, FolderKanban, LogOut, MessageSquareText, Sparkles } from 'lucide-vue-next'
+import {
+  Bot,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  FolderKanban,
+  LogOut,
+  MessageSquareText,
+  Plus,
+  Settings,
+  Sparkles,
+} from 'lucide-vue-next'
 import { useAuthStore } from '../stores/auth'
+import { useAgentConversationStore } from '../stores/agentConversation'
 
 const auth = useAuthStore()
 const router = useRouter()
+const agentConversation = useAgentConversationStore()
+const historyExpanded = ref(true)
+const settingsVisible = ref(false)
+const userInitial = computed(() => auth.currentUser?.username?.slice(0, 1).toUpperCase() ?? 'U')
+
+onMounted(() => {
+  if (auth.currentUser) void agentConversation.refreshHistory()
+})
+
+function startNewConversation(): void {
+  agentConversation.selectConversation(null)
+  void router.push('/hexgent')
+}
+
+function openConversation(conversationId: string): void {
+  agentConversation.selectConversation(conversationId)
+  void router.push(`/hexgent/conversations/${conversationId}`)
+}
 
 async function handleLogout(): Promise<void> {
   try {
     await auth.logout()
   } finally {
+    agentConversation.clear()
     await router.replace('/login')
   }
 }
-
-const historyExpanded = ref(true)
-const todayConversations = ['示例会话 A', '示例会话 B']
-const yesterdayConversations = ['示例会话 C']
 </script>

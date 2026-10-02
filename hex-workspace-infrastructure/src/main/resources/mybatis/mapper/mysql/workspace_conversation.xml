@@ -22,4 +22,15 @@
         SELECT id, conversation_id, workspace_id, user_id, title, created_at, updated_at
         FROM workspace_conversation WHERE conversation_id = #{conversationId} FOR UPDATE
     </select>
+    <select id="queryByUserId" resultMap="conversationResultMap">
+        SELECT id, conversation_id, workspace_id, user_id, title, created_at, updated_at
+        FROM workspace_conversation
+        WHERE user_id = #{userId}
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit}
+    </select>
+    <update id="touch">
+        UPDATE workspace_conversation SET updated_at = #{updatedAt}
+        WHERE conversation_id = #{conversationId}
+    </update>
 </mapper>

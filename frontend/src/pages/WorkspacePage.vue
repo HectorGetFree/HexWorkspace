@@ -7,7 +7,11 @@
           <span class="eyebrow">MY WORKSPACE</span>
           <h1>{{ route.params.documentCode ? '文档预览' : 'Workspace' }}</h1>
         </div>
-        <el-button plain size="small"><Settings2 :size="15" /> 设置</el-button>
+        <div class="workspace-header-actions">
+          <button v-if="!agentPanelOpen" class="workspace-agent-open" type="button" @click="agentPanelOpen = true">
+            ✨ Agent
+          </button>
+        </div>
       </header>
       <DocumentWorkspace v-if="selectedDocumentCode" :workspace-id="workspace?.workspaceId ?? null" :document-code="selectedDocumentCode" />
       <div v-else class="editor-placeholder">
@@ -16,22 +20,35 @@
         <p>从左侧资源树选择文档，打开当前版本内容。</p>
       </div>
     </main>
+    <aside v-if="workspace" v-show="agentPanelOpen" class="agent-panel">
+      <AgentConversation
+        :conversation-id="agentConversation.currentConversationId"
+        :workspace-id="workspace.workspaceId"
+        :workspace-name="workspace.workspaceName"
+        variant="panel"
+        @collapse="agentPanelOpen = false"
+      />
+    </aside>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FileText, Settings2 } from 'lucide-vue-next'
+import { FileText } from 'lucide-vue-next'
 import * as workspaceApi from '../api/workspace'
 import * as folderApi from '../api/folder'
 import ResourceSidebar from '../features/workspace/ResourceSidebar.vue'
 import DocumentWorkspace from '../features/document/DocumentWorkspace.vue'
+import AgentConversation from '../features/agent/AgentConversation.vue'
+import { useAgentConversationStore } from '../stores/agentConversation'
 import type { DirectoryResponse, ResourceNode, Workspace } from '../types/workspace'
 
 const route = useRoute()
 const router = useRouter()
+const agentConversation = useAgentConversationStore()
 const resourceSidebarCollapsed = ref(false)
+const agentPanelOpen = ref(false)
 const workspace = ref<Workspace | null>(null)
 const rootNodes = ref<ResourceNode[]>([])
 const expandedFolderIds = ref(new Set<number>())

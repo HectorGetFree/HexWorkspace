@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hector.infrastructure.dao.IAgentRunPermissionRequestDao">
+    <resultMap id="permissionRequestMap" type="com.hector.infrastructure.dao.po.AgentRunPermissionRequest">
+        <id property="id" column="id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="runId" column="run_id"/>
+        <result property="toolName" column="tool_name"/>
+        <result property="description" column="description"/>
+        <result property="status" column="status"/>
+        <result property="responseId" column="response_id"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="resolvedAt" column="resolved_at"/>
+    </resultMap>
+
+    <select id="queryByRequestId" resultMap="permissionRequestMap">
+        SELECT id, request_id, run_id, tool_name, description, status, response_id, created_at, resolved_at
+        FROM agent_run_permission_request
+        WHERE request_id = #{requestId}
+        LIMIT 1
+    </select>
+
+    <insert id="insertIgnore" useGeneratedKeys="true" keyProperty="id">
+        INSERT IGNORE INTO agent_run_permission_request
+        (request_id, run_id, tool_name, description, status, response_id, created_at, resolved_at)
+        VALUES (#{requestId}, #{runId}, #{toolName}, #{description}, #{status}, #{responseId}, #{createdAt}, #{resolvedAt})
+    </insert>
+
+    <update id="resolvePending">
+        UPDATE agent_run_permission_request
+        SET status = #{status}, response_id = #{responseId}, resolved_at = #{resolvedAt}
+        WHERE request_id = #{requestId} AND run_id = #{runId} AND status = 0
+    </update>
+</mapper>
