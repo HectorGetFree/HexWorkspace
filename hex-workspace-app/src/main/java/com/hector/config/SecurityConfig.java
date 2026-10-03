@@ -50,6 +50,8 @@ public class SecurityConfig {
                                 "/internal/v1/agent-runs/lifecycle",
                                 "/internal/v1/agent-runs/permissions",
                                 "/internal/agent/capabilities/invoke",
+                                "/internal/v1/evaluation/retrieval",
+                                "/internal/v1/evaluation/retrieval/readiness",
                                 "/error") // 这些接口允许匿名访问
                         .permitAll()
                         .anyRequest()
