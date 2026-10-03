@@ -53,13 +53,16 @@ class AgentRunServiceImplTest {
                     RuntimeCommandResultVO.Status.ACCEPTED, null, null);
         });
 
-        AgentRunEntity result = service.startAndDispatch("C1", 7L, "执行任务", "{}", "[]");
+        AgentRunEntity result = service.startAndDispatch(
+                "C1", 7L, "执行任务", "{}", "[\"search_workspace\"]");
 
         assertEquals(AgentRunStatusVO.PENDING, result.getStatus());
         ArgumentCaptor<RuntimeCommandRequestVO> request = ArgumentCaptor.forClass(RuntimeCommandRequestVO.class);
         verify(runtimeCommandPort).send(request.capture());
         assertEquals("start_" + result.getRunId(), request.getValue().commandId());
         assertTrue(request.getValue().payloadJson().contains("\"permissionMode\":\"default\""));
+        assertTrue(request.getValue().payloadJson()
+                .contains("\"allowedTools\":[\"search_workspace\"]"));
     }
 
     @Test
@@ -110,13 +113,17 @@ class AgentRunServiceImplTest {
         });
 
         assertThrows(RuntimeCommandUnknownException.class,
-                () -> service.startAndDispatch("C1", 7L, "执行任务", "{}", "[]"));
-        AgentRunEntity retryResult = service.startAndDispatch("C1", 7L, "执行任务", "{}", "[]");
+                () -> service.startAndDispatch(
+                        "C1", 7L, "执行任务", "{}", "[\"search_workspace\"]"));
+        AgentRunEntity retryResult = service.startAndDispatch(
+                "C1", 7L, "执行任务", "{}", "[\"list_folder\"]");
 
         assertEquals(created[0].getRunId(), retryResult.getRunId());
         ArgumentCaptor<RuntimeCommandRequestVO> requests = ArgumentCaptor.forClass(RuntimeCommandRequestVO.class);
         verify(runtimeCommandPort, org.mockito.Mockito.times(2)).send(requests.capture());
         assertEquals(requests.getAllValues().get(0).commandId(), requests.getAllValues().get(1).commandId());
+        assertTrue(requests.getAllValues().stream().allMatch(request -> request.payloadJson()
+                .contains("\"allowedTools\":[\"search_workspace\"]")));
     }
 
     private AgentRunServiceImpl service(IWorkspaceConversationRepository conversationRepository,

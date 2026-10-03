@@ -25,4 +25,7 @@ public class DocumentCommandRequestDTO implements Serializable {
 
     /** Markdown 文档正文。 */
     private String content;
+
+    /** 编辑 Markdown 时客户端观察到的当前正式版本主键。 */
+    private Long expectedVersionId;
 }

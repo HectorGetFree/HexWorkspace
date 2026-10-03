@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.List;
 
 /** Conversation 业务服务。 */
 @Service
@@ -34,5 +35,10 @@ public class WorkspaceConversationServiceImpl implements IWorkspaceConversationS
     public WorkspaceConversationEntity require(String conversationId) {
         return repository.findByConversationId(conversationId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.ILLEGAL_PARAMETER));
+    }
+
+    @Override
+    public List<WorkspaceConversationEntity> listByUserId(Long userId, int limit) {
+        return repository.findByUserId(userId, limit);
     }
 }

@@ -14,4 +14,6 @@ public class AgentRunResponseDTO {
     private String instruction;
     private String failureCode;
     private String failureMessage;
+    private String createdAt;
+    private String finishedAt;
 }

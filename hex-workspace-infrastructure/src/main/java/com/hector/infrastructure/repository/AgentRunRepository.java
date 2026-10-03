@@ -9,6 +9,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 /** AgentRun MySQL 仓储。 */
 @Repository
@@ -47,6 +48,11 @@ public class AgentRunRepository implements IAgentRunRepository {
     @Override
     public Optional<AgentRunEntity> findNonTerminalByConversationId(String conversationId) {
         return Optional.ofNullable(dao.queryNonTerminalByConversationId(conversationId)).map(this::toEntity);
+    }
+
+    @Override
+    public List<AgentRunEntity> findByConversationId(String conversationId) {
+        return dao.queryByConversationId(conversationId).stream().map(this::toEntity).toList();
     }
 
     @Override

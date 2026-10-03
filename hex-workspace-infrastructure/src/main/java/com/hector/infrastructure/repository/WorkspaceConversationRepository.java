@@ -8,6 +8,8 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
+import java.time.LocalDateTime;
 
 /** Workspace Conversation MySQL 仓储。 */
 @Repository
@@ -33,6 +35,16 @@ public class WorkspaceConversationRepository implements IWorkspaceConversationRe
     @Override
     public Optional<WorkspaceConversationEntity> findByIdForUpdate(String conversationId) {
         return Optional.ofNullable(dao.queryByConversationIdForUpdate(conversationId)).map(this::toEntity);
+    }
+
+    @Override
+    public List<WorkspaceConversationEntity> findByUserId(Long userId, int limit) {
+        return dao.queryByUserId(userId, limit).stream().map(this::toEntity).toList();
+    }
+
+    @Override
+    public void touch(String conversationId, LocalDateTime updatedAt) {
+        dao.touch(conversationId, updatedAt);
     }
 
     private WorkspaceConversationEntity toEntity(WorkspaceConversation row) {

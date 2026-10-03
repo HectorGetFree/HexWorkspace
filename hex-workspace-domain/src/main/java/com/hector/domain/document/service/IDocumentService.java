@@ -60,4 +60,7 @@ public interface IDocumentService {
     /** 查询并校验属于指定 Workspace 的可用文档。 */
     DocumentEntity getActiveDocument(Long workspaceId, String documentCode);
 
+    /** 返回文档当前正式版本的真实主键。 */
+    Long getCurrentVersionId(DocumentEntity documentEntity);
+
 }

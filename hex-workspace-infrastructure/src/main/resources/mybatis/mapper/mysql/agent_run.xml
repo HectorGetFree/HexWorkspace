@@ -39,6 +39,13 @@
         FROM agent_run WHERE conversation_id = #{conversationId} AND status IN (0, 1, 2, 3)
         ORDER BY id DESC LIMIT 1
     </select>
+    <select id="queryByConversationId" resultMap="agentRunResultMap">
+        SELECT id, run_id, conversation_id, workspace_id, initiator_user_id, status, instruction,
+               CAST(resource_scope AS CHAR) resource_scope, CAST(allowed_tools AS CHAR) allowed_tools, version,
+               created_at, started_at, finished_at, failure_code, failure_message, lifecycle_sequence
+        FROM agent_run WHERE conversation_id = #{conversationId}
+        ORDER BY id ASC
+    </select>
     <update id="markRejected">
         UPDATE agent_run
         SET status = 5, failure_code = #{failureCode}, failure_message = #{failureMessage},

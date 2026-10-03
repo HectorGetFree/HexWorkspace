@@ -47,8 +47,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return "/internal/v1/agent-runs/lifecycle".equals(request.getRequestURI())
-                || "/internal/agent/capabilities/invoke".equals(request.getRequestURI());
+        String requestPath = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && requestPath.startsWith(contextPath)) {
+            requestPath = requestPath.substring(contextPath.length());
+        }
+        while (requestPath.length() > 1 && requestPath.endsWith("/")) {
+            requestPath = requestPath.substring(0, requestPath.length() - 1);
+        }
+        return "/internal/v1/agent-runs/lifecycle".equals(requestPath)
+                || "/internal/v1/agent-runs/permissions".equals(requestPath)
+                || "/internal/agent/capabilities/invoke".equals(requestPath);
     }
 
     /**
