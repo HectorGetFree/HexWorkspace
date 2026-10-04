@@ -41,8 +41,52 @@ python3 rag-eval/scripts/run_retrieval_v2.py \
 
 每次运行会在 `runs/<runId>/` 写入：文档映射、处理状态、逐题结果 `cases.jsonl` 与聚合指标 `summary.json`。`runs/` 被 Git 忽略，避免提交 JWT、真实 API 响应、模型答案和成本相关数据。
 
-`summary.json` 记录 retrieval 参数、就绪时的 Active Generation 身份、延迟与 `retrieval-v2.yml` 的 SHA-256。历史 `runs/baseline-v1-*` 不代表当前实现的指标。
+`summary.json` 记录 retrieval 参数、就绪时的 Active Generation 身份、浏览器侧与服务端分段延迟、按题型指标、未命中题目及 `retrieval-v2.yml` 的 SHA-256。历史 `runs/baseline-v1-*` 不代表当前实现的指标。
 
 评测题目会逐条追加写入 `cases.jsonl`，遇到单题网络超时会重试 GET 请求；重试仍失败时记录该题的 `status: ERROR` 并继续后续题目。使用相同的 `--run-id` 重新执行可以跳过已落盘题目，继续未完成部分。
 
-当前检索接口经过单文档版本去重后最多返回 20 条命中；默认 `topK=6`，因此 V2 输出 `Hit Rate@6`、`Recall@6` 与 `MRR@6`。V2 不输出答案正确率或拒答率；这些属于未来独立的 generation evaluation。
+当前检索接口经过单文档版本去重后最多返回 20 条命中；评测默认以 `candidateLimit=30` 取 Qdrant 初始候选池，再以 `topK=5` 输出最终结果，因此 V2 输出 `Hit Rate@5`、`Recall@5` 与 `MRR@5`。V2 不输出答案正确率或拒答率；这些属于未来独立的 generation evaluation。
+
+## 使用 dataset-v1.1
+
+`dataset-v1.1` 保留 V1.0 语料，仅修正 test split 中两条确定的重复 query 标注；详细原因见 `dataset-v1.1/CHANGELOG.md`。它的 158 题结果应作为后续优化的新基线，不能与 V1.0 的 160 题结果直接横比。
+
+```bash
+python3 rag-eval/scripts/run_retrieval_v2.py \
+  --dataset-root rag-eval/dataset-v1.1 \
+  --config rag-eval/configs/retrieval-v2-v1.1.yml \
+  --document-map rag-eval/runs/<已有V1.0运行目录>/document-map.json \
+  --candidate-limit 30 \
+  --top-k 5 \
+  --run-id retrieval-v2-v1.1-$(date -u +%Y%m%dT%H%M%SZ)
+```
+
+由于 V1.0/V1.1 的原始语料完全相同，上述命令可以复用同一专用 Workspace 的既有 document map；不需要重新上传语料。
+
+## Phase B：候选池深度对比
+
+Phase B 只比较 Qdrant 初始候选池 `candidateLimit`，不改变 MySQL 权威校验、每文档最多两段、最终排序或生成链路。固定同一 Workspace、document map、数据集和 `topK=5`，依次运行 `30 / 60 / 100`，再比较 `summary.json` 的 `Hit Rate@5`、`Recall@5`、`MRR@5`、`serverTimingMs` 与 `missedCases`。候选池扩大没有提升 numeric/multi-condition 的召回时，不应继续盲目增加候选数。
+
+## Phase C0：候选阶段诊断
+
+评测接口还会在 `cases.jsonl` 和 `summary.json` 的 `missedCases` 中写入 `retrievalDiagnostics`，仅包含内部评测需要的 `documentCode / rank / score`。它将漏题归因为：
+
+- `QDRANT_TOP_CANDIDATE_MISS`：黄金文档未进入本次 `candidateLimit` 的 Qdrant 候选；
+- `AUTHORITY_FILTERED`：进入 Qdrant 候选，但未通过 MySQL 当前权威校验；
+- `RANKING_MISS`：通过权威校验，但未进入最终 TopK；
+- `DIAGNOSTICS_UNAVAILABLE`：运行中的服务尚未部署该诊断版本。
+
+诊断只由 service-token 保护的评测调用生成；用户和 Agent 的正常检索不会构造或暴露这些候选信息。
+
+## Phase C1：可选 Rerank
+
+Rerank 位于 `Qdrant → MySQL 权威校验` 之后，最终结果仍会再次进行 MySQL 权威复核。默认关闭；服务超时、调用异常或响应不完整时自动回退原始向量排序。
+
+```bash
+export HEX_WORKSPACE_RERANK_ENABLED=true
+export DASHSCOPE_RERANK_API_KEY='...'
+# 使用 Model Studio 工作空间专属域名时，按账号区域覆盖 endpoint。
+export DASHSCOPE_RERANK_ENDPOINT='https://<workspace-id>.cn-beijing.maas.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank'
+```
+
+启用后，评测诊断额外包含 `rerankedCandidates`。其中 `score` 是单次请求内的 rerank relevance score，不能跨请求比较；新增的服务端耗时位于 `serverTimingMs.rerankMs`。

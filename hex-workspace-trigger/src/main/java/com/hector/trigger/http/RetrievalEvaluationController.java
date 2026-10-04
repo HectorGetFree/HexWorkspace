@@ -2,7 +2,6 @@ package com.hector.trigger.http;
 
 import com.hector.domain.knowledge.model.valobj.RetrievalEvaluationReadinessVO;
 import com.hector.domain.knowledge.model.valobj.RetrievalHitVO;
-import com.hector.domain.knowledge.model.valobj.RetrievalResultVO;
 import com.hector.domain.knowledge.service.IRetrievalEvaluationService;
 import com.hector.trigger.api.dto.RetrievalEvaluationReadinessRequestDTO;
 import com.hector.trigger.api.dto.RetrievalEvaluationRequestDTO;
@@ -42,10 +41,13 @@ public class RetrievalEvaluationController {
         if (!isAuthorized(authorization)) {
             return ResponseEntity.status(401).build();
         }
-        RetrievalResultVO result = evaluationService.retrieve(request.getWorkspaceId(), request.getQuery(), request.getTopK());
+        var result = evaluationService.retrieve(
+                request.getWorkspaceId(), request.getQuery(), request.getCandidateLimit(), request.getTopK());
         return ResponseEntity.ok(Map.of(
                 "workspaceId", request.getWorkspaceId(),
-                "hits", result.hits() == null ? List.of() : result.hits().stream().map(this::toHit).toList()));
+                "hits", result.result().hits() == null ? List.of() : result.result().hits().stream().map(this::toHit).toList(),
+                "timingMs", result.timing(),
+                "diagnostics", result.diagnostics()));
     }
 
     @PostMapping("/internal/v1/evaluation/retrieval/readiness")

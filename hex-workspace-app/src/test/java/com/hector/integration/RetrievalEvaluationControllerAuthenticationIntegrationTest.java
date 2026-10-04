@@ -1,6 +1,8 @@
 package com.hector.integration;
 
+import com.hector.domain.knowledge.model.valobj.RetrievalEvaluationResultVO;
 import com.hector.domain.knowledge.model.valobj.RetrievalResultVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalTimingVO;
 import com.hector.domain.knowledge.service.IRetrievalEvaluationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** RAG 评测内部入口必须只接受独立的 service token。 */
@@ -35,6 +38,8 @@ class RetrievalEvaluationControllerAuthenticationIntegrationTest {
     @BeforeEach
     void reset() {
         service.invocations = 0;
+        service.candidateLimit = null;
+        service.topK = null;
     }
 
     @Test
@@ -57,14 +62,18 @@ class RetrievalEvaluationControllerAuthenticationIntegrationTest {
     @Test
     void acceptsEvaluationTokenWithoutFrontendJwt() throws Exception {
         mockMvc.perform(post("/internal/v1/evaluation/retrieval")
-                        .header("Authorization", "Bearer eval-test-token")
+                .header("Authorization", "Bearer eval-test-token")
                         .contentType(MediaType.APPLICATION_JSON).content(request()))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timingMs.totalMs").value(0))
+                .andExpect(jsonPath("$.diagnostics.qdrantCandidates").isArray());
         assertEquals(1, service.invocations);
+        assertEquals(60, service.candidateLimit);
+        assertEquals(5, service.topK);
     }
 
     private String request() {
-        return "{\"workspaceId\":1,\"query\":\"测试\",\"topK\":6}";
+        return "{\"workspaceId\":1,\"query\":\"测试\",\"candidateLimit\":60,\"topK\":5}";
     }
 
     @TestConfiguration
@@ -79,10 +88,16 @@ class RetrievalEvaluationControllerAuthenticationIntegrationTest {
     static class FixtureEvaluationService implements IRetrievalEvaluationService {
         private int invocations;
 
+        private Integer candidateLimit;
+
+        private Integer topK;
+
         @Override
-        public RetrievalResultVO retrieve(Long workspaceId, String query, Integer topK) {
+        public RetrievalEvaluationResultVO retrieve(Long workspaceId, String query, Integer candidateLimit, Integer topK) {
             invocations++;
-            return RetrievalResultVO.empty();
+            this.candidateLimit = candidateLimit;
+            this.topK = topK;
+            return new RetrievalEvaluationResultVO(RetrievalResultVO.empty(), new RetrievalTimingVO(0, 0, 0, 0, 0));
         }
 
         @Override

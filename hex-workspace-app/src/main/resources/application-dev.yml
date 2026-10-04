@@ -39,6 +39,10 @@ hexworkspace:
       batch-size: 10
       timeout-ms: 10000
       retry-count: 2
+    rerank:
+      # 默认关闭；启用后仅重排已完成权威校验的 Qdrant 候选，失败自动回退向量排序。
+      enabled: ${HEX_WORKSPACE_RERANK_ENABLED:false}
+      timeout-ms: ${HEX_WORKSPACE_RERANK_TIMEOUT_MS:800}
     worker:
       lease-seconds: 120
       max-retry-count: 3
@@ -147,6 +151,11 @@ ai:
       api-key: ${DASHSCOPE_API_KEY:}
       model: text-embedding-v4
       dimensions: 1024
+  rerank:
+    dashscope:
+      api-key: ${DASHSCOPE_RERANK_API_KEY:${DASHSCOPE_API_KEY:}}
+      model: ${DASHSCOPE_RERANK_MODEL:qwen3-rerank}
+      endpoint: ${DASHSCOPE_RERANK_ENDPOINT:https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank}
   vector-store:
     qdrant:
       endpoint: http://127.0.0.1:6333

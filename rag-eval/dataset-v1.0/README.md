@@ -26,3 +26,9 @@ dataset-v1.0/
 问题由 `../scripts/generate_qa_v1.py` 根据 canonical text 中刻意注入的事实离线生成。脚本使用固定随机种子，重跑不会改变划分；它不调用模型，因此标注可审计、可复现。
 
 黄金证据使用 `documentKey + heading + quote`，不使用运行时的 `chunkNo`。这样分段策略变化后，评测集仍可复用。
+
+## 2026-10-03 manifest 完整性修订
+
+本次仅修正 `manifest/documents.jsonl` 中 20 条与当前 `corpus/raw/` 文件不一致的
+`rawSha256` 元数据。原始语料、canonical text、QA 标注及历史运行结果均未改动。
+后续数据集校验应以修订后的 SHA-256 值验证实际 raw 文件。

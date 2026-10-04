@@ -1,7 +1,7 @@
 package com.hector.domain.knowledge.service;
 
 import com.hector.domain.knowledge.model.valobj.RetrievalEvaluationReadinessVO;
-import com.hector.domain.knowledge.model.valobj.RetrievalResultVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalEvaluationResultVO;
 
 import java.util.List;
 
@@ -11,7 +11,7 @@ import java.util.List;
  */
 public interface IRetrievalEvaluationService {
 
-    RetrievalResultVO retrieve(Long workspaceId, String query, Integer topK);
+    RetrievalEvaluationResultVO retrieve(Long workspaceId, String query, Integer candidateLimit, Integer topK);
 
     List<RetrievalEvaluationReadinessVO> readiness(Long workspaceId, List<String> documentCodes);
 }

@@ -12,7 +12,8 @@ retrieval:
   implementation: IKnowledgeRetrievalService
   vectorStore: qdrant-candidate-recall
   authority: mysql-workspace-document-folder-active-generation-validation
-  finalTopK: 6
+  candidateLimit: 30
+  finalTopK: 5
 
 metrics:
   hitRate: true

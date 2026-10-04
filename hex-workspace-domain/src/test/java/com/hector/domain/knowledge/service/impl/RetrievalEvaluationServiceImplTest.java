@@ -8,8 +8,12 @@ import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexGenerationEntity;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexStateEntity;
 import com.hector.domain.knowledge.model.valobj.RetrievalContextVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalCandidateRankVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalDiagnosticsVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalExecutionVO;
 import com.hector.domain.knowledge.model.valobj.RetrievalOptionsVO;
 import com.hector.domain.knowledge.model.valobj.RetrievalResultVO;
+import com.hector.domain.knowledge.model.valobj.RetrievalTimingVO;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexGenerationRepository;
 import com.hector.domain.knowledge.repository.IKnowledgeIndexStateRepository;
 import com.hector.domain.knowledge.service.IKnowledgeRetrievalService;
@@ -22,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -35,13 +40,14 @@ class RetrievalEvaluationServiceImplTest {
     void retrievesUsingWorkspaceOwnerInsteadOfCallerSuppliedIdentity() {
         Fixture fixture = new Fixture();
         when(fixture.workspaces.findById(1L)).thenReturn(Optional.of(activeWorkspace()));
-        when(fixture.retrieval.retrieve(eq(new RetrievalContextVO(9L, 1L)), eq("问题"),
-                eq(new RetrievalOptionsVO(null, null, 6)))).thenReturn(RetrievalResultVO.empty());
+        when(fixture.retrieval.retrieveWithEvaluationTrace(eq(new RetrievalContextVO(9L, 1L)), eq("问题"),
+                eq(new RetrievalOptionsVO(60, null, 5))))
+                .thenReturn(new RetrievalExecutionVO(RetrievalResultVO.empty(), new RetrievalTimingVO(1, 2, 3, 4, 10)));
 
-        fixture.service.retrieve(1L, "问题", 6);
+        fixture.service.retrieve(1L, "问题", 60, 5);
 
-        verify(fixture.retrieval).retrieve(new RetrievalContextVO(9L, 1L), "问题",
-                new RetrievalOptionsVO(null, null, 6));
+        verify(fixture.retrieval).retrieveWithEvaluationTrace(new RetrievalContextVO(9L, 1L), "问题",
+                new RetrievalOptionsVO(60, null, 5));
     }
 
     @Test
@@ -63,6 +69,29 @@ class RetrievalEvaluationServiceImplTest {
 
         assertTrue(readiness.ready());
         assertTrue(readiness.versionId().equals(31L));
+    }
+
+    @Test
+    void mapsInternalCandidateRanksToDocumentCodesForEvaluationOnly() {
+        Fixture fixture = new Fixture();
+        when(fixture.workspaces.findById(1L)).thenReturn(Optional.of(activeWorkspace()));
+        when(fixture.documents.listByWorkspaceId(1L)).thenReturn(List.of(
+                DocumentEntity.builder().id(11L).documentCode("doc-a").build()));
+        RetrievalExecutionVO execution = new RetrievalExecutionVO(
+                RetrievalResultVO.empty(), new RetrievalTimingVO(1, 2, 3, 4, 10),
+                new RetrievalDiagnosticsVO(
+                        List.of(new RetrievalCandidateRankVO(11L, 1, 0.9D)),
+                        List.of(new RetrievalCandidateRankVO(11L, 1, 0.9D)),
+                        List.of()));
+        when(fixture.retrieval.retrieveWithEvaluationTrace(eq(new RetrievalContextVO(9L, 1L)), eq("问题"),
+                eq(new RetrievalOptionsVO(30, null, 5)))).thenReturn(execution);
+
+        var result = fixture.service.retrieve(1L, "问题", 30, 5);
+
+        assertEquals("doc-a", result.diagnostics().qdrantCandidates().get(0).documentCode());
+        assertEquals(1, result.diagnostics().authorityValidCandidates().get(0).rank());
+        assertTrue(result.diagnostics().rerankedCandidates().isEmpty());
+        assertTrue(result.diagnostics().finalCandidates().isEmpty());
     }
 
     @Test

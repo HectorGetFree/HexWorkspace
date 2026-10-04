@@ -25,7 +25,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_ROOT = PROJECT_ROOT / "rag-eval" / "dataset-v1.0"
-CONFIG_PATH = PROJECT_ROOT / "rag-eval" / "configs" / "retrieval-v2.yml"
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "rag-eval" / "configs" / "retrieval-v2.yml"
 
 
 class ApiError(RuntimeError):
@@ -40,8 +40,12 @@ def parse_args():
     parser.add_argument("--user-token", default=os.getenv("HEX_WORKSPACE_TOKEN", ""),
                         help="only required by --upload for public document import")
     parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
+    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH,
+                        help="copied into the run directory and hashed in summary.json")
     parser.add_argument("--split", choices=("train", "dev", "test"), default="test")
-    parser.add_argument("--top-k", type=int, default=6)
+    parser.add_argument("--candidate-limit", type=int, default=30,
+                        help="Qdrant 初始候选池大小，仅用于受控离线评测")
+    parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--run-id", default=datetime.now(timezone.utc).strftime("retrieval-v2-%Y%m%dT%H%M%SZ"))
     parser.add_argument("--upload", action="store_true", help="import frozen V1 raw corpus into a dedicated workspace")
     parser.add_argument("--document-map", type=Path, help="existing document map; avoids duplicate imports")
@@ -56,6 +60,8 @@ def parse_args():
         parser.error("首次运行使用 --upload；复用已有语料时只使用 --document-map PATH")
     if args.upload and not args.user_token:
         parser.error("--upload 需要 --user-token 或 HEX_WORKSPACE_TOKEN")
+    if not 1 <= args.candidate_limit <= 100:
+        parser.error("--candidate-limit 必须在 1 到 100 之间")
     if not 1 <= args.top_k <= 20:
         parser.error("--top-k 必须在 1 到 20 之间")
     return args
@@ -123,10 +129,11 @@ class WorkspaceApi:
         return self.request("POST", "/internal/v1/evaluation/retrieval/readiness", body=payload,
                             content_type="application/json", token=self.evaluation_token, retryable=True)["documents"]
 
-    def retrieve(self, workspace_id, question, top_k):
-        payload = json.dumps({"workspaceId": workspace_id, "query": question, "topK": top_k}, ensure_ascii=False).encode()
+    def retrieve(self, workspace_id, question, candidate_limit, top_k):
+        payload = json.dumps({"workspaceId": workspace_id, "query": question,
+                              "candidateLimit": candidate_limit, "topK": top_k}, ensure_ascii=False).encode()
         return self.request("POST", "/internal/v1/evaluation/retrieval", body=payload,
-                            content_type="application/json", token=self.evaluation_token, retryable=True)["hits"]
+                            content_type="application/json", token=self.evaluation_token, retryable=True)
 
 
 def json_lines(path):
@@ -176,7 +183,9 @@ def evaluate(api, args, questions, document_map, run_dir):
         for index, question in enumerate(questions, start=1):
             started = time.perf_counter()
             try:
-                hits = api.retrieve(args.workspace_id, question["question"], args.top_k)
+                retrieval_response = api.retrieve(
+                    args.workspace_id, question["question"], args.candidate_limit, args.top_k)
+                hits = retrieval_response["hits"]
                 retrieved = []
                 for hit in hits:
                     key = reverse.get(hit.get("documentCode"))
@@ -184,13 +193,17 @@ def evaluate(api, args, questions, document_map, run_dir):
                         retrieved.append(key)
                 golden = {item["documentKey"] for item in question["evidences"]}
                 ranks = [rank for rank, key in enumerate(retrieved, 1) if key in golden]
+                diagnostics = retrieval_response.get("diagnostics")
                 result = {
                     "id": question["id"], "category": question["category"], "question": question["question"],
                     "goldenDocumentKeys": sorted(golden), "retrievedDocumentKeys": retrieved,
                     "goldenRanks": ranks, "hitAtK": bool(ranks),
                     "recallAtK": len(set(retrieved) & golden) / len(golden) if golden else None,
                     "reciprocalRankAtK": 1 / ranks[0] if ranks else 0,
-                    "hits": hits, "latencyMs": round((time.perf_counter() - started) * 1000, 2), "status": "SUCCESS",
+                    "hits": hits, "retrievalTimingMs": retrieval_response.get("timingMs"),
+                    "retrievalDiagnostics": diagnostics,
+                    "missClassification": classify_miss(golden, diagnostics, reverse),
+                    "latencyMs": round((time.perf_counter() - started) * 1000, 2), "status": "SUCCESS",
                 }
             except ApiError as exc:
                 result = {"id": question["id"], "category": question["category"], "question": question["question"],
@@ -201,6 +214,24 @@ def evaluate(api, args, questions, document_map, run_dir):
             if index % 10 == 0 or index == len(questions):
                 print(f"evaluated {index}/{len(questions)}")
     return cases
+
+
+def classify_miss(golden, diagnostics, reverse):
+    if not golden:
+        return "NOT_APPLICABLE"
+    if not diagnostics:
+        return "DIAGNOSTICS_UNAVAILABLE"
+    stages = (
+        ("qdrantCandidates", "QDRANT_TOP_CANDIDATE_MISS"),
+        ("authorityValidCandidates", "AUTHORITY_FILTERED"),
+        ("finalCandidates", "RANKING_MISS"),
+    )
+    for stage, classification in stages:
+        candidates = diagnostics.get(stage, [])
+        keys = {reverse.get(candidate.get("documentCode")) for candidate in candidates}
+        if not (keys & golden):
+            return classification
+    return "FINAL_HIT"
 
 
 def percentile(values, percent):
@@ -214,14 +245,48 @@ def summary(cases, args):
     successful = [case for case in cases if case["status"] == "SUCCESS"]
     answerable = [case for case in successful if case.get("goldenDocumentKeys")]
     latencies = [case["latencyMs"] for case in successful]
+    stage_timings = {
+        "embeddingMs": [case["retrievalTimingMs"]["embeddingMs"] for case in successful if case.get("retrievalTimingMs")],
+        "qdrantMs": [case["retrievalTimingMs"]["qdrantMs"] for case in successful if case.get("retrievalTimingMs")],
+        "authorityInitialMs": [case["retrievalTimingMs"]["authorityInitialMs"] for case in successful if case.get("retrievalTimingMs")],
+        "rerankMs": [case["retrievalTimingMs"].get("rerankMs", 0) for case in successful if case.get("retrievalTimingMs")],
+        "authorityRecheckMs": [case["retrievalTimingMs"]["authorityRecheckMs"] for case in successful if case.get("retrievalTimingMs")],
+        "totalMs": [case["retrievalTimingMs"]["totalMs"] for case in successful if case.get("retrievalTimingMs")],
+    }
+    by_category = {}
+    for category in sorted({case["category"] for case in successful}):
+        category_cases = [case for case in successful if case["category"] == category]
+        category_answerable = [case for case in category_cases if case.get("goldenDocumentKeys")]
+        by_category[category] = {
+            "questionCount": len(category_cases),
+            "hitRateAtK": sum(case["hitAtK"] for case in category_answerable) / len(category_answerable)
+            if category_answerable else None,
+            "recallAtK": statistics.mean(case["recallAtK"] for case in category_answerable)
+            if category_answerable else None,
+            "mrrAtK": statistics.mean(case["reciprocalRankAtK"] for case in category_answerable)
+            if category_answerable else None,
+            "latencyMs": {"p50": percentile([case["latencyMs"] for case in category_cases], 50),
+                          "p95": percentile([case["latencyMs"] for case in category_cases], 95)},
+        }
+    missed_cases = [{"id": case["id"], "category": case["category"], "question": case["question"],
+                     "goldenDocumentKeys": case["goldenDocumentKeys"],
+                     "retrievedDocumentKeys": case["retrievedDocumentKeys"],
+                     "missClassification": case.get("missClassification"),
+                     "retrievalDiagnostics": case.get("retrievalDiagnostics")}
+                    for case in successful if case.get("goldenDocumentKeys") and not case["hitAtK"]]
     return {
-        "datasetVersion": "dataset-v1.0", "split": args.split, "topK": args.top_k,
+        "datasetVersion": args.dataset_root.name, "split": args.split,
+        "candidateLimit": args.candidate_limit, "topK": args.top_k,
         "questionCount": len(cases), "successfulQuestionCount": len(successful),
         "errorQuestionCount": len(cases) - len(successful),
         f"hitRateAt{args.top_k}": sum(case["hitAtK"] for case in answerable) / len(answerable) if answerable else None,
         f"recallAt{args.top_k}": statistics.mean(case["recallAtK"] for case in answerable) if answerable else None,
         f"mrrAt{args.top_k}": statistics.mean(case["reciprocalRankAtK"] for case in answerable) if answerable else None,
         "latencyMs": {"p50": percentile(latencies, 50), "p95": percentile(latencies, 95), "p99": percentile(latencies, 99)},
+        "serverTimingMs": {stage: {"p50": percentile(values, 50), "p95": percentile(values, 95),
+                                    "p99": percentile(values, 99)} for stage, values in stage_timings.items()},
+        "byCategory": by_category,
+        "missedCases": missed_cases,
     }
 
 
@@ -240,9 +305,9 @@ def main():
     questions = json_lines(args.dataset_root / "qa" / f"{args.split}.jsonl")
     cases = evaluate(api, args, questions, document_map, run_dir)
     report = summary(cases, args) | {"activeGenerationReadiness": readiness}
-    report["configSha256"] = hashlib.sha256(CONFIG_PATH.read_bytes()).hexdigest()
+    report["configSha256"] = hashlib.sha256(args.config.read_bytes()).hexdigest()
     (run_dir / "summary.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    shutil.copy2(CONFIG_PATH, run_dir / CONFIG_PATH.name)
+    shutil.copy2(args.config, run_dir / args.config.name)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

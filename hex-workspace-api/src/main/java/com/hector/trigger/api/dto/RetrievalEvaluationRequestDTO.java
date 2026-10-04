@@ -12,5 +12,9 @@ public class RetrievalEvaluationRequestDTO implements Serializable {
 
     private String query;
 
+    /** Qdrant 初始候选池上限；仅供受控离线评测比较召回深度。 */
+    private Integer candidateLimit;
+
+    /** 最终经过权威校验和单文档去重后返回的结果数。 */
     private Integer topK;
 }

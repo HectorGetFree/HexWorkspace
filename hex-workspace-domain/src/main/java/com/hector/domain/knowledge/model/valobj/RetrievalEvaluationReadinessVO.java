@@ -5,6 +5,7 @@ public record RetrievalEvaluationReadinessVO(
         String documentCode,
         Long documentId,
         Long versionId,
+        String generationId,
         boolean ready,
         String reason) {
 }
