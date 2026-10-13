@@ -18,6 +18,8 @@ app:
     cross-origin: '*'
 
 hexworkspace:
+  agent:
+    permission-mode: auto_approve
   jwt:
     access-expire-minutes: 120
   hexgent:
@@ -43,6 +45,10 @@ hexworkspace:
       # 默认关闭；启用后仅重排已完成权威校验的 Qdrant 候选，失败自动回退向量排序。
       enabled: ${HEX_WORKSPACE_RERANK_ENABLED:false}
       timeout-ms: ${HEX_WORKSPACE_RERANK_TIMEOUT_MS:800}
+      # 默认沿用已验证的通用问答排序指令；通过环境变量仅做受控 A/B 评测。
+      instruct: ${HEX_WORKSPACE_RERANK_INSTRUCT:Given a web search query, retrieve relevant passages that answer the query.}
+      # 1.0 为纯 Rerank；较低值按候选名次融合原始 Qdrant 排名，避免 Rerank 挤掉稳定命中。
+      rerank-weight: ${HEX_WORKSPACE_RERANK_WEIGHT:1.0}
     worker:
       lease-seconds: 120
       max-retry-count: 3
