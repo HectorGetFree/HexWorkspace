@@ -2,6 +2,7 @@ package com.hector.domain.workspace.service.impl;
 
 import com.hector.domain.document.model.entity.DocumentEntity;
 import com.hector.domain.document.service.IDocumentService;
+import com.hector.domain.document.repository.IDocumentVersionRepository;
 import com.hector.domain.folder.model.entity.FolderEntity;
 import com.hector.domain.folder.service.IFolderService;
 import com.hector.domain.workspace.model.valobj.WorkspaceStructureItemVO;
@@ -21,12 +22,15 @@ public class WorkspaceStructureServiceImpl implements IWorkspaceStructureService
     private final IFolderService folderService;
     private final IDocumentService documentService;
     private final IWorkspaceRepository workspaceRepository;
+    private final IDocumentVersionRepository documentVersionRepository;
 
     public WorkspaceStructureServiceImpl(IFolderService folderService, IDocumentService documentService,
-                                         IWorkspaceRepository workspaceRepository) {
+                                         IWorkspaceRepository workspaceRepository,
+                                         IDocumentVersionRepository documentVersionRepository) {
         this.folderService = folderService;
         this.documentService = documentService;
         this.workspaceRepository = workspaceRepository;
+        this.documentVersionRepository = documentVersionRepository;
     }
 
     @Override
@@ -49,8 +53,15 @@ public class WorkspaceStructureServiceImpl implements IWorkspaceStructureService
         documentService.listVisibleDocumentsByParentId(workspaceId, parent.getId()).stream()
                 .filter(document -> document.isActive() && document.getCurrentVersionNo() != null
                         && document.getCurrentVersionNo() > 0)
-                .map(document -> new WorkspaceStructureItemVO(
-                        "document", document.getId(), document.getFileName(), document.getCurrentVersionNo()))
+                .map(document -> {
+                    // versionId 必须是不可变版本主键，才能直接用于 get_document 和版本冲突检查。
+                    Long versionId = documentVersionRepository.findByDocumentIdAndVersionNo(
+                                    document.getId(), document.getCurrentVersionNo())
+                            .orElseThrow(() -> new IllegalStateException("文档当前版本记录不存在"))
+                            .getId();
+                    return new WorkspaceStructureItemVO(
+                            "document", document.getId(), document.getFileName(), versionId);
+                })
                 .forEach(items::add);
 
         // 3. 目录优先、名称稳定排序、ID 兜底，确保截断边界在稳定顺序之后计算。
