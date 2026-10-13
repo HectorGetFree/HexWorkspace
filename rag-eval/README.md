@@ -9,6 +9,107 @@
 - `scripts/`：评测执行器与指标计算脚本，后续补充。
 - `runs/`：每次评测的原始结果与报告，不反向修改数据集。
 
+`dataset-v1.*` 仍是 Workspace 受控回归集，不能当作 General IR 能力证明。V2 还保持三套
+**不混分**的 suite：`general`（公开 IR）、`workspace_business`（业务资料）和
+`synthetic_hard`（明确失败边界）。
+
+## General：SciFact deterministic sanity subset
+
+General 首个试点复用 SciFact 的公开 corpus/query/qrels，但为了先验证当前 Workspace 上传、
+索引、Generation 与 retrieval 这条真实链路，默认只物化确定性的子集：50 条 test query、每条
+query 的所有正相关 document 和 350 条 deterministic distractor。它不是完整 BEIR SciFact
+benchmark；其 Hit/Recall/MRR 只能作为 `general` 单独报告，不能与 Workspace Business/Hard 混合。
+
+公开原始数据和物化文本放在 Git 忽略的 `rag-eval/cache/`。准备器会写入 archive SHA-256、来源、
+subsample seed 和许可证记录；不要把下载数据直接提交。SciFact 原项目的许可证说明为：
+claims/evidence annotations 是 CC BY 4.0，corpus abstracts 是 ODC-By 1.0。
+
+```bash
+# 如已有下载的 BEIR SciFact archive，优先显式传入本地文件。
+python3 rag-eval/scripts/prepare_general_scifact.py \
+  --archive /absolute/path/to/scifact.zip
+
+# 或由脚本下载；会保存到被 Git 忽略的 rag-eval/cache/downloads/。
+python3 rag-eval/scripts/prepare_general_scifact.py --download
+
+# 使用新的、专用 evaluation Workspace。--upload 只在首次导入时使用。
+python3 rag-eval/scripts/run_retrieval_v2.py \
+  --dataset-root rag-eval/cache/general-scifact-sanity-v1 \
+  --config rag-eval/configs/general-scifact-sanity-v1.yml \
+  --upload \
+  --candidate-limit 30 \
+  --top-k 5 \
+  --run-id general-scifact-sanity-$(date -u +%Y%m%dT%H%M%SZ)
+```
+
+后续复用该 corpus 时使用首次 run 输出的 `document-map.json`，并固定相同 dataset metadata、
+candidateLimit、topK 和 retrieval config。General 只验证 document-level qrels，不走
+quote-to-runtime-chunk mapping；后者专属于 Workspace Business/Hard 的 evidence-first 评测。
+
+## General：完整 SciFact test
+
+正式 General 运行使用 SciFact 的全部 5,183 份 corpus 文档和 test split 的全部 300 条有正
+qrels query。这里的“全部 query”专指 test split：archive 同时带有 train/dev query，混入它们会破坏
+测试集语义。完整上传会创建 5,183 条异步索引任务，应使用新的专用 Workspace，并按实际 Worker
+吞吐设置较长的 poll timeout。
+
+```bash
+# 只物化完整 corpus 与 test qrels；公开数据仍在被忽略的 rag-eval/cache/ 下。
+python3 rag-eval/scripts/prepare_general_scifact.py \
+  --archive rag-eval/cache/downloads/scifact.zip \
+  --full
+
+# 首次完整导入与评测。不要与 sanity subset 或产品 Workspace 共用 Workspace。
+python3 rag-eval/scripts/run_retrieval_v2.py \
+  --dataset-root rag-eval/cache/general-scifact-full-v1 \
+  --config rag-eval/configs/general-scifact-full-v1.yml \
+  --upload \
+  --candidate-limit 30 \
+  --top-k 5 \
+  --upload-batch-size 25 \
+  --readiness-batch-size 10 \
+  --poll-timeout 14400 \
+  --run-id general-scifact-full-$(date -u +%Y%m%dT%H%M%SZ)
+```
+
+这仍然不应与 BEIR leaderboard 直接横比：本项目会经过自己的文本物化、上传、chunking、embedding、
+Qdrant 与 MySQL authority recheck。它是完整 SciFact test qrels 下的 HexWorkspace General 基线。
+
+### BM25 candidate rescue diagnostic
+
+该离线实验只诊断 BM25 是否能召回 Dense Top30 漏掉的 qrels document。它读取冻结的 SciFact
+corpus、test qrels 和既有 C1 的 `qdrantCandidates` diagnostics；不调用生产检索、不 rerank、不做
+RRF，也不修改 corpus、query、qrels 或 C1 产物。
+
+```bash
+python3 rag-eval/scripts/run_scifact_bm25_rescue.py \
+  --dataset-root rag-eval/cache/general-scifact-full-v1 \
+  --baseline-run rag-eval/runs/general-scifact-full-20261004T075524Z \
+  --top-n 30
+```
+
+新 run 会写出 `summary.json`、全部 300 条的 `cases.jsonl`，以及仅包含 Dense candidate miss 的
+`dense-candidate-miss-attribution.jsonl`。其中 rescue 原因只是可复现的词法启发式标签，不是人工相关性
+判定，也不能直接证明 Hybrid 的最终 Top5 指标会提升。
+
+### C2：Dense + BM25 RRF 对照
+
+C2 使用相同 Active Generation 的 **Chunk** 作为 Dense、BM25 和 RRF 的共同候选单位：Dense Top30 与
+离线 BM25 Top30 经 RRF 融合到 30 条候选，再由 WS 评测专用接口以当前 `IRetrievalReranker` 重排为
+Top5。它不改用户检索入口；运行前需要部署带 `/internal/v1/evaluation/retrieval/rerank` 的最新 WS。
+
+```bash
+python3 rag-eval/scripts/run_scifact_c2_hybrid.py \
+  --dataset-root rag-eval/cache/general-scifact-full-v1 \
+  --baseline-run rag-eval/runs/general-scifact-full-20261004T075524Z \
+  --candidate-limit 30 \
+  --top-k 5 \
+  --rrf-k 60
+```
+
+输出独立保存为新的 C2 run，包含 Active Generation Chunk snapshot、每条 query 的 Dense/BM25/RRF/rerank
+候选和最终指标；不得覆盖 C1。只有 C2 的最终 Hit/Recall/MRR 与额外延迟同时被记录后，才讨论正式 Hybrid。
+
 ## 数据集原则
 
 1. 文档使用稳定的 `documentKey`，不绑定运行时生成的 `documentCode`。
@@ -90,3 +191,7 @@ export DASHSCOPE_RERANK_ENDPOINT='https://<workspace-id>.cn-beijing.maas.aliyunc
 ```
 
 启用后，评测诊断额外包含 `rerankedCandidates`。其中 `score` 是单次请求内的 rerank relevance score，不能跨请求比较；新增的服务端耗时位于 `serverTimingMs.rerankMs`。
+
+默认 instruct 保持已验证的通用问答排序规则。可以通过 `HEX_WORKSPACE_RERANK_INSTRUCT` 覆盖该指令进行单变量 A/B 评测；每次只改变 instruct，固定 Workspace、`document-map`、`candidateLimit=30` 与 `topK=5`。
+
+`HEX_WORKSPACE_RERANK_WEIGHT` 控制按候选名次融合 Rerank 与原始 Qdrant 排名：`1.0` 是纯 Rerank，`0.0` 是原始向量顺序。候选名次而非 provider 原始分数参与融合，因为 Rerank relevance score 只在单次请求内可比较。建议固定通用 instruct，依次测量 `0.7 / 0.8 / 0.9 / 1.0`。

@@ -30,6 +30,7 @@ import com.hector.domain.knowledge.service.IKnowledgeRetrievalService;
 import com.hector.domain.workspace.model.entity.WorkspaceEntity;
 import com.hector.domain.workspace.repository.IWorkspaceRepository;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -75,6 +76,9 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
     private IRetrievalVectorStore retrievalVectorStore;
     @Resource
     private IRetrievalReranker retrievalReranker;
+    /** 1.0 保持纯 Rerank；低于 1.0 时以原始 Qdrant 排名作为稳定锚点。 */
+    @Value("${hexworkspace.knowledge.rerank.rerank-weight:1.0}")
+    private double rerankWeight = 1D;
 
     @Override
     public RetrievalResultVO retrieve(RetrievalContextVO context, String query, RetrievalOptionsVO options) {
@@ -83,17 +87,24 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
 
     @Override
     public RetrievalExecutionVO retrieveWithTrace(RetrievalContextVO context, String query, RetrievalOptionsVO options) {
-        return execute(context, query, options, false);
+        return execute(context, query, options, false, true);
     }
 
     @Override
     public RetrievalExecutionVO retrieveWithEvaluationTrace(
             RetrievalContextVO context, String query, RetrievalOptionsVO options) {
-        return execute(context, query, options, true);
+        return execute(context, query, options, true, true);
+    }
+
+    @Override
+    public RetrievalExecutionVO retrieveCandidatesWithEvaluationTrace(
+            RetrievalContextVO context, String query, RetrievalOptionsVO options) {
+        return execute(context, query, options, true, false);
     }
 
     private RetrievalExecutionVO execute(
-            RetrievalContextVO context, String query, RetrievalOptionsVO options, boolean includeDiagnostics) {
+            RetrievalContextVO context, String query, RetrievalOptionsVO options,
+            boolean includeDiagnostics, boolean applyRerank) {
         long totalStartedAt = System.nanoTime();
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("检索内容不能为空");
@@ -122,7 +133,9 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
         double authorityInitialMs = initialAuthorityMs + elapsedMs(authorityValidationStartedAt);
 
         long rerankStartedAt = System.nanoTime();
-        RerankExecution rerankExecution = rerankAuthorizedHits(query.trim(), authorizedHits);
+        RerankExecution rerankExecution = applyRerank
+                ? rerankAuthorizedHits(query.trim(), authorizedHits)
+                : new RerankExecution(authorizedHits, List.of());
         double rerankMs = elapsedMs(rerankStartedAt);
         List<RetrievalHitVO> selectedHits = limitHits(rerankExecution.hits(), normalizedOptions);
 
@@ -188,12 +201,25 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
             if (scoresByIndex.size() != authorizedHits.size()) {
                 throw new IllegalStateException("Rerank 返回候选标识不完整");
             }
-            List<Integer> indexes = new ArrayList<>(scoresByIndex.keySet());
-            indexes.sort(Comparator
+            List<Integer> rerankIndexes = new ArrayList<>(scoresByIndex.keySet());
+            rerankIndexes.sort(Comparator
                     .comparing((Integer index) -> scoresByIndex.get(index), Comparator.reverseOrder())
                     .thenComparing(index -> authorizedHits.get(index).score(), Comparator.nullsLast(Comparator.reverseOrder()))
                     .thenComparingInt(Integer::intValue));
-            log.info("可信知识检索 Rerank 完成 candidateCount:{}", authorizedHits.size());
+            Map<Integer, Integer> rerankRanks = new HashMap<>();
+            for (int rank = 0; rank < rerankIndexes.size(); rank++) {
+                rerankRanks.put(rerankIndexes.get(rank), rank + 1);
+            }
+            double effectiveRerankWeight = normalizedRerankWeight();
+            List<Integer> indexes = new ArrayList<>(rerankIndexes);
+            indexes.sort(Comparator
+                    .comparing((Integer index) -> blendedRankScore(
+                            index + 1, rerankRanks.get(index), authorizedHits.size(), effectiveRerankWeight))
+                    .reversed()
+                    .thenComparing(index -> scoresByIndex.get(index), Comparator.reverseOrder())
+                    .thenComparing(index -> authorizedHits.get(index).score(), Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparingInt(Integer::intValue));
+            log.info("可信知识检索 Rerank 完成 candidateCount:{} rerankWeight:{}", authorizedHits.size(), effectiveRerankWeight);
             List<RetrievalHitVO> rankedHits = indexes.stream().map(authorizedHits::get).toList();
             Map<Long, RetrievalCandidateRankVO> firstByDocument = new LinkedHashMap<>();
             for (int rank = 0; rank < indexes.size(); rank++) {
@@ -215,6 +241,26 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
         return "标题：" + Objects.toString(hit.title(), "")
                 + "\n章节：" + heading
                 + "\n正文：" + Objects.toString(hit.content(), "");
+    }
+
+    /**
+     * Provider relevance score 仅在单次请求内可比较，故按名次归一化融合，避免跨请求或模型版本的分值尺度漂移。
+     */
+    private double blendedRankScore(int vectorRank, int rerankRank, int candidateCount, double effectiveRerankWeight) {
+        if (candidateCount <= 1) {
+            return 1D;
+        }
+        double vectorRankScore = (candidateCount - vectorRank) / (double) (candidateCount - 1);
+        double rerankRankScore = (candidateCount - rerankRank) / (double) (candidateCount - 1);
+        return effectiveRerankWeight * rerankRankScore + (1D - effectiveRerankWeight) * vectorRankScore;
+    }
+
+    private double normalizedRerankWeight() {
+        if (Double.isFinite(rerankWeight) && rerankWeight >= 0D && rerankWeight <= 1D) {
+            return rerankWeight;
+        }
+        log.warn("可信知识检索 Rerank 权重非法，回退纯 Rerank configuredWeight:{}", rerankWeight);
+        return 1D;
     }
 
     private WorkspaceEntity requireAccessibleWorkspace(RetrievalContextVO context) {
@@ -351,35 +397,39 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
         return selected;
     }
 
-    /** 对同文档的多 Chunk 只保留首个最佳排名，便于评测判断候选阶段归因。 */
+    /**
+     * 保留候选 Chunk 身份，供离线评测在与 BM25 相同的 Chunk 粒度做候选融合。
+     * 正常用户检索不读取 diagnostics，故不改变生产召回、授权或排序结果。
+     */
     private List<RetrievalCandidateRankVO> candidateRanks(List<RetrievalCandidateVO> candidates) {
         if (candidates == null || candidates.isEmpty()) {
             return List.of();
         }
-        Map<Long, RetrievalCandidateRankVO> bestByDocument = new LinkedHashMap<>();
+        List<RetrievalCandidateRankVO> ranks = new ArrayList<>();
         for (int index = 0; index < candidates.size(); index++) {
             RetrievalCandidateVO candidate = candidates.get(index);
-            if (candidate != null && candidate.documentId() != null) {
-                bestByDocument.putIfAbsent(candidate.documentId(),
-                        new RetrievalCandidateRankVO(candidate.documentId(), index + 1, candidate.score()));
+            if (candidate != null && candidate.documentId() != null && candidate.generationId() != null
+                    && candidate.chunkNo() != null) {
+                ranks.add(new RetrievalCandidateRankVO(candidate.documentId(), candidate.generationId(),
+                        candidate.chunkNo(), index + 1, candidate.score()));
             }
         }
-        return List.copyOf(bestByDocument.values());
+        return List.copyOf(ranks);
     }
 
     private List<RetrievalCandidateRankVO> hitRanks(List<RetrievalHitVO> hits) {
         if (hits == null || hits.isEmpty()) {
             return List.of();
         }
-        Map<Long, RetrievalCandidateRankVO> bestByDocument = new LinkedHashMap<>();
+        List<RetrievalCandidateRankVO> ranks = new ArrayList<>();
         for (int index = 0; index < hits.size(); index++) {
             RetrievalHitVO hit = hits.get(index);
-            if (hit != null && hit.documentId() != null) {
-                bestByDocument.putIfAbsent(hit.documentId(),
-                        new RetrievalCandidateRankVO(hit.documentId(), index + 1, hit.score()));
+            if (hit != null && hit.documentId() != null && hit.generationId() != null && hit.chunkNo() != null) {
+                ranks.add(new RetrievalCandidateRankVO(hit.documentId(), hit.generationId(), hit.chunkNo(),
+                        index + 1, hit.score()));
             }
         }
-        return List.copyOf(bestByDocument.values());
+        return List.copyOf(ranks);
     }
 
     private String hitKey(RetrievalHitVO hit) {

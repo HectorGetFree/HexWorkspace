@@ -22,6 +22,8 @@ import java.util.List;
 @Component
 public class DashScopeRetrievalReranker implements IRetrievalReranker {
 
+    private static final String DEFAULT_INSTRUCT = "Given a web search query, retrieve relevant passages that answer the query.";
+
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     @Value("${hexworkspace.knowledge.rerank.enabled:false}")
@@ -34,7 +36,7 @@ public class DashScopeRetrievalReranker implements IRetrievalReranker {
     private String endpoint;
     @Value("${hexworkspace.knowledge.rerank.timeout-ms:800}")
     private long timeoutMs;
-    @Value("${hexworkspace.knowledge.rerank.instruct:Given a web search query, retrieve relevant passages that answer the query.}")
+    @Value("${hexworkspace.knowledge.rerank.instruct:}")
     private String instruct;
 
     @Override
@@ -63,7 +65,7 @@ public class DashScopeRetrievalReranker implements IRetrievalReranker {
         JSONObject parameters = new JSONObject();
         parameters.put("top_n", candidates.size());
         parameters.put("return_documents", false);
-        parameters.put("instruct", instruct);
+        parameters.put("instruct", instruct == null || instruct.isBlank() ? DEFAULT_INSTRUCT : instruct);
         JSONObject body = new JSONObject();
         body.put("model", model);
         body.put("input", input);

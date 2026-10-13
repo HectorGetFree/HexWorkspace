@@ -1,5 +1,8 @@
 package com.hector.infrastructure.rag.rerank;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.hector.domain.knowledge.model.valobj.RetrievalRerankCandidateVO;
 import com.hector.domain.knowledge.model.valobj.RetrievalRerankScoreVO;
 import com.sun.net.httpserver.HttpExchange;
@@ -15,7 +18,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** DashScope Rerank HTTP 协议映射测试，不调用真实云端服务。 */
 class DashScopeRetrievalRerankerTest {
@@ -31,19 +33,21 @@ class DashScopeRetrievalRerankerTest {
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/reranks", exchange -> {
             String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            assertTrue(request.contains("qwen3-rerank"));
-            assertTrue(request.contains("查询内容"));
-            assertTrue(request.contains("候选正文"));
-            respond(exchange, 200, "{\"results\":[{\"index\":1,\"relevance_score\":0.9},{\"index\":0,\"relevance_score\":0.2}]}");
+            JSONObject body = JSON.parseObject(request);
+            assertEquals("qwen3-rerank", body.getString("model"));
+            assertEquals("查询内容", body.getJSONObject("input").getString("query"));
+            JSONArray documents = body.getJSONObject("input").getJSONArray("documents");
+            assertEquals(List.of("标题：文档 A\n章节：第一章 / 小节\n正文：候选正文 A"), documents.toJavaList(String.class));
+            assertEquals("configured exact-answer instruction", body.getJSONObject("parameters").getString("instruct"));
+            respond(exchange, 200, "{\"results\":[{\"index\":0,\"relevance_score\":0.9}]}");
         });
         server.start();
 
         List<RetrievalRerankScoreVO> scores = reranker(true).rerank("查询内容", List.of(
-                new RetrievalRerankCandidateVO(0, "候选正文 A"),
-                new RetrievalRerankCandidateVO(1, "候选正文 B")));
+                new RetrievalRerankCandidateVO(0, "标题：文档 A\n章节：第一章 / 小节\n正文：候选正文 A")));
 
-        assertEquals(2, scores.size());
-        assertEquals(1, scores.get(0).index());
+        assertEquals(1, scores.size());
+        assertEquals(0, scores.get(0).index());
     }
 
     @Test
@@ -57,7 +61,7 @@ class DashScopeRetrievalRerankerTest {
         ReflectionTestUtils.setField(reranker, "apiKey", withApiKey ? "test-key" : "");
         ReflectionTestUtils.setField(reranker, "model", "qwen3-rerank");
         ReflectionTestUtils.setField(reranker, "timeoutMs", 1_000L);
-        ReflectionTestUtils.setField(reranker, "instruct", "retrieve answer passages");
+        ReflectionTestUtils.setField(reranker, "instruct", "configured exact-answer instruction");
         if (server != null) {
             ReflectionTestUtils.setField(reranker, "endpoint",
                     "http://127.0.0.1:" + server.getAddress().getPort() + "/reranks");

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hex-workspace.local/rag-eval/rag-eval-v2/canonical-chunk.schema.json",
+  "title": "RAG Evaluation V2 canonical chunk anchor",
+  "type": "object",
+  "required": ["chunkId", "documentId", "section", "contentSha256", "content"],
+  "properties": {
+    "chunkId": {"type": "string", "minLength": 1},
+    "documentId": {"type": "string", "minLength": 1},
+    "section": {"type": "string", "minLength": 1},
+    "contentSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "content": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

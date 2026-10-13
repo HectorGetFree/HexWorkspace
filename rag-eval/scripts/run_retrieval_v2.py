@@ -32,6 +32,10 @@ class ApiError(RuntimeError):
     """A non-retriable evaluation transport or protocol failure."""
 
 
+class TransientReadinessError(ApiError):
+    """A readiness response that can be retried within the polling deadline."""
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default=os.getenv("HEX_WORKSPACE_BASE_URL", "http://127.0.0.1:8098"))
@@ -47,10 +51,16 @@ def parse_args():
                         help="Qdrant 初始候选池大小，仅用于受控离线评测")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--run-id", default=datetime.now(timezone.utc).strftime("retrieval-v2-%Y%m%dT%H%M%SZ"))
-    parser.add_argument("--upload", action="store_true", help="import frozen V1 raw corpus into a dedicated workspace")
+    parser.add_argument("--upload", action="store_true", help="上传冻结语料；可按 batch 等待索引完成")
     parser.add_argument("--document-map", type=Path, help="existing document map; avoids duplicate imports")
+    parser.add_argument("--resume-upload-map", type=Path,
+                        help="仅与 --upload 一起使用；从已落盘的部分 document-map 继续导入")
+    parser.add_argument("--upload-batch-size", type=int, default=25,
+                        help="每上传 N 份文档就等待该 batch 进入 Active Generation，0 表示全部上传后再等待")
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--poll-timeout", type=float, default=900.0)
+    parser.add_argument("--readiness-batch-size", type=int, default=10,
+                        help="每次 readiness 请求携带的 documentCode 数；减小评测轮询的数据库突发压力")
     parser.add_argument("--request-timeout", type=float, default=60.0)
     parser.add_argument("--http-retries", type=int, default=2)
     args = parser.parse_args()
@@ -58,12 +68,18 @@ def parse_args():
         parser.error("请提供 --workspace-id / --evaluation-token，或设置对应 HEX_WORKSPACE_* 环境变量")
     if args.upload == bool(args.document_map):
         parser.error("首次运行使用 --upload；复用已有语料时只使用 --document-map PATH")
+    if args.resume_upload_map and not args.upload:
+        parser.error("--resume-upload-map 只能与 --upload 一起使用")
     if args.upload and not args.user_token:
         parser.error("--upload 需要 --user-token 或 HEX_WORKSPACE_TOKEN")
     if not 1 <= args.candidate_limit <= 100:
         parser.error("--candidate-limit 必须在 1 到 100 之间")
     if not 1 <= args.top_k <= 20:
         parser.error("--top-k 必须在 1 到 20 之间")
+    if not 1 <= args.readiness_batch_size <= 50:
+        parser.error("--readiness-batch-size 必须在 1 到 50 之间")
+    if not 0 <= args.upload_batch_size <= 100:
+        parser.error("--upload-batch-size 必须在 0 到 100 之间")
     return args
 
 
@@ -106,6 +122,24 @@ class WorkspaceApi:
             raise ApiError(f"Workspace response {payload.get('code')}: {payload.get('info')}")
         return payload.get("data")
 
+    @staticmethod
+    def internal_field(payload, field, endpoint):
+        """Read direct internal responses and the legacy common response envelope.
+
+        Evaluation endpoints were introduced as service-token-only APIs and the
+        current controller returns a direct JSON body.  Some already-running
+        deployments still wrap the same body as ``{code, info, data}``.  Accept
+        both successful shapes, but surface the actual body for every other
+        shape instead of masking it with a KeyError.
+        """
+        if field in payload:
+            return payload[field]
+        if payload.get("code") is not None:
+            data = WorkspaceApi.unwrap(payload)
+            if isinstance(data, dict) and field in data:
+                return data[field]
+        raise ApiError(f"unexpected response from {endpoint}: {json.dumps(payload, ensure_ascii=False)}")
+
     def root_folder(self, workspace_id):
         return self.unwrap(self.request("GET", f"/api/v1/workspaces/{workspace_id}/folders/root", token=self.user_token, retryable=True))["folderId"]
 
@@ -126,8 +160,22 @@ class WorkspaceApi:
 
     def readiness(self, workspace_id, document_codes):
         payload = json.dumps({"workspaceId": workspace_id, "documentCodes": document_codes}, ensure_ascii=False).encode()
-        return self.request("POST", "/internal/v1/evaluation/retrieval/readiness", body=payload,
-                            content_type="application/json", token=self.evaluation_token, retryable=True)["documents"]
+        response = self.request("POST", "/internal/v1/evaluation/retrieval/readiness", body=payload,
+                                content_type="application/json", token=self.evaluation_token, retryable=True)
+        try:
+            return self.internal_field(response, "documents", "/internal/v1/evaluation/retrieval/readiness")
+        except ApiError as exception:
+            # 9999 是 WS GlobalExceptionHandler 的通用异常 envelope。readiness 仅是等待
+            # Active Generation 的观测操作，故在整体 poll timeout 内允许它暂态重试。
+            if response.get("code") == "9999":
+                raise TransientReadinessError(str(exception)) from exception
+            raise
+
+    def active_chunks(self, workspace_id, document_codes):
+        payload = json.dumps({"workspaceId": workspace_id, "documentCodes": document_codes}, ensure_ascii=False).encode()
+        response = self.request("POST", "/internal/v1/evaluation/retrieval/chunks", body=payload,
+                                content_type="application/json", token=self.evaluation_token, retryable=True)
+        return self.internal_field(response, "chunks", "/internal/v1/evaluation/retrieval/chunks")
 
     def retrieve(self, workspace_id, question, candidate_limit, top_k):
         payload = json.dumps({"workspaceId": workspace_id, "query": question,
@@ -135,41 +183,109 @@ class WorkspaceApi:
         return self.request("POST", "/internal/v1/evaluation/retrieval", body=payload,
                             content_type="application/json", token=self.evaluation_token, retryable=True)
 
+    def retrieve_candidates(self, workspace_id, question, candidate_limit, top_k):
+        """Read Dense candidate diagnostics without invoking the service-side reranker."""
+        payload = json.dumps({"workspaceId": workspace_id, "query": question,
+                              "candidateLimit": candidate_limit, "topK": top_k}, ensure_ascii=False).encode()
+        return self.request("POST", "/internal/v1/evaluation/retrieval/candidates", body=payload,
+                            content_type="application/json", token=self.evaluation_token, retryable=True)
+
+    def rerank_candidates(self, workspace_id, question, candidates, top_k, input_variant=None):
+        """Run only the current service-side reranker for verified Active Generation chunks.
+
+        This is evaluation-only: callers submit identities and source ranks, while
+        WS reloads candidate content from the authoritative Chunk Artifact.
+        """
+        payload_body = {"workspaceId": workspace_id, "query": question,
+                        "candidates": candidates, "topK": top_k}
+        if input_variant is not None:
+            payload_body["inputVariant"] = input_variant
+        payload = json.dumps(payload_body, ensure_ascii=False).encode()
+        response = self.request("POST", "/internal/v1/evaluation/retrieval/rerank", body=payload,
+                                content_type="application/json", token=self.evaluation_token, retryable=True)
+        body = response
+        if "candidates" not in body and body.get("code") is not None:
+            body = self.unwrap(body)
+        if not isinstance(body, dict) or "candidates" not in body:
+            raise ApiError("unexpected response from /internal/v1/evaluation/retrieval/rerank: "
+                           + json.dumps(response, ensure_ascii=False))
+        if input_variant is not None and body.get("inputVariant") != input_variant:
+            raise ApiError("rerank inputVariant was not acknowledged by Workspace: "
+                           f"expected {input_variant}, actual {body.get('inputVariant')!r}; "
+                           "please restart WS with the current evaluation endpoint")
+        return body["candidates"]
+
 
 def json_lines(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def write_json_atomic(path, value):
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
 def upload_corpus(api, args, manifest, run_dir):
     root_id = api.root_folder(args.workspace_id)
+    known_keys = {item["documentKey"] for item in manifest}
     document_map = {}
+    if args.resume_upload_map:
+        document_map = json.loads(args.resume_upload_map.read_text(encoding="utf-8"))
+        unknown_keys = sorted(set(document_map) - known_keys)
+        if unknown_keys:
+            raise ApiError(f"resume document-map 包含当前 dataset 不存在的 documentKey: {unknown_keys[:5]}")
+        print(f"resuming upload: {len(document_map)}/{len(manifest)} document(s) already mapped")
+
+    map_path = run_dir / "document-map.json"
+    write_json_atomic(map_path, document_map)
+    current_batch = []
     for index, item in enumerate(manifest, start=1):
+        if item["documentKey"] in document_map:
+            continue
         raw_path = args.dataset_root / item["rawFile"]
         key = "rag-eval-v2:" + hashlib.sha256(item["rawSha256"].encode()).hexdigest()
         response = api.upload(args.workspace_id, root_id, raw_path, item["title"], key)
         document_map[item["documentKey"]] = {"documentCode": response["documentCode"], "rawFile": item["rawFile"]}
+        write_json_atomic(map_path, document_map)
+        current_batch.append(item["documentKey"])
         print(f"uploaded {index}/{len(manifest)}: {item['documentKey']} -> {response['documentCode']}")
-    path = run_dir / "document-map.json"
-    path.write_text(json.dumps(document_map, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if args.upload_batch_size and len(current_batch) >= args.upload_batch_size:
+            print(f"waiting for upload batch: {len(current_batch)} document(s)")
+            batch_map = {document_key: document_map[document_key] for document_key in current_batch}
+            wait_until_ready(api, args, batch_map, run_dir, f"readiness-upload-batch-{index}.json")
+            current_batch = []
+    if current_batch:
+        print(f"waiting for final upload batch: {len(current_batch)} document(s)")
+        batch_map = {document_key: document_map[document_key] for document_key in current_batch}
+        wait_until_ready(api, args, batch_map, run_dir, "readiness-upload-final-batch.json")
     return document_map
 
 
-def wait_until_ready(api, args, document_map, run_dir):
+def wait_until_ready(api, args, document_map, run_dir, readiness_filename="readiness.json"):
     reverse = {entry["documentCode"]: key for key, entry in document_map.items()}
     pending = set(reverse)
     latest = {}
     deadline = time.monotonic() + args.poll_timeout
     while pending and time.monotonic() < deadline:
-        for batch_start in range(0, len(pending), 50):
-            batch = list(pending)[batch_start:batch_start + 50]
-            for row in api.readiness(args.workspace_id, batch):
+        # 对本轮 pending 做稳定快照；循环中 ready document 会被移除，不能再基于动态集合
+        # 重新按 offset 切片，否则可能跳过后续 document。
+        pending_snapshot = sorted(pending)
+        for batch_start in range(0, len(pending_snapshot), args.readiness_batch_size):
+            batch = pending_snapshot[batch_start:batch_start + args.readiness_batch_size]
+            try:
+                rows = api.readiness(args.workspace_id, batch)
+            except TransientReadinessError as exception:
+                print(f"readiness 暂态失败，稍后重试 batch={batch[0]}..{batch[-1]}: {exception}")
+                continue
+            for row in rows:
                 latest[reverse[row["documentCode"]]] = row
                 if row["ready"]:
                     pending.discard(row["documentCode"])
         if pending:
             print(f"waiting for Active Generation: {len(pending)} document(s) remaining")
             time.sleep(args.poll_interval)
-    (run_dir / "readiness.json").write_text(json.dumps(latest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_json_atomic(run_dir / readiness_filename, latest)
     if pending:
         raise TimeoutError(f"timed out waiting for Active Generation: {sorted(pending)}")
     return latest
@@ -277,6 +393,7 @@ def summary(cases, args):
     return {
         "datasetVersion": args.dataset_root.name, "split": args.split,
         "candidateLimit": args.candidate_limit, "topK": args.top_k,
+        "uploadBatchSize": args.upload_batch_size,
         "questionCount": len(cases), "successfulQuestionCount": len(successful),
         "errorQuestionCount": len(cases) - len(successful),
         f"hitRateAt{args.top_k}": sum(case["hitAtK"] for case in answerable) / len(answerable) if answerable else None,

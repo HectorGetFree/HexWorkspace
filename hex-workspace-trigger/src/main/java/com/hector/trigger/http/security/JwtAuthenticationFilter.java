@@ -59,7 +59,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || "/internal/v1/agent-runs/permissions".equals(requestPath)
                 || "/internal/agent/capabilities/invoke".equals(requestPath)
                 || "/internal/v1/evaluation/retrieval".equals(requestPath)
-                || "/internal/v1/evaluation/retrieval/readiness".equals(requestPath);
+                || "/internal/v1/evaluation/retrieval/candidates".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/readiness".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/chunks".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/rerank".equals(requestPath);
     }
 
     /**

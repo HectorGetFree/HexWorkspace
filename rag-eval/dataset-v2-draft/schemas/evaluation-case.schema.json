@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hex-workspace.local/rag-eval/rag-eval-v2/evaluation-case.schema.json",
+  "title": "RAG Evaluation V2 case",
+  "type": "object",
+  "required": ["queryId", "suite", "query", "queryType", "difficulty", "answerable", "relevantDocumentIds", "relevantChunkIds", "evidence", "hardNegativeChunkIds", "hardNegativeReasons", "expectedRetrievalStrength", "generationMethod", "reviewStatus", "notes"],
+  "properties": {
+    "queryId": {"type": "string", "minLength": 1},
+    "suite": {"enum": ["general", "workspace_business", "synthetic_hard"]},
+    "query": {"type": "string", "minLength": 1},
+    "queryType": {"enum": ["single_hop_semantic", "paraphrase", "exact_lexical", "hard_negative", "multi_hop", "ambiguous", "long_tail", "unanswerable"]},
+    "difficulty": {"enum": ["EASY", "MEDIUM", "HARD"]},
+    "answerable": {"type": "boolean"},
+    "relevantDocumentIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "relevantChunkIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "evidence": {"type": "array", "items": {"type": "object", "required": ["chunkId", "quote", "relevanceGrade"], "properties": {"chunkId": {"type": "string"}, "quote": {"type": "string", "minLength": 1}, "relevanceGrade": {"type": "integer", "minimum": 1, "maximum": 3}}, "additionalProperties": false}},
+    "hardNegativeChunkIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "hardNegativeReasons": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+    "expectedRetrievalStrength": {"enum": ["dense", "sparse", "both", "rerank", "multi_hop", "unknown"]},
+    "generationMethod": {"enum": ["manual", "synthetic", "public_benchmark", "derived_from_failure_case"]},
+    "reviewStatus": {"enum": ["UNREVIEWED", "REVIEWED", "VERIFIED", "REJECTED"]},
+    "notes": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

@@ -36,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** 可信检索必须以 MySQL 状态过滤 Qdrant 候选的单元测试。 */
@@ -158,11 +160,24 @@ class KnowledgeRetrievalServiceImplTest {
         assertEquals(0.9D, execution.diagnostics().rerankedCandidates().get(0).score());
         assertTrue(execution.timing().rerankMs() >= 0);
 
+        inject(service, "rerankWeight", 0.25D);
+        RetrievalExecutionVO blended = service.retrieveWithEvaluationTrace(
+                new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        assertEquals(11L, blended.result().hits().get(0).documentId());
+
         when(reranker.rerank(eq("查询"), any())).thenThrow(new IllegalStateException("provider unavailable"));
         RetrievalExecutionVO fallback = service.retrieveWithEvaluationTrace(
                 new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
         assertEquals(11L, fallback.result().hits().get(0).documentId());
         assertTrue(fallback.diagnostics().rerankedCandidates().isEmpty());
+
+        // C2 读取 Dense 候选时不能先调用一次生产 Rerank，否则融合实验会双重计时、双重消耗外部配额。
+        clearInvocations(reranker);
+        RetrievalExecutionVO candidatesOnly = service.retrieveCandidatesWithEvaluationTrace(
+                new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        verifyNoInteractions(reranker);
+        assertEquals(2, candidatesOnly.diagnostics().qdrantCandidates().size());
+        assertTrue(candidatesOnly.diagnostics().rerankedCandidates().isEmpty());
     }
 
     private RetrievalCandidateVO candidate(Long documentId, String generationId, Double score) {

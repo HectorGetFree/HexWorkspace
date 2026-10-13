@@ -1,0 +1,5 @@
+{"documentId":"workspace-product-boundary","sourceFile":"docs/product-boundary.md","sourceSha256":"d24978893d17562f548504fbc474f4eef0016d625b217d0429652b87bfaa9e46","title":"Hex-Workspace 产品定位与设计边界"}
+{"documentId":"personal-workspace-design","sourceFile":"docs/personal-workspace-design.md","sourceSha256":"48a2247d05ab63974c818a0de6dfef4ec08bcfbff3cbe3f4ffc17c52da686335","title":"个人资料库设计"}
+{"documentId":"document-upload-consistency","sourceFile":"docs/document-upload-consistency-design.md","sourceSha256":"cb0e7d60519c09da69a0f0ed5cb84d712a5c710148424a459df156c53a58754a","title":"文档上传最终一致性设计"}
+{"documentId":"rag-v1-final-acceptance","sourceFile":"docs/RAG-V1-Final-Acceptance.md","sourceSha256":"f76d257dbbe81096d82ff856a433a17f37eee158e7b0490250e95e97d4268403","title":"RAG V1 最终交付验收"}
+{"documentId":"user-authentication-design","sourceFile":"docs/user-authentication-design.md","sourceSha256":"204caea5c7c53786b92ac528cb23308191db09dbb8660c62d723f84a79a1124f","title":"User 与 Auth 技术设计"}

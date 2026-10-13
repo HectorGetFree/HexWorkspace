@@ -39,4 +39,13 @@ public interface IKnowledgeRetrievalService {
             RetrievalContextVO context, String query, RetrievalOptionsVO options) {
         return retrieveWithTrace(context, query, options);
     }
+
+    /**
+     * 仅供离线候选融合实验读取 Dense 与权威过滤后的诊断，不执行 Rerank。
+     * 这避免 C2 在 RRF 前额外消耗一次外部 Rerank 调用；普通产品路径不得使用。
+     */
+    default RetrievalExecutionVO retrieveCandidatesWithEvaluationTrace(
+            RetrievalContextVO context, String query, RetrievalOptionsVO options) {
+        return retrieveWithEvaluationTrace(context, query, options);
+    }
 }
