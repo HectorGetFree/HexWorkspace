@@ -1,5 +1,10 @@
 .DS_Store
 
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
 # IntelliJ IDEA
 .idea/
 *.iml
@@ -19,3 +24,25 @@ temp/
 # RAG evaluation runtime outputs
 rag-eval/runs/*
 !rag-eval/runs/.gitkeep
+
+# Downloaded public IR corpora and their materialized evaluation workspaces.
+# Keep only the deterministic preparation code and source/LICENCE metadata in Git.
+rag-eval/cache/
+
+# Frontend dependencies and generated artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# 本地实验输出、Python 缓存与派生评测语料不纳入源码提交。
+.local/
+__pycache__/
+*.py[cod]
+/rag-eval/dataset-v2-java-notes-v1-draft/
+/rag-eval/dataset-v2-workspace-architecture-draft/
+/rag-eval/dataset-v2-workspace-business-full-v1/
+/rag-eval/dataset-v2-workspace-design-draft/

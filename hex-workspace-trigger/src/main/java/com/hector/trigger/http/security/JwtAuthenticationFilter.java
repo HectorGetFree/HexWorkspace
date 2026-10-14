@@ -57,7 +57,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         return "/internal/v1/agent-runs/lifecycle".equals(requestPath)
                 || "/internal/v1/agent-runs/permissions".equals(requestPath)
-                || "/internal/agent/capabilities/invoke".equals(requestPath);
+                || "/internal/agent/capabilities/invoke".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/candidates".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/readiness".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/hybrid-status".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/ab".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/chunks-topk".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/chunks".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/rerank".equals(requestPath);
     }
 
     /**

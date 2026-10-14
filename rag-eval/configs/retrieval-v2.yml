@@ -1,0 +1,26 @@
+dataset:
+  version: dataset-v1.0
+  split: test
+
+ingestion:
+  transport: public-document-import
+  completion: document-active-plus-active-generation-ready
+  source: frozen-raw-corpus
+
+retrieval:
+  transport: internal-evaluation-retrieval-v1
+  implementation: IKnowledgeRetrievalService
+  vectorStore: qdrant-candidate-recall
+  authority: mysql-workspace-document-folder-active-generation-validation
+  candidateLimit: 30
+  finalTopK: 5
+
+metrics:
+  hitRate: true
+  recall: true
+  mrr: true
+  latencyPercentiles: [50, 95, 99]
+
+security:
+  ingestion: frontend-jwt
+  evaluation: hexworkspace.rag-evaluation.token

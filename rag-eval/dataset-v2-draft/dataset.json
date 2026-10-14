@@ -1,0 +1,8 @@
+{
+  "datasetVersion": "rag-eval-v2-draft.1",
+  "status": "REVIEWED_SAMPLE",
+  "corpusSource": "repository-docs-draft",
+  "canonicalChunking": "section-anchor-v1",
+  "purpose": "schema, corpus-manifest and human-review sample only",
+  "frozen": false
+}

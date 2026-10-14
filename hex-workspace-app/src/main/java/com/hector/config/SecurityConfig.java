@@ -50,6 +50,14 @@ public class SecurityConfig {
                                 "/internal/v1/agent-runs/lifecycle",
                                 "/internal/v1/agent-runs/permissions",
                                 "/internal/agent/capabilities/invoke",
+                                "/internal/v1/evaluation/retrieval",
+                                "/internal/v1/evaluation/retrieval/candidates",
+                                "/internal/v1/evaluation/retrieval/readiness",
+                                "/internal/v1/evaluation/retrieval/hybrid-status",
+                                "/internal/v1/evaluation/retrieval/ab",
+                                "/internal/v1/evaluation/retrieval/chunks-topk",
+                                "/internal/v1/evaluation/retrieval/chunks",
+                                "/internal/v1/evaluation/retrieval/rerank",
                                 "/error") // 这些接口允许匿名访问
                         .permitAll()
                         .anyRequest()

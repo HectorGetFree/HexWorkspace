@@ -393,7 +393,7 @@ public class DocumentServiceImpl implements IDocumentService {
                     normalizedContentType, contentSize, contentHash, idempotencyKey, documentCode, stagingPath, targetPath);
             documentRegistered = true;
             return document;
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException exception) { // 处理首次查询后，另一个并发请求抢先完成登记的情况
             if (idempotencyKey != null && contentHash != null) {
                 DocumentEntity duplicate = documentRepository.findByUploadIdempotencyKey(
                         workspaceId, ownerUserId, idempotencyKey).orElse(null);

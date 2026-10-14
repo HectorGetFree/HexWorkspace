@@ -5,5 +5,6 @@ public record WorkspaceStructureItemVO(
         String type,
         Long id,
         String name,
+        // 文档的不可变版本记录主键；文件夹为空，不是文档内版本号。
         Long versionId) {
 }
