@@ -7,6 +7,11 @@ import com.hector.domain.knowledge.model.valobj.RetrievalResultVO;
 
 /** 仅供内部 AI 调用的可信知识检索服务。 */
 public interface IKnowledgeRetrievalService {
+    /** 受控评测逐请求选择召回路径，不修改全局生产开关。 */
+    default RetrievalExecutionVO retrieveWithEvaluationProfile(RetrievalContextVO context, String query,
+            RetrievalOptionsVO options, boolean hybrid) {
+        throw new UnsupportedOperationException("当前实现不支持逐请求 A/B 评测");
+    }
 
     /**
      * 执行一次经过 MySQL 权威状态复核的内部知识检索。

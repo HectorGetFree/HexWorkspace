@@ -9,6 +9,8 @@ import com.hector.domain.folder.repository.IFolderRepository;
 import com.hector.domain.knowledge.adapter.port.IQueryEmbeddingClient;
 import com.hector.domain.knowledge.adapter.port.IRetrievalReranker;
 import com.hector.domain.knowledge.adapter.port.IRetrievalVectorStore;
+import com.hector.domain.knowledge.adapter.port.IRetrievalSparseStore;
+import com.hector.domain.knowledge.service.ReciprocalRankFusion;
 import com.hector.domain.knowledge.model.entity.EmbeddingConfigEntity;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexGenerationEntity;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexStateEntity;
@@ -76,6 +78,10 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
     private IRetrievalVectorStore retrievalVectorStore;
     @Resource
     private IRetrievalReranker retrievalReranker;
+    @Resource
+    private IRetrievalSparseStore retrievalSparseStore;
+    @Value("${hexworkspace.knowledge.hybrid.enabled:true}")
+    private boolean hybridEnabled;
     /** 1.0 保持纯 Rerank；低于 1.0 时以原始 Qdrant 排名作为稳定锚点。 */
     @Value("${hexworkspace.knowledge.rerank.rerank-weight:1.0}")
     private double rerankWeight = 1D;
@@ -105,12 +111,23 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
     private RetrievalExecutionVO execute(
             RetrievalContextVO context, String query, RetrievalOptionsVO options,
             boolean includeDiagnostics, boolean applyRerank) {
+        return execute(context, query, options, includeDiagnostics, applyRerank, hybridEnabled, false);
+    }
+
+    @Override
+    public RetrievalExecutionVO retrieveWithEvaluationProfile(RetrievalContextVO context, String query,
+            RetrievalOptionsVO options, boolean hybrid) {
+        return execute(context, query, options, true, true, hybrid, true);
+    }
+
+    private RetrievalExecutionVO execute(RetrievalContextVO context, String query, RetrievalOptionsVO options,
+            boolean includeDiagnostics, boolean applyRerank, boolean useHybrid, boolean evaluationDocumentLimit) {
         long totalStartedAt = System.nanoTime();
         if (query == null || query.isBlank()) {
             throw new IllegalArgumentException("检索内容不能为空");
         }
-        RetrievalOptionsVO normalizedOptions = (options == null
-                ? RetrievalOptionsVO.defaults() : options).normalized();
+        RetrievalOptionsVO requestedOptions = options == null ? RetrievalOptionsVO.defaults() : options;
+        RetrievalOptionsVO normalizedOptions = requestedOptions.normalized();
         log.info("可信知识检索开始 userId:{} workspaceId:{}", context.userId(), context.workspaceId());
 
         long initialAuthorityStartedAt = System.nanoTime();
@@ -127,6 +144,26 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
                 servingConfig.getCollectionName(), workspace.getId(), queryVector, normalizedOptions.candidateLimit());
         List<RetrievalCandidateRankVO> qdrantCandidateRanks = includeDiagnostics ? candidateRanks(candidates) : List.of();
         double qdrantMs = elapsedMs(qdrantStartedAt);
+        List<RetrievalCandidateRankVO> sparseRanks = List.of();
+        double hybridMs = 0D;
+        // 1. 保留 Dense-only 评测入口；正式检索先融合，再统一执行权限与最终状态复核。
+        if (applyRerank && useHybrid) {
+            long sparseStartedAt = System.nanoTime();
+            try {
+                var sparse = retrievalSparseStore.searchCandidates(workspace.getId(), servingConfig.getId(),
+                        query.trim(), normalizedOptions.candidateLimit());
+                if (includeDiagnostics) sparseRanks = candidateRanks(sparse);
+                if (!sparse.isEmpty()) {
+                    candidates = ReciprocalRankFusion.fuse(candidates, sparse, normalizedOptions.candidateLimit());
+                }
+                log.info("混合召回 workspaceId:{} sparseCount:{} fusedCount:{} sparseMs:{}",
+                        workspace.getId(), sparse.size(), candidates.size(), elapsedMs(sparseStartedAt));
+            } catch (RuntimeException e) {
+                log.warn("稀疏召回不可用，回退 Dense workspaceId:{}", workspace.getId(), e);
+            }
+            hybridMs = elapsedMs(sparseStartedAt);
+        }
+        List<RetrievalCandidateRankVO> fusedRanks = includeDiagnostics ? candidateRanks(candidates) : List.of();
         long authorityValidationStartedAt = System.nanoTime();
         List<RetrievalHitVO> authorizedHits = validateCandidates(context, servingConfig, candidates);
         List<RetrievalCandidateRankVO> authorityValidRanks = includeDiagnostics ? hitRanks(authorizedHits) : List.of();
@@ -137,7 +174,10 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
                 ? rerankAuthorizedHits(query.trim(), authorizedHits)
                 : new RerankExecution(authorizedHits, List.of());
         double rerankMs = elapsedMs(rerankStartedAt);
-        List<RetrievalHitVO> selectedHits = limitHits(rerankExecution.hits(), normalizedOptions);
+        // 普通生产仅保留总 TopK；受控历史 A/B 入口显式保留冻结的文档限额。
+        List<RetrievalHitVO> selectedHits = evaluationDocumentLimit
+                ? limitHits(rerankExecution.hits(), normalizedOptions)
+                : rerankExecution.hits().stream().limit(normalizedOptions.resultLimit()).toList();
 
         // 返回前重读权威状态，阻断检索过程中发生的删除、移动、版本/Generation 切换。
         long authorityRecheckStartedAt = System.nanoTime();
@@ -156,7 +196,7 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
         }
         double authorityRecheckMs = elapsedMs(authorityRecheckStartedAt);
         RetrievalTimingVO timing = new RetrievalTimingVO(
-                embeddingMs, qdrantMs, authorityInitialMs, rerankMs, authorityRecheckMs, elapsedMs(totalStartedAt));
+                embeddingMs, qdrantMs, authorityInitialMs, rerankMs, authorityRecheckMs, elapsedMs(totalStartedAt), hybridMs);
         log.info("可信知识检索完成 userId:{} workspaceId:{} candidateCount:{} hitCount:{}",
                 context.userId(), context.workspaceId(), candidates.size(), result.hits().size());
         log.info("可信知识检索阶段耗时 workspaceId:{} embeddingMs:{} qdrantMs:{} authorityInitialMs:{} rerankMs:{} authorityRecheckMs:{} totalMs:{}",
@@ -164,7 +204,8 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
                 timing.rerankMs(), timing.authorityRecheckMs(), timing.totalMs());
         RetrievalDiagnosticsVO diagnostics = includeDiagnostics
                 ? new RetrievalDiagnosticsVO(
-                        qdrantCandidateRanks, authorityValidRanks, rerankExecution.documentRanks(), hitRanks(result.hits()))
+                        qdrantCandidateRanks, authorityValidRanks, rerankExecution.documentRanks(), hitRanks(result.hits()),
+                        sparseRanks, fusedRanks, rerankExecution.chunkRanks())
                 : RetrievalDiagnosticsVO.empty();
         return new RetrievalExecutionVO(result, timing, diagnostics);
     }
@@ -222,13 +263,16 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
             log.info("可信知识检索 Rerank 完成 candidateCount:{} rerankWeight:{}", authorizedHits.size(), effectiveRerankWeight);
             List<RetrievalHitVO> rankedHits = indexes.stream().map(authorizedHits::get).toList();
             Map<Long, RetrievalCandidateRankVO> firstByDocument = new LinkedHashMap<>();
+            List<RetrievalCandidateRankVO> chunkRanks = new ArrayList<>();
             for (int rank = 0; rank < indexes.size(); rank++) {
                 int index = indexes.get(rank);
                 RetrievalHitVO hit = authorizedHits.get(index);
+                chunkRanks.add(new RetrievalCandidateRankVO(hit.documentId(), hit.generationId(), hit.chunkNo(),
+                        rank + 1, scoresByIndex.get(index)));
                 firstByDocument.putIfAbsent(hit.documentId(),
                         new RetrievalCandidateRankVO(hit.documentId(), rank + 1, scoresByIndex.get(index)));
             }
-            return new RerankExecution(rankedHits, List.copyOf(firstByDocument.values()));
+            return new RerankExecution(rankedHits, List.copyOf(firstByDocument.values()), List.copyOf(chunkRanks));
         } catch (RuntimeException exception) {
             log.warn("可信知识检索 Rerank 失败，回退向量排序 candidateCount:{}", authorizedHits.size(), exception);
             return new RerankExecution(authorizedHits, List.of());
@@ -438,6 +482,10 @@ public class KnowledgeRetrievalServiceImpl implements IKnowledgeRetrievalService
 
     private record RerankExecution(
             List<RetrievalHitVO> hits,
-            List<RetrievalCandidateRankVO> documentRanks) {
+            List<RetrievalCandidateRankVO> documentRanks,
+            List<RetrievalCandidateRankVO> chunkRanks) {
+        private RerankExecution(List<RetrievalHitVO> hits, List<RetrievalCandidateRankVO> ranks) {
+            this(hits, ranks, List.of());
+        }
     }
 }

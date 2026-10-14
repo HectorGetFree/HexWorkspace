@@ -94,6 +94,21 @@ public class RetrievalEvaluationServiceImpl implements IRetrievalEvaluationServi
                         context, query, new RetrievalOptionsVO(candidateLimit, null, topK))
                 : retrievalService.retrieveWithEvaluationTrace(
                         context, query, new RetrievalOptionsVO(candidateLimit, null, topK));
+        return evaluationResult(workspace, execution);
+    }
+
+    @Override
+    public RetrievalEvaluationResultVO retrieveAB(Long workspaceId, String query, Integer candidateLimit, Integer topK,
+            boolean hybrid) {
+        WorkspaceEntity workspace = requireActiveWorkspace(workspaceId);
+        var execution = retrievalService.retrieveWithEvaluationProfile(
+                new RetrievalContextVO(workspace.getOwnerUserId(), workspaceId), query,
+                new RetrievalOptionsVO(candidateLimit, 2, topK), hybrid);
+        return evaluationResult(workspace, execution);
+    }
+
+    private RetrievalEvaluationResultVO evaluationResult(WorkspaceEntity workspace,
+            com.hector.domain.knowledge.model.valobj.RetrievalExecutionVO execution) {
         var documentCodes = documentRepository.listByWorkspaceId(workspace.getId()).stream()
                 .collect(java.util.stream.Collectors.toMap(DocumentEntity::getId, DocumentEntity::getDocumentCode));
         return new RetrievalEvaluationResultVO(execution.result(), execution.timing(),
@@ -101,7 +116,20 @@ public class RetrievalEvaluationServiceImpl implements IRetrievalEvaluationServi
                         toEvaluationCandidates(execution.diagnostics().qdrantCandidates(), documentCodes),
                         toEvaluationCandidates(execution.diagnostics().authorityValidCandidates(), documentCodes),
                         toEvaluationCandidates(execution.diagnostics().rerankedCandidates(), documentCodes),
-                        toEvaluationCandidates(execution.diagnostics().finalCandidates(), documentCodes)));
+                        toEvaluationCandidates(execution.diagnostics().finalCandidates(), documentCodes),
+                        toEvaluationCandidates(execution.diagnostics().sparseCandidates(), documentCodes),
+                        toEvaluationCandidates(execution.diagnostics().fusedCandidates(), documentCodes),
+                        toEvaluationCandidates(execution.diagnostics().rerankedChunks(), documentCodes)));
+    }
+
+    @Override
+    public RetrievalEvaluationResultVO retrieveChunkTopK(Long workspaceId, String query, Integer candidateLimit, Integer topK) {
+        if (!Integer.valueOf(30).equals(candidateLimit) || !Integer.valueOf(5).equals(topK))
+            throw new IllegalArgumentException("本次冻结评测仅允许 Top30 候选 / Top5 Chunk");
+        WorkspaceEntity workspace = requireActiveWorkspace(workspaceId);
+        return evaluationResult(workspace, retrievalService.retrieveWithEvaluationProfile(
+                new RetrievalContextVO(workspace.getOwnerUserId(), workspaceId), query,
+                new RetrievalOptionsVO(30, 5, 5), true));
     }
 
     @Override

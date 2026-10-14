@@ -47,6 +47,34 @@ import static org.mockito.Mockito.when;
 class RetrievalEvaluationServiceImplTest {
 
     @Test
+    void chunkTopFiveUsesFivePerDocumentAndRetainsOwnerAndHybridPath() {
+        Fixture fixture = new Fixture();
+        when(fixture.workspaces.findById(1L)).thenReturn(Optional.of(activeWorkspace()));
+        var options = new RetrievalOptionsVO(30, 5, 5);
+        var context = new RetrievalContextVO(9L, 1L);
+        when(fixture.retrieval.retrieveWithEvaluationProfile(context, "问题", options, true))
+                .thenReturn(new RetrievalExecutionVO(RetrievalResultVO.empty(), new RetrievalTimingVO(0, 0, 0, 0, 0)));
+        fixture.service.retrieveChunkTopK(1L, "问题", 30, 5);
+        verify(fixture.retrieval).retrieveWithEvaluationProfile(context, "问题", options, true);
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.retrieveChunkTopK(1L, "问题", 30, 6));
+    }
+
+    @Test
+    void abProfileKeepsOwnerAndTwoChunkContractWithoutGlobalMutation() {
+        Fixture fixture = new Fixture();
+        when(fixture.workspaces.findById(1L)).thenReturn(Optional.of(activeWorkspace()));
+        var context = new RetrievalContextVO(9L, 1L);
+        var options = new RetrievalOptionsVO(30, 2, 5);
+        var empty = new RetrievalExecutionVO(RetrievalResultVO.empty(), new RetrievalTimingVO(0, 0, 0, 0, 0));
+        when(fixture.retrieval.retrieveWithEvaluationProfile(context, "问题", options, false)).thenReturn(empty);
+        when(fixture.retrieval.retrieveWithEvaluationProfile(context, "问题", options, true)).thenReturn(empty);
+        fixture.service.retrieveAB(1L, "问题", 30, 5, false);
+        fixture.service.retrieveAB(1L, "问题", 30, 5, true);
+        verify(fixture.retrieval).retrieveWithEvaluationProfile(context, "问题", options, false);
+        verify(fixture.retrieval).retrieveWithEvaluationProfile(context, "问题", options, true);
+    }
+
+    @Test
     void retrievesUsingWorkspaceOwnerInsteadOfCallerSuppliedIdentity() {
         Fixture fixture = new Fixture();
         when(fixture.workspaces.findById(1L)).thenReturn(Optional.of(activeWorkspace()));

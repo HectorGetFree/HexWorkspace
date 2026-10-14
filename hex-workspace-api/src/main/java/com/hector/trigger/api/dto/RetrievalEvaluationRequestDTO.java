@@ -17,4 +17,6 @@ public class RetrievalEvaluationRequestDTO implements Serializable {
 
     /** 最终经过权威校验和单文档去重后返回的结果数。 */
     private Integer topK;
+    /** 仅 /ab 使用 A 或 B；普通检索端点忽略该字段。 */
+    private String variant;
 }

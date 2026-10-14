@@ -31,6 +31,13 @@ hexworkspace:
   capability:
     phase5-fixture-enabled: ${HEX_WORKSPACE_PHASE5_FIXTURE_ENABLED:false}
   knowledge:
+    hybrid:
+      # 进程内快照冷启动/刷新失败回退 Dense；不新增外部搜索服务。
+      enabled: ${HEX_WORKSPACE_HYBRID_ENABLED:true}
+      refresh-ms: ${HEX_WORKSPACE_BM25_REFRESH_MS:60000}
+      max-workspaces: ${HEX_WORKSPACE_BM25_MAX_WORKSPACES:8}
+      max-chunks: ${HEX_WORKSPACE_BM25_MAX_CHUNKS:20000}
+      max-source-chars: ${HEX_WORKSPACE_BM25_MAX_SOURCE_CHARS:4000000}
     legacy-api:
       # 旧知识接口不校验文档版本与文件夹权限，Phase 1 默认关闭。
       enabled: ${HEX_WORKSPACE_LEGACY_KNOWLEDGE_API_ENABLED:false}

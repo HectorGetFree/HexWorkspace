@@ -7,7 +7,13 @@ public record RetrievalTimingVO(
         double authorityInitialMs,
         double rerankMs,
         double authorityRecheckMs,
-        double totalMs) {
+        double totalMs,
+        double hybridMs) {
+
+    public RetrievalTimingVO(double embeddingMs, double qdrantMs, double authorityInitialMs, double rerankMs,
+            double authorityRecheckMs, double totalMs) {
+        this(embeddingMs, qdrantMs, authorityInitialMs, rerankMs, authorityRecheckMs, totalMs, 0D);
+    }
 
     public RetrievalTimingVO(
             double embeddingMs,

@@ -21,6 +21,9 @@ import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import jakarta.annotation.Resource;
+import com.hector.domain.knowledge.adapter.port.IRetrievalSparseStore;
+import com.hector.domain.knowledge.adapter.port.IRetrievalReranker;
 
 /**
  * 离线 RAG 评测专用内部接口。
@@ -30,12 +33,31 @@ import java.util.Map;
 public class RetrievalEvaluationController {
 
     private final IRetrievalEvaluationService evaluationService;
+    @Resource private IRetrievalSparseStore sparseStore;
+    @Resource private IRetrievalReranker reranker;
+    @Value("${hexworkspace.knowledge.rerank.rerank-weight:1.0}")
+    private double rerankWeight;
 
     @Value("${hexworkspace.rag-evaluation.token:}")
     private String evaluationToken;
 
     public RetrievalEvaluationController(IRetrievalEvaluationService evaluationService) {
         this.evaluationService = evaluationService;
+    }
+
+    /** 内部就绪检查；沿用评测 Token 与 Workspace 校验，不产生真实模型调用。 */
+    @PostMapping("/internal/v1/evaluation/retrieval/hybrid-status")
+    public ResponseEntity<Map<String, Object>> hybridStatus(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody RetrievalEvaluationReadinessRequestDTO request) {
+        if (!isAuthorized(authorization)) return ResponseEntity.status(401).build();
+        evaluationService.readiness(request.getWorkspaceId(), request.getDocumentCodes());
+        Map<String, Object> status = new LinkedHashMap<>(sparseStore.prepareAndStatus(request.getWorkspaceId()));
+        status.put("rerankEnabled", reranker.isEnabled());
+        status.put("maxChunksPerDocument", 0);
+        status.put("documentLimitPolicy", "NONE");
+        status.put("rerankWeight", rerankWeight);
+        return ResponseEntity.ok(status);
     }
 
     @PostMapping("/internal/v1/evaluation/retrieval")
@@ -48,6 +70,34 @@ public class RetrievalEvaluationController {
         var result = evaluationService.retrieve(
                 request.getWorkspaceId(), request.getQuery(), request.getCandidateLimit(), request.getTopK());
         return retrievalResponse(request, result);
+    }
+
+    /** 受控单机制对照；A Dense，B Dense+BM25/RRF，两侧每文档两条，完整生产复核。 */
+    @PostMapping("/internal/v1/evaluation/retrieval/ab")
+    public ResponseEntity<Map<String, Object>> retrieveAB(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody RetrievalEvaluationRequestDTO request) {
+        if (!isAuthorized(authorization)) return ResponseEntity.status(401).build();
+        if (!"A".equals(request.getVariant()) && !"B".equals(request.getVariant()))
+            throw new IllegalArgumentException("variant 必须为 A 或 B");
+        var result = evaluationService.retrieveAB(request.getWorkspaceId(), request.getQuery(),
+                request.getCandidateLimit(), request.getTopK(), "B".equals(request.getVariant()));
+        Map<String, Object> response = new LinkedHashMap<>(retrievalResponse(request, result).getBody());
+        response.put("evaluationProfile", Map.of("variant", request.getVariant(), "maxChunksPerDocument", 2));
+        return ResponseEntity.ok(response);
+    }
+
+    /** 仅受控 SciFact 重测使用；总 Top5 不变，每文档 5 条等价于取消单文档限额。 */
+    @PostMapping("/internal/v1/evaluation/retrieval/chunks-topk")
+    public ResponseEntity<Map<String, Object>> retrieveChunkTopK(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody RetrievalEvaluationRequestDTO request) {
+        if (!isAuthorized(authorization)) return ResponseEntity.status(401).build();
+        var result = evaluationService.retrieveChunkTopK(request.getWorkspaceId(), request.getQuery(),
+                request.getCandidateLimit(), request.getTopK());
+        Map<String, Object> response = new LinkedHashMap<>(retrievalResponse(request, result).getBody());
+        response.put("evaluationProfile", Map.of("variant", "HYBRID_CHUNK_TOPK", "maxChunksPerDocument", 5));
+        return ResponseEntity.ok(response);
     }
 
     /**

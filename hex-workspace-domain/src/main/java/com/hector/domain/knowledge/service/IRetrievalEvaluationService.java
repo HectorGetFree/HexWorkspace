@@ -14,6 +14,13 @@ import java.util.List;
  * 评测调用方不提供用户身份，服务仅使用 Workspace 权威 owner 建立 RetrievalContext。
  */
 public interface IRetrievalEvaluationService {
+    /** 受控评测：TopK Chunk，每文档额度等于总 TopK，不产生额外文档截断。 */
+    default RetrievalEvaluationResultVO retrieveChunkTopK(Long workspaceId, String query, Integer candidateLimit, Integer topK) {
+        throw new UnsupportedOperationException("不支持 Chunk TopK 评测");
+    }
+    /** 固定每文档两条，仅在受控 A/B 中逐请求启用/禁用 BM25/RRF。 */
+    default RetrievalEvaluationResultVO retrieveAB(Long workspaceId, String query, Integer candidateLimit, Integer topK,
+            boolean hybrid) { throw new UnsupportedOperationException("不支持 A/B 评测"); }
 
     RetrievalEvaluationResultVO retrieve(Long workspaceId, String query, Integer candidateLimit, Integer topK);
 

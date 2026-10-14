@@ -61,6 +61,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || "/internal/v1/evaluation/retrieval".equals(requestPath)
                 || "/internal/v1/evaluation/retrieval/candidates".equals(requestPath)
                 || "/internal/v1/evaluation/retrieval/readiness".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/hybrid-status".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/ab".equals(requestPath)
+                || "/internal/v1/evaluation/retrieval/chunks-topk".equals(requestPath)
                 || "/internal/v1/evaluation/retrieval/chunks".equals(requestPath)
                 || "/internal/v1/evaluation/retrieval/rerank".equals(requestPath);
     }

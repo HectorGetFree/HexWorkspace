@@ -11,6 +11,8 @@ import com.hector.domain.folder.repository.IFolderRepository;
 import com.hector.domain.knowledge.adapter.port.IQueryEmbeddingClient;
 import com.hector.domain.knowledge.adapter.port.IRetrievalReranker;
 import com.hector.domain.knowledge.adapter.port.IRetrievalVectorStore;
+import com.hector.domain.knowledge.adapter.port.IRetrievalSparseStore;
+import static org.mockito.Mockito.doReturn;
 import com.hector.domain.knowledge.model.entity.EmbeddingConfigEntity;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexGenerationEntity;
 import com.hector.domain.knowledge.model.entity.KnowledgeIndexStateEntity;
@@ -178,6 +180,75 @@ class KnowledgeRetrievalServiceImplTest {
         verifyNoInteractions(reranker);
         assertEquals(2, candidatesOnly.diagnostics().qdrantCandidates().size());
         assertTrue(candidatesOnly.diagnostics().rerankedCandidates().isEmpty());
+
+        // 完整 Chunk 诊断不改变原排序，并保留身份与逐 Chunk 分数。
+        when(reranker.rerank(eq("查询"), any())).thenReturn(List.of(
+                new RetrievalRerankScoreVO(0, 0.1D), new RetrievalRerankScoreVO(1, 0.9D)));
+        inject(service, "rerankWeight", 1D);
+        var abDense = service.retrieveWithEvaluationProfile(new RetrievalContextVO(2L, 1L), "查询",
+                new RetrievalOptionsVO(30, 2, 5), false);
+        assertEquals(2, abDense.diagnostics().rerankedChunks().size());
+        assertEquals("generation-12", abDense.diagnostics().rerankedChunks().get(0).generationId());
+        assertEquals(0, abDense.diagnostics().rerankedChunks().get(0).chunkNo());
+        assertEquals(0.9D, abDense.diagnostics().rerankedChunks().get(0).score());
+
+        // 混合接线独立检查：Dense 未命中的合法候选由 Sparse 补回，原 Dense 诊断不被替换。
+        IRetrievalSparseStore sparse = mock(IRetrievalSparseStore.class);
+        inject(service, "retrievalSparseStore", sparse);
+        inject(service, "hybridEnabled", true);
+        inject(service, "rerankWeight", 1D);
+        clearInvocations(sparse);
+        service.retrieveWithEvaluationProfile(new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 2, 5), false);
+        verifyNoInteractions(sparse);
+        when(vectors.searchCandidates("test_collection", 1L, List.of(0.1F, 0.2F, 0.3F), 30))
+                .thenReturn(List.of(candidate(11L, "generation-11", 0.9D)));
+        when(sparse.searchCandidates(1L, 7L, "查询", 30))
+                .thenReturn(List.of(candidate(12L, "generation-12", 0.8D)));
+        when(reranker.rerank(eq("查询"), any())).thenReturn(List.of(
+                new RetrievalRerankScoreVO(0, 0.1D), new RetrievalRerankScoreVO(1, 0.9D)));
+        var hybrid = service.retrieveWithEvaluationTrace(new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        assertEquals(12L, hybrid.result().hits().get(0).documentId());
+        assertEquals(1, hybrid.diagnostics().qdrantCandidates().size());
+        clearInvocations(sparse);
+        service.retrieveCandidatesWithEvaluationTrace(new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        verifyNoInteractions(sparse);
+
+        // Sparse 的旧 Generation 不能进入外部 Rerank；异常不破坏 Dense 回退。
+        when(sparse.searchCandidates(1L, 7L, "查询", 30))
+                .thenReturn(List.of(candidate(12L, "stale-generation", 0.8D)));
+        clearInvocations(reranker);
+        var stale = service.retrieveWithEvaluationTrace(new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        assertEquals(11L, stale.result().hits().get(0).documentId());
+        verifyNoInteractions(reranker);
+        when(sparse.searchCandidates(1L, 7L, "查询", 30)).thenThrow(new IllegalStateException("snapshot unavailable"));
+        var denseFallback = service.retrieveWithEvaluationTrace(new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        assertEquals(0.9D, denseFallback.result().hits().get(0).score());
+
+        // 合法 Sparse 候选在重排期间被撤销，也必须被返回前复核剔除。
+        doReturn(List.of(candidate(12L, "generation-12", 0.8D)))
+                .when(sparse).searchCandidates(1L, 7L, "查询", 30);
+        when(states.listByDocumentIds(any())).thenReturn(List.of(
+                KnowledgeIndexStateEntity.builder().documentId(11L).activeGenerationId("generation-11").build(),
+                KnowledgeIndexStateEntity.builder().documentId(12L).activeGenerationId("generation-12").build()),
+                List.of(KnowledgeIndexStateEntity.builder().documentId(11L).activeGenerationId("generation-11").build(),
+                        KnowledgeIndexStateEntity.builder().documentId(12L).activeGenerationId("new-generation").build()));
+        var revoked = service.retrieveWithEvaluationTrace(new RetrievalContextVO(2L, 1L), "查询", new RetrievalOptionsVO(30, 1, 1));
+        assertTrue(revoked.result().hits().isEmpty());
+
+        // 普通生产不再采用单文档额度；只有受控评测仍可复现旧额度。
+        inject(service, "hybridEnabled", false);
+        var firstChunk = candidate(11L, "generation-11", 0.9D);
+        var secondChunk = new RetrievalCandidateVO("point-second", 1L, 11L, 3L, 5L,
+                "generation-11", 1, List.of("标题"), "第二条证据", 1, 1, 0.8D);
+        when(vectors.searchCandidates("test_collection", 1L, List.of(0.1F, 0.2F, 0.3F), 30))
+                .thenReturn(List.of(firstChunk, secondChunk));
+        var unrestricted = service.retrieveWithEvaluationTrace(new RetrievalContextVO(2L, 1L), "查询",
+                new RetrievalOptionsVO(30, 1, 5));
+        assertEquals(2, unrestricted.result().hits().size());
+        assertTrue(unrestricted.result().hits().stream().allMatch(hit -> hit.documentId().equals(11L)));
+        var historical = service.retrieveWithEvaluationProfile(new RetrievalContextVO(2L, 1L), "查询",
+                new RetrievalOptionsVO(30, 1, 5), false);
+        assertEquals(1, historical.result().hits().size());
     }
 
     private RetrievalCandidateVO candidate(Long documentId, String generationId, Double score) {
