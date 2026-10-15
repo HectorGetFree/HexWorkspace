@@ -1,327 +1,160 @@
-# hex-workspace
+# HexWorkspace
 
-hex-workspace 是一个面向个人与团队文档资料库的智能工作台后端。当前版本已建立个人 Workspace、目录树、云文档及文档知识检索能力；新用户注册后会自动获得唯一的个人 Workspace。
+HexWorkspace 是面向个人资料与任务的智能工作台。Java 后端负责 Workspace、版本化文档、异步 RAG 与业务授权，通过服务接口集成独立的 [Hexgent](../hexgent) Agent Runtime；Vue 前端提供资料浏览、Markdown 编辑和 Agent 会话交互。
 
-项目后续将在现有 MVP 上继续完成 DocAI 的 DDD 重构与缺陷补足，并逐步演进为包含 AI Gateway、AI Orchestrator、Tool Runtime、RAG Runtime 和可观测体系的 AI 应用平台。
+项目是 Java 17 / Spring Boot 3.2 的 Maven 多模块单体，不是完整微服务平台。下文只描述当前源码能力，并保留可选开关及已知边界。
 
-> 当前版本标签：`mvp-v1`。README 中“已实现”仅描述当前代码中真实存在的能力，规划能力不会计入当前完成度。
+## 核心能力
 
-## 当前实现进度
+### 版本化资料与异步索引
 
-### 已实现
+- 用户注册、登录、JWT 认证，个人 Workspace、目录树与文档管理。
+- Markdown 创建和编辑，以及 TXT、Markdown、PDF、DOCX 上传；大小上限以运行配置为准。
+- 文档元数据与不可变 DocumentVersion 分离；原文、解析及 Chunk 产物保存到 MinIO。
+- 上传幂等键处理同一次请求重投，不等于按内容禁止用户再次上传。
+- UploadTask / IndexJob 登记处理意图，Outbox 负责可靠投递，RabbitMQ 驱动异步 Worker。
+- CAS + Token + Lease 支持竞争领取、续期、过期接管和旧执行者隔离；通过重试与补偿处理部分失败，不承诺跨 MySQL、MinIO、Qdrant 原子提交或端到端 exactly-once。
+- 每次构建使用独立 Generation；完成解析、结构感知分段、Embedding 和向量写入，经完整性与当前输入状态校验后，事务切换 Active 指针。
+- 支持过保留期的失效 Generation 回收和 staging 对象清理，避开当前有效引用。
 
-- 用户注册、登录、JWT 鉴权、当前用户查询与登出接口。
-- Workspace 聚合及 `PERSONAL`、`TEAM` 类型；新用户注册时在同一事务内创建默认个人 Workspace。
-- 已支持注册默认 Workspace、创建自己的资料 Workspace，以及查询当前用户拥有的 Workspace；协作权限将在 Folder/Document 层实现。
-- Workspace创建、查询，以及用户所属Workspace列表。
-- Workspace成员初始化、添加、查询和移除，并区分 `ADMIN`、`MEMBER` 等角色与成员状态。
-- 文档版本内容以 MinIO 对象快照保存，对用户不形成独立文件资源。
-- 文档及不可变版本建模，支持文档创建、列表、详情和解析状态查询。
-- 支持 TXT、Markdown、PDF、DOCX 文件上传，单文件上限 50 MB。
-- 通过 RabbitMQ 异步完成文档解析，解析文本作为文档版本的派生内容快照保存。
-- 章节优先、固定窗口兜底的文档分段策略，默认窗口 1000 字符、重叠 100 字符。
-- 通过 DashScope `text-embedding-v4` 批量生成 1024 维向量。
-- 使用 Qdrant 保存Workspace隔离的文档向量，支持 Top-K 语义检索。
-- 基于 OpenAI Chat Completions 兼容接口的单轮知识库问答，并返回实际检索来源。
-- AI 模型运行信息及连通性检测接口。
-- RAG `dataset-v1.0`、Baseline V1 执行器，以及 Hit Rate@6、Recall@6、MRR@6、回答正确率、拒答率和延迟指标。
-
-### 当前限制
-
-- 当前是单体、多 Maven 模块的后端 MVP，不是完整的微服务平台。
-- RAG 链路尚未实现独立 Reranker、Query Rewrite、Answer Judge 和对话 Memory。
-- 问答目前为单轮调用，没有 Planner、Workflow 或复杂 Agent 编排。
-- 尚未实现 API Gateway、AI Gateway、Tool Runtime，以及 CRM、DB、MQ 等工具连接器。
-- 尚未建立完整的 Trace、Cost、Metrics、Audit 体系。
-- `hex-workspace-queries` 当前是预留模块，尚无查询侧实现代码。
-- Java 自动化测试尚未补齐；当前 Maven 配置默认跳过测试。
-- `hex-workspace-app` 的 Spring Boot Maven 插件仍残留旧模板入口 `cn.bugstack.Application`；源码真实入口为 `com.hector.HexWorkspaceApplication`，当前应从 IDE 运行真实入口，打包 JAR 的启动配置需要后续修复。
-- 当前配置面向本地开发，生产环境的密钥管理、数据库迁移、容灾与安全加固仍需完善。
-
-## MVP 链路
+### 混合检索与可信结果
 
 ```text
-客户端
-  │
-  ├─ 注册 / 登录 ────────────────> JWT
-  │
-  └─ 上传文档
-       │
-       ├─ MySQL：文档与版本元数据
-       ├─ MinIO：文档初始内容快照
-       └─ RabbitMQ：解析事件
-              │
-              ▼
-         文档解析消费者
-              │
-              ├─ MinIO：解析后的 TXT 派生内容快照
-              ├─ Document Segmenter：章节识别与固定窗口分段
-              ├─ DashScope：Embedding
-              └─ Qdrant：Workspace级向量索引
-                         │
-                         ▼
-                   Search / RAG Ask
-                         │
-                         └─ OpenAI-compatible Chat Model
+Query Embedding → Dense + BM25 → RRF
+→ 首次 MySQL 权威校验 → 结构上下文 Rerank → 总 TopK
+→ 返回前权威复核 → 带不可变 versionId 的结果
 ```
+
+- Qdrant 按 Workspace 召回；进程内 BM25 复用 Generation Chunk 产物，后台全量刷新并原子发布快照。
+- BM25 使用英文正则切词，不具备中文分词能力；冷启动、快照不匹配或调用异常时回退 Dense。刷新失败保留旧快照，候选仍需权威复核。
+- RRF 融合排名；Rerank 输入为标题、章节路径和正文，只处理已通过首次权威校验的候选。
+- 校验 Workspace、目录、文档版本、输入修订号、Active/READY Generation 与 Serving Embedding 配置；返回前重读状态，剔除检索期间失效的候选。
+- 当前普通生产检索仅限制总 TopK；每文档限额与单机制 A/B 保留在受控评测入口。
+- Rerank 为可选能力，默认配置关闭；未启用或失败时保留召回顺序。完整链路需显式启用。
+
+### Agent 业务集成
+
+- Conversation / AgentRun 与 Hexgent Runtime Session 分离，支持启动、控制、事件流和权限确认适配。
+- Agent 通过 Capability 调用 `search_workspace`、`list_folder`、`get_document`、`create_document`、`update_document`。
+- 执行范围来自权威 Run 的用户、Workspace、状态和 allowedTools，不信任模型提供的身份。
+- `get_document` 按不可变 DocumentVersion 主键精确读取，支持分页；普通 HTTP API 的存在不代表 Agent 自动拥有对应工具。
 
 ## 工程结构
 
 ```text
-hex-workspace
-├── hex-workspace-app             # Spring Boot 启动模块与运行配置
-├── hex-workspace-api             # 对外 DTO、请求与统一响应模型
-├── hex-workspace-trigger         # HTTP Controller、安全过滤器、MQ Listener
-├── hex-workspace-domain          # 领域模型、领域服务、仓储与外部能力端口
-├── hex-workspace-infrastructure  # MyBatis、MinIO、RabbitMQ、模型与向量库适配器
-├── hex-workspace-types           # 通用枚举与业务异常
-├── hex-workspace-queries         # 查询侧预留模块
-├── docs/devops             # 本地依赖与 MySQL 初始化脚本
-└── rag-eval                # RAG 数据集、配置、执行器与运行结果目录
+hex-workspace-app/             启动、配置与装配
+hex-workspace-api/             请求、响应及接口 DTO
+hex-workspace-trigger/         HTTP、安全过滤器、MQ Listener、Job
+hex-workspace-domain/          领域规则、实体、服务及仓储/外部能力端口
+hex-workspace-infrastructure/  MyBatis、MinIO、MQ、模型、Qdrant 等实现
+hex-workspace-types/           通用枚举和异常
+hex-workspace-queries/         查询侧预留模块
+frontend/                     Vue 3 / TypeScript / Vite / Element Plus
+docs/devops/                  本地基础设施和数据库初始化
+rag-eval/                     数据合同、执行器、评分及实验说明
 ```
-
-当前领域主要包括：
-
-- `user`：平台用户。
-- `auth`：密码校验、JWT 签发与认证会话。
-- `Workspace`：Workspace及其生命周期。
-- `membership`：用户与Workspace之间的资源协作关系。
-- `document`：云文档、不可变版本、内容快照和异步解析状态。
-- `knowledge`：分段、向量化、检索和知识库问答。
-- `workspace`：Workspace 类型、生命周期和默认个人 Workspace 创建；资源树和成员迁移尚未完成。
-
-## 技术栈
-
-- Java 17
-- Spring Boot 3.2
-- Spring Security + JWT
-- Maven 多模块工程
-- MyBatis + MySQL 8
-- Redis / Redisson
-- RabbitMQ
-- MinIO
-- Qdrant
-- Apache PDFBox / Apache POI
-- DashScope Embedding API
-- OpenAI Chat Completions 兼容 API
-- Python 3（仅用于 RAG 评测脚本）
 
 ## 本地启动
 
-### 1. 环境要求
+要求 JDK 17、Maven、Docker Compose；前端需要支持当前 Vite 的 Node.js。索引/检索需要匹配的 Embedding 配置；Agent 执行另需 Hexgent 与 Responses 兼容模型服务。
 
-- JDK 17
-- Maven 3.8+
-- Docker 与 Docker Compose
-- Python 3.10+（仅运行 RAG 评测时需要）
-- 可用的 DashScope API Key
-- 可用的 OpenAI API Key，或兼容 Chat Completions 的服务地址与密钥
-
-### 2. 启动基础设施
+### 基础设施
 
 ```bash
 docker compose -f docs/devops/docker-compose.yml up -d
 ```
 
-默认端口：
+默认端口：MySQL `13306`、Redis `16379`、MinIO API/Console `19000/19001`、RabbitMQ/Console `5672/15672`、Qdrant HTTP/gRPC `6333/6334`。
 
-| 服务 | 地址或端口 |
+首次创建数据卷时执行 `docs/devops/mysql/sql/` 初始化。已有卷不会自动重放脚本；升级前备份并核对结构，不要为启动直接删除已有卷。
+
+### 后端
+
+配置入口：`hex-workspace-app/src/main/resources/application-dev.yml`。不要提交真实密钥；环境变量必须在启动后端的终端设置。
+
+```bash
+export DASHSCOPE_API_KEY='你的 Embedding API Key'
+# 可选：启用完整重排，endpoint 按账号区域配置。
+export HEX_WORKSPACE_RERANK_ENABLED=true
+export DASHSCOPE_RERANK_API_KEY='你的 Rerank API Key'
+# 较大语料按内存预算提高上限；默认 400 万正文字符。
+# export HEX_WORKSPACE_BM25_MAX_SOURCE_CHARS=12000000
+
+mvn -pl hex-workspace-app -am -DskipTests package
+java -jar hex-workspace-app/target/hex-workspace-app.jar --spring.profiles.active=dev
+```
+
+默认地址 `http://127.0.0.1:8098`，启动类 `com.hector.HexWorkspaceApplication`。
+
+### 前端
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Vite 将 `/api` 代理到本地 8098；模型密钥不得交给浏览器。
+
+### 可选：连接 Hexgent
+
+在 Hexgent 项目启动 Service：
+
+```bash
+python -m hexgent.adapters.web --host 127.0.0.1 --port 8000
+```
+
+Java 端使用 `HEXGENT_RUNTIME_URL`（默认 `http://127.0.0.1:8000`）。按实际部署设置两端匹配的：
+
+| 变量 | 用途 |
 | --- | --- |
-| MySQL | `127.0.0.1:13306` |
-| Redis | `127.0.0.1:16379` |
-| MinIO API | `http://127.0.0.1:19000` |
-| MinIO Console | `http://127.0.0.1:19001` |
-| RabbitMQ | `127.0.0.1:5672` |
-| RabbitMQ Console | `http://127.0.0.1:15672` |
-| Qdrant HTTP | `http://127.0.0.1:6333` |
+| `HEXGENT_WORKSPACE_INTEGRATION_TOKEN` | Workspace → Runtime 命令 |
+| `HEXGENT_WORKSPACE_CAPABILITY_TOKEN` | Runtime → Workspace 业务工具 |
+| `HEXGENT_WORKSPACE_LIFECYCLE_TOKEN` | 生命周期回调 |
 
-首次创建 Docker 数据卷时，MySQL 会自动执行 `docs/devops/mysql/sql/001-init-hex-workspace.sql`。当前不保留旧领域模型的增量迁移脚本；已有旧数据卷需要重建后再启动本版本。
+Runtime 还需 `HEXGENT_WORKSPACE_URL`；启用回调时配置 `HEXGENT_WORKSPACE_LIFECYCLE_URL`。内部 Token 不能替代最终用户授权，协议以两端 integration 源码为准。
 
-### 3. 配置模型密钥
+## 接口入口
 
-不要把真实密钥写入或提交到配置文件。启动前设置环境变量：
+普通业务接口使用 JWT；Runtime、Capability、回调及评测接口使用各自独立凭证。
 
-```bash
-export DASHSCOPE_API_KEY='你的 DashScope API Key'
-export OPENAI_API_KEY='你的 OpenAI 或兼容服务 API Key'
-export OPENAI_BASE_URL='https://api.openai.com/v1'
-```
+| 能力 | 入口 |
+| --- | --- |
+| 用户认证 | `/api/v1/users/*` |
+| Workspace / 目录 / 文档 | `/api/v1/workspaces/*` |
+| 创建会话 | `POST /api/v1/workspaces/{workspaceId}/conversations` |
+| 启动 Run | `POST /api/v1/conversations/{conversationId}/runs` |
+| Agent Capability | `POST /internal/agent/capabilities/invoke` |
+| 受控检索评测 | `/internal/v1/evaluation/retrieval*` |
 
-默认模型配置位于 `hex-workspace-app/src/main/resources/application-dev.yml`：
+旧 `/knowledge/search`、`/knowledge/ask` 默认关闭，不是当前 Agent 可信检索入口。当前检索服务要求 Workspace ACTIVE 且调用者为 Owner；成员存在不等于已支持任意成员检索。
 
-- Embedding：`text-embedding-v4`，1024 维。
-- Chat：`gpt-5.4`。
+## 评测与验证
 
-如兼容服务不支持默认 Chat 模型，请在本地配置中调整 `ai.chat.openai.model`。
+- SciFact：5,183 份文档、300 条 test Query，按公开相关文档标注评分。
+- Java Notes：34 份资料、143 条 Query，同时统计文档命中和证据组覆盖；保留语义审核待完成的草案状态。
+- 就绪检查、Generation/快照哈希、逐请求诊断、失败账本和 Resume 防重复机制支撑追溯。
+- TopK Chunk 与 TopK 不同文档不能混算；本地 Token 估算不是 Provider Usage，检索命中也不等于最终回答正确。
 
-### 4. 构建并启动
-
-```bash
-mvn clean package -DskipTests
-```
-
-当前请在 IntelliJ IDEA 中运行：
-
-```text
-hex-workspace-app/src/main/java/com/hector/HexWorkspaceApplication.java
-```
-
-现有 `hex-workspace-app/pom.xml` 的 Spring Boot Maven 插件仍指向旧模板入口，因此暂不建议直接执行打包 JAR。修正插件的 `mainClass` 和版本后，再恢复标准的 `java -jar` 或 `spring-boot:run` 启动方式。
-
-应用默认监听：
-
-```text
-http://127.0.0.1:8098
-```
-
-## 核心 API
-
-除注册、登录和 `/error` 外，其余接口均需要：
-
-```http
-Authorization: Bearer <JWT>
-```
-
-| 能力 | 方法 | 路径 |
-| --- | --- | --- |
-| 用户注册 | POST | `/api/v1/users/register` |
-| 用户登录 | POST | `/api/v1/users/login` |
-| 用户登出 | POST | `/api/v1/users/logout` |
-| 当前用户 | GET | `/api/v1/users/me` |
-| 查询我的 Workspace | GET | `/api/v1/workspaces/my` |
-| 查询根目录 | GET | `/api/v1/workspaces/{workspaceId}/folders/root` |
-| 查询目录内容 | GET | `/api/v1/workspaces/{workspaceId}/folders/{folderId}/children` |
-| 新建文件夹 | POST | `/api/v1/workspaces/{workspaceId}/folders` |
-| 文件夹重命名 | PATCH | `/api/v1/workspaces/{workspaceId}/folders/{folderId}/name` |
-| 移动文件夹 | PATCH | `/api/v1/workspaces/{workspaceId}/folders/{folderId}/parent` |
-| 删除文件夹 | DELETE | `/api/v1/workspaces/{workspaceId}/folders/{folderId}` |
-| 上传云文档 | POST | `/api/v1/workspaces/{workspaceId}/documents` |
-| 新建 Markdown | POST | `/api/v1/workspaces/{workspaceId}/documents/markdown` |
-| 文档列表 | GET | `/api/v1/workspaces/{workspaceId}/documents` |
-| 文档详情 | GET | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}` |
-| 编辑 Markdown | PUT | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/content` |
-| 文档重命名 | PATCH | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/name` |
-| 移动文档 | PATCH | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}/parent` |
-| 删除文档 | DELETE | `/api/v1/workspaces/{workspaceId}/documents/{documentCode}` |
-| 知识检索 | GET | `/api/v1/workspaces/{workspaceId}/knowledge/search?question=...` |
-| 知识问答 | POST | `/api/v1/workspaces/{workspaceId}/knowledge/ask` |
-| AI 运行信息 | GET | `/api/v1/ai/runtime-info` |
-| AI 连通性检测 | GET | `/api/v1/ai/ping` |
-
-统一响应格式：
-
-```json
-{
-  "code": "0000",
-  "info": "成功",
-  "data": {}
-}
-```
-
-### 最小调用示例
-
-注册：
+参阅 [评测总览](rag-eval/README.md)、[SciFact 重测](rag-eval/PRODUCTION_SCIFACT.md)、[业务集重测](rag-eval/PRODUCTION_BUSINESS.md)、[业务 A/B](rag-eval/BUSINESS_AB.md)、[Top5 Chunk](rag-eval/SCIFACT_CHUNK_TOP5.md)。缓存、运行结果和部分派生数据被 Git 忽略，克隆仓库不一定包含全部复现资产。
 
 ```bash
-curl -X POST 'http://127.0.0.1:8098/api/v1/users/register' \
-  -H 'Content-Type: application/json' \
-  -d '{"data":{"username":"hector","password":"123456"}}'
-```
-
-登录：
-
-```bash
-curl -X POST 'http://127.0.0.1:8098/api/v1/users/login' \
-  -H 'Content-Type: application/json' \
-  -d '{"data":{"username":"hector","password":"123456"}}'
-```
-
-上传文档：
-
-```bash
-curl -X POST 'http://127.0.0.1:8098/api/v1/workspaces/1/documents' \
-  -H 'Authorization: Bearer <JWT>' \
-  -F 'file=@./demo.pdf' \
-  -F 'parentId=1'
-```
-
-知识库问答：
-
-```bash
-curl -X POST 'http://127.0.0.1:8098/api/v1/workspaces/1/knowledge/ask' \
-  -H 'Authorization: Bearer <JWT>' \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"这份文档的主要内容是什么？"}'
-```
-
-## RAG 评测
-
-评测资产位于 `rag-eval/`。`dataset-v1.0` 包含 40 份自编语料与 240 条固定问题，其中 train 40 条、dev 40 条、test 160 条。
-
-首次在专用评测Workspace中运行：
-
-```bash
-export HEX_WORKSPACE_TOKEN='<JWT>'
-export HEX_WORKSPACE_WORKSPACE_ID=1
-python3 rag-eval/scripts/run_baseline_v1.py --upload
-```
-
-复用已有文档映射：
-
-```bash
-python3 rag-eval/scripts/run_baseline_v1.py \
-  --document-map rag-eval/runs/baseline-v1-<timestamp>/document-map.json
-```
-
-运行结果写入 `rag-eval/runs/<runId>/`，该目录已被 Git 忽略。更完整的约定见 `rag-eval/README.md`。
-
-## 后续演进方向
-
-计划架构：
-
-```text
-API Gateway
-    │
-AI Gateway
-路由 / 鉴权 / 限流 / 缓存
-    │
-AI Orchestrator
-Planner + Workflow
-    │
-    ├── Tool Runtime ── CRM / DB / MQ
-    │
-    └── RAG Runtime
-          ├── Retriever
-          ├── Reranker
-          ├── Query Rewrite
-          ├── Answer Judge
-          └── Memory
-    │
-Monitoring
-Trace / Cost / Metrics / Audit
-```
-
-建议按以下顺序演进：
-
-1. 以当前 MVP 为基线，审计并补足 DocAI 的领域边界、事务、一致性、测试和运维缺陷。
-2. 收紧模块依赖方向，完善聚合、应用服务、领域事件和查询侧边界。
-3. 将 RAG 能力拆分为可替换的 Retriever、Reranker、Query Rewrite、Answer Judge 和 Memory 组件。
-4. 引入 AI Orchestrator，承载 Planner 与可持久化 Workflow。
-5. 建设 Tool Runtime，并通过受控端口连接 CRM、DB、MQ 等外部系统。
-6. 建设 AI Gateway 和 API Gateway，统一模型路由、鉴权、限流与缓存。
-7. 补齐全链路 Trace、Token/Cost、Metrics 和 Audit。
-
-## 构建验证
-
-当前主分支已通过：
-
-```bash
-mvn -DskipTests package
+# 部分 IntegrationTest 依赖 Docker / 数据库；真实 Provider Smoke 需单独审阅费用与开关。
+mvn -pl hex-workspace-infrastructure -am test
+# app 测试默认跳过，需要时显式开启：
+# mvn -pl hex-workspace-app -am test -Dapp.tests.skip=false
 docker compose -f docs/devops/docker-compose.yml config --quiet
+cd frontend && npm run typecheck
 ```
 
-Compose 会提示顶层 `version` 字段已过时，但不影响当前配置解析与运行。
+## 当前边界
+
+- 开发配置不等于生产安全配置；部署前检查自动批准、内部 Token、网络暴露、密钥与备份。
+- BM25 全量刷新且仅保存在进程内，不保证发布后立即完成 Sparse 更新。
+- 返回前校验不是跨资源快照事务；剔除失效候选后不承诺补满 TopK。
+- Runtime 工具、Memory 和恢复语义由 Hexgent 实现，Java AgentRun 不是 Runtime Transcript 的替代品。
+- README 不把历史测试通过数、单次真实实验或离线契约测试描述为线上可靠性承诺。
 
 ## License
 
-Apache License 2.0。
+项目 POM 声明 Apache License 2.0；当前根目录未提供独立 LICENSE 文件，发布前应补齐许可证正文及第三方声明。
